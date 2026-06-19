@@ -1,0 +1,193 @@
+import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/storage/secure_storage.dart';
+import '../../core/socket/socket_service.dart';
+import '../../data/models/user_model.dart';
+import '../../data/repositories/auth_repository.dart';
+
+final authStateProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
+  return AuthNotifier(
+    ref.read(authRepositoryProvider),
+    ref.read(secureStorageProvider),
+    ref.read(socketServiceProvider),
+  );
+});
+
+final currentUserProvider = Provider<UserModel?>((ref) {
+  return ref.watch(authStateProvider).user;
+});
+
+class AuthState {
+  final bool isLoading;
+  final UserModel? user;
+  final bool isAuthenticated;
+  final String? error;
+  final List<OrgSelectionModel> orgOptions;
+  final String? pendingPhone;
+  final String? pendingPassword;
+
+  const AuthState({
+    this.isLoading = false,
+    this.user,
+    this.isAuthenticated = false,
+    this.error,
+    this.orgOptions = const [],
+    this.pendingPhone,
+    this.pendingPassword,
+  });
+
+  AuthState copyWith({
+    bool? isLoading,
+    UserModel? user,
+    bool? isAuthenticated,
+    String? error,
+    List<OrgSelectionModel>? orgOptions,
+    String? pendingPhone,
+    String? pendingPassword,
+  }) {
+    return AuthState(
+      isLoading: isLoading ?? this.isLoading,
+      user: user ?? this.user,
+      isAuthenticated: isAuthenticated ?? this.isAuthenticated,
+      error: error,
+      orgOptions: orgOptions ?? this.orgOptions,
+      pendingPhone: pendingPhone ?? this.pendingPhone,
+      pendingPassword: pendingPassword ?? this.pendingPassword,
+    );
+  }
+}
+
+class AuthNotifier extends StateNotifier<AuthState> {
+  final AuthRepository _repo;
+  final SecureStorageService _storage;
+  final SocketService _socket;
+
+  AuthNotifier(this._repo, this._storage, this._socket) : super(const AuthState());
+
+  Future<void> checkAuth() async {
+    state = state.copyWith(isLoading: true);
+    try {
+      final isLoggedIn = await _storage.isLoggedIn();
+      if (isLoggedIn) {
+        final user = await _repo.getUserByToken();
+        if (user != null) {
+          state = state.copyWith(isLoading: false, user: user, isAuthenticated: true);
+          await _socket.connect();
+          _socket.joinOrgRoom(user.baiguullagiinId);
+          _socket.joinUserRoom(user.id);
+          return;
+        }
+      }
+      state = state.copyWith(isLoading: false, isAuthenticated: false);
+    } catch (_) {
+      state = state.copyWith(isLoading: false, isAuthenticated: false);
+    }
+  }
+
+  Future<LoginResult> login(String phone, String password, {String? baiguullagiinId}) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final data = await _repo.login(
+        phone: phone,
+        password: password,
+        baiguullagiinId: baiguullagiinId,
+      );
+
+      if (data['multipleOrgs'] == true) {
+        final baiguullaguud = data['baiguullaguud'] as List?;
+        final orgs = (baiguullaguud ?? []).map((e) => OrgSelectionModel.fromJson(e as Map<String, dynamic>)).toList();
+        state = state.copyWith(
+          isLoading: false,
+          orgOptions: orgs,
+          pendingPhone: phone,
+          pendingPassword: password,
+        );
+        return LoginResult.needsOrgSelection;
+      }
+
+      return await _handleLoginSuccess(data, phone);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: _parseError(e));
+      return LoginResult.error;
+    }
+  }
+
+  Future<LoginResult> loginWithOrg(OrgSelectionModel org) async {
+    if (state.pendingPhone == null || state.pendingPassword == null) {
+      return LoginResult.error;
+    }
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final data = await _repo.login(
+        phone: state.pendingPhone!,
+        password: state.pendingPassword!,
+        baiguullagiinId: org.id,
+        barilgiinId: org.barilgiinId,
+      );
+      return await _handleLoginSuccess(data, state.pendingPhone!);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: _parseError(e));
+      return LoginResult.error;
+    }
+  }
+
+  Future<LoginResult> _handleLoginSuccess(Map<String, dynamic> data, String phone) async {
+    final token = data['token']?.toString() ?? '';
+    final khariltsagch = data['result'] as Map<String, dynamic>?;
+
+    if (token.isEmpty || khariltsagch == null) {
+      state = state.copyWith(isLoading: false, error: 'Нэвтрэх мэдээлэл буруу байна');
+      return LoginResult.error;
+    }
+
+    await _storage.saveToken(token);
+    final user = UserModel.fromJson({...khariltsagch, 'token': token});
+
+    await _storage.saveUserData(
+      role: user.zochinTurul,
+      orgId: user.baiguullagiinId,
+      buildingId: user.barilgiinId,
+      userId: user.id,
+      phone: phone,
+      userName: user.ner,
+      userRegister: user.register,
+    );
+
+    state = state.copyWith(isLoading: false, user: user, isAuthenticated: true);
+    await _socket.connect();
+    _socket.joinOrgRoom(user.baiguullagiinId);
+    _socket.joinUserRoom(user.id);
+    return LoginResult.success;
+  }
+
+  Future<void> logout() async {
+    _socket.disconnect();
+    await _storage.clearAll();
+    state = const AuthState();
+  }
+
+  String _parseError(Object e) {
+    if (e is DioException) {
+      final data = e.response?.data;
+      if (data is Map) {
+        final serverMsg = data['aldaa'] ?? data['message'];
+        if (serverMsg != null) return serverMsg.toString();
+      }
+      if (e.response?.statusCode == 401) return 'Нууц үг буруу байна';
+      if (e.response?.statusCode == 404) return 'Хэрэглэгч олдсонгүй';
+      if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.receiveTimeout) {
+        return 'Холболтын хугацаа дууссан';
+      }
+      if (e.type == DioExceptionType.connectionError) return 'Интернет холболт байхгүй';
+    }
+    final msg = e.toString();
+    if (msg.contains('401') || msg.contains('Unauthorized')) return 'Нууц үг буруу байна';
+    if (msg.contains('404')) return 'Хэрэглэгч олдсонгүй';
+    if (msg.contains('SocketException')) return 'Интернет холболт байхгүй';
+    return 'Алдаа гарлаа. Дахин оролдоно уу';
+  }
+
+  void clearError() => state = state.copyWith(error: null);
+}
+
+enum LoginResult { success, needsOrgSelection, error }
