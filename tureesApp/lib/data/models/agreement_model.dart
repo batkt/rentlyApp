@@ -48,6 +48,31 @@ class AgreementModel {
   bool get isActive => tuluv == 1;
   bool get hasDebt => uldegdel > 0;
 
+  AgreementModel copyWith({double? uldegdel}) {
+    return AgreementModel(
+      id: id,
+      gereeniiDugaar: gereeniiDugaar,
+      gereeniiOgnoo: gereeniiOgnoo,
+      ner: ner,
+      ovog: ovog,
+      register: register,
+      utas: utas,
+      talbainDugaar: talbainDugaar,
+      talbainIdnuud: talbainIdnuud,
+      khugatsaa: khugatsaa,
+      tuluv: tuluv,
+      uldegdel: uldegdel ?? this.uldegdel,
+      baiguullagiinId: baiguullagiinId,
+      barilgiinId: barilgiinId,
+      davkhar: davkhar,
+      talbainKhemjee: talbainKhemjee,
+      uneKhemjee: uneKhemjee,
+      avlaga: avlaga,
+      zardluud: zardluud,
+      duusakhOgnoo: duusakhOgnoo,
+    );
+  }
+
   factory AgreementModel.fromJson(Map<String, dynamic> json) {
     return AgreementModel(
       id: json['_id']?.toString() ?? '',

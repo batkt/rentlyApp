@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../data/models/chat_model.dart';
@@ -24,6 +27,7 @@ class ChatDetailScreen extends ConsumerStatefulWidget {
 class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
+  final _imagePicker = ImagePicker();
 
   @override
   void dispose() {
@@ -52,6 +56,92 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     _scrollToBottom();
   }
 
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final picked = await _imagePicker.pickImage(
+        source: source,
+        imageQuality: 80,
+        maxWidth: 1280,
+      );
+      if (picked == null) return;
+      final file = File(picked.path);
+      final text = _messageController.text.trim();
+      _messageController.clear();
+      await ref.read(messagesProvider(widget.conversationId).notifier)
+          .sendWithImage(file, text: text.isEmpty ? null : text);
+      _scrollToBottom();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Зураг сонгоход алдаа гарлаа'), backgroundColor: AppColors.error),
+      );
+    }
+  }
+
+  void _showAttachmentOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        margin: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: context.appCardBg,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 32,
+              height: 3,
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: context.appDivider,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            ListTile(
+              leading: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.photo_library_rounded, color: AppColors.primary),
+              ),
+              title: const Text('Зургийн цомгоос', style: TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: const Text('Хадгалсан зурга сонгох'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickImage(ImageSource.gallery);
+              },
+            ),
+            ListTile(
+              leading: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.info.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.camera_alt_rounded, color: AppColors.info),
+              ),
+              title: const Text('Камер', style: TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: const Text('Шинэ зураг авах'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickImage(ImageSource.camera);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(messagesProvider(widget.conversationId));
@@ -77,15 +167,20 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             CircleAvatar(
               radius: 18,
               backgroundColor: AppColors.success,
-              child: Text(name.isNotEmpty ? name[0].toUpperCase() : 'З',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+              child: Text(
+                name.isNotEmpty ? name[0].toUpperCase() : 'З',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+              ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(name, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                  Text(
+                    name,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                  ),
                   const Text('Онлайн', style: TextStyle(fontSize: 11, color: AppColors.success)),
                 ],
               ),
@@ -127,6 +222,23 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               );
             }),
           ),
+          if (state.error != null)
+            Container(
+              color: context.appErrorLight,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline, size: 14, color: AppColors.error),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      state.error!,
+                      style: const TextStyle(fontSize: 12, color: AppColors.error),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           _buildInputBar(state),
         ],
       ),
@@ -150,9 +262,28 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         color: context.appSurface,
         border: Border(top: BorderSide(color: context.appDivider)),
       ),
-      padding: EdgeInsets.fromLTRB(16, 10, 8, MediaQuery.of(context).padding.bottom + 10),
+      padding: EdgeInsets.fromLTRB(12, 10, 12, MediaQuery.of(context).padding.bottom + 10),
       child: Row(
         children: [
+          // Attach button
+          GestureDetector(
+            onTap: state.isSending ? null : _showAttachmentOptions,
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: context.appInputFill,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: context.appDivider),
+              ),
+              child: Icon(
+                Icons.attach_file_rounded,
+                color: state.isSending ? context.appTextTertiary : AppColors.primary,
+                size: 20,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           Expanded(
             child: Container(
               decoration: BoxDecoration(
@@ -186,7 +317,10 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                 shape: BoxShape.circle,
               ),
               child: state.isSending
-                  ? const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
                   : const Icon(Icons.send_rounded, color: Colors.white, size: 20),
             ),
           ),
@@ -224,7 +358,6 @@ class _MessageBubble extends StatelessWidget {
           Flexible(
             child: Container(
               constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.72),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: isMine ? AppColors.primary : context.appCardBg,
                 borderRadius: BorderRadius.only(
@@ -238,19 +371,45 @@ class _MessageBubble extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    message.content,
-                    style: TextStyle(
-                      color: isMine ? Colors.white : context.appTextPrimary,
-                      fontSize: 14,
+                  if (message.hasImage)
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                      child: Image.network(
+                        message.imageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          height: 120,
+                          color: context.appInputFill,
+                          child: const Icon(Icons.broken_image_rounded, color: AppColors.textTertiary),
+                        ),
+                        loadingBuilder: (_, child, progress) => progress == null
+                            ? child
+                            : Container(
+                                height: 120,
+                                alignment: Alignment.center,
+                                child: const CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                              ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    message.createdAt != null ? AppFormatters.dateTime(message.createdAt) : '',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: isMine ? Colors.white60 : context.appTextTertiary,
+                  if (message.content.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+                      child: Text(
+                        message.content,
+                        style: TextStyle(
+                          color: isMine ? Colors.white : context.appTextPrimary,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+                    child: Text(
+                      message.createdAt != null ? AppFormatters.dateTime(message.createdAt) : '',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: isMine ? Colors.white60 : context.appTextTertiary,
+                      ),
                     ),
                   ),
                 ],

@@ -1,8 +1,13 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:local_auth/local_auth.dart';
+import '../../../core/services/biometric_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/storage/secure_storage.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../providers/auth_provider.dart';
 
@@ -13,7 +18,8 @@ class LoginScreen extends ConsumerStatefulWidget {
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -26,17 +32,59 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   String? _selectedOrgId;
   String _lastCheckedPhone = '';
 
+  bool _canUseBiometric = false;
+  bool _biometricEnabled = false;
+  bool _isBiometricLoading = false;
+
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _fadeController = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
+    _fadeAnim = CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
+    _fadeController.forward();
+    _initBiometric();
+  }
+
+  Future<void> _initBiometric() async {
+    final bio = ref.read(biometricServiceProvider);
+    final storage = ref.read(secureStorageProvider);
+    final available = await bio.isAvailable;
+    final enabled = await storage.isBiometricEnabled();
+    final hasToken = await storage.isLoggedIn();
+    if (mounted) {
+      setState(() {
+        _canUseBiometric = available && hasToken;
+        _biometricEnabled = enabled;
+      });
+      // Auto-trigger biometric if previously enabled
+      if (available && enabled && hasToken) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _doBiometricLogin());
+      }
+    }
+  }
+
+  Future<void> _doBiometricLogin() async {
+    setState(() => _isBiometricLoading = true);
+    final success = await ref.read(authStateProvider.notifier).loginWithBiometric();
+    if (!mounted) return;
+    setState(() => _isBiometricLoading = false);
+    if (success) context.go('/home');
+  }
+
   @override
   void dispose() {
     _phoneController.dispose();
     _passwordController.dispose();
+    _fadeController.dispose();
     super.dispose();
   }
 
   Future<void> _checkPhone(String phone) async {
     if (phone.length != 8 || phone == _lastCheckedPhone) return;
     _lastCheckedPhone = phone;
-
     setState(() {
       _isCheckingPhone = true;
       _phoneError = null;
@@ -44,11 +92,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _orgs = [];
       _selectedOrgId = null;
     });
-
     try {
       final data = await ref.read(authRepositoryProvider).verifyPhone(phone);
       if (!mounted) return;
-
       final exists = data['exists'] as bool? ?? false;
       if (!exists) {
         setState(() {
@@ -57,10 +103,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         });
         return;
       }
-
       final rawOrgs = (data['baiguullaguud'] as List?) ?? [];
       final orgs = rawOrgs.map((e) => _OrgItem.fromJson(e as Map<String, dynamic>)).toList();
-
       setState(() {
         _isCheckingPhone = false;
         _phoneVerified = true;
@@ -85,16 +129,46 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _passwordController.text,
       baiguullagiinId: _selectedOrgId,
     );
-
     if (!mounted) return;
 
-    switch (result) {
-      case LoginResult.success:
-        context.go('/home');
-      case LoginResult.needsOrgSelection:
-        context.push('/org-select');
-      case LoginResult.error:
-        break;
+    if (result == LoginResult.success) {
+      // Offer biometric setup on first successful login
+      if (_canUseBiometric && !_biometricEnabled) {
+        await _offerBiometricSetup();
+      }
+      context.go('/home');
+    } else if (result == LoginResult.needsOrgSelection) {
+      context.push('/org-select');
+    }
+  }
+
+  Future<void> _offerBiometricSetup() async {
+    final icon = Platform.isIOS ? Icons.face_rounded : Icons.fingerprint_rounded;
+    final label = Platform.isIOS ? 'Face ID' : 'Хурууны хээ';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(icon, color: AppColors.primary),
+            const SizedBox(width: 10),
+            Text('$label идэвхжүүлэх'),
+          ],
+        ),
+        content: Text('Дараагаас $label ашиглан хурдан нэвтрэх үү?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Үгүй')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Тийм'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await ref.read(authStateProvider.notifier).enableBiometric();
+      setState(() => _biometricEnabled = true);
     }
   }
 
@@ -112,16 +186,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final authState = ref.watch(authStateProvider);
 
-    ref.listen(authStateProvider, (prev, next) {
+    ref.listen(authStateProvider, (_, next) {
       if (next.error != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(next.error!),
             backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             margin: const EdgeInsets.all(16),
           ),
         );
@@ -133,22 +208,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final showOrgSelector = _phoneVerified && _orgs.length > 1 && _selectedOrgId == null;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFEDF7F5),
+      backgroundColor: isDark ? const Color(0xFF0D1514) : const Color(0xFFEDF7F5),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              children: [
-                SizedBox(height: MediaQuery.sizeOf(context).height * 0.08),
-                _buildHeader(),
-                const SizedBox(height: 32),
-                _buildCard(authState, showPasswordSection, showOrgSelector),
-                const SizedBox(height: 32),
-                _buildFooter(),
-                const SizedBox(height: 24),
-              ],
+        child: FadeTransition(
+          opacity: _fadeAnim,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  SizedBox(height: MediaQuery.sizeOf(context).height * 0.07),
+                  _buildHeader(isDark),
+                  const SizedBox(height: 28),
+                  _buildCard(context, isDark, authState, showPasswordSection, showOrgSelector),
+                  if (_canUseBiometric) ...[
+                    const SizedBox(height: 20),
+                    _buildBiometricButton(isDark),
+                  ],
+                  const SizedBox(height: 24),
+                  _buildFooter(isDark),
+                  const SizedBox(height: 24),
+                ],
+              ),
             ),
           ),
         ),
@@ -156,87 +238,105 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(bool isDark) {
     return Column(
       children: [
         Container(
-          width: 76,
-          height: 76,
+          width: 80,
+          height: 80,
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [AppColors.primary, AppColors.primaryLight],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
                 color: AppColors.primary.withOpacity(0.35),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
+                blurRadius: 28,
+                offset: const Offset(0, 12),
               ),
             ],
           ),
-          child: const Icon(Icons.apartment_rounded, color: Colors.white, size: 40),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: Image.asset(
+              'assets/images/rently.png',
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [AppColors.primary, AppColors.primaryLight],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: const Icon(Icons.apartment_rounded, color: Colors.white, size: 42),
+              ),
+            ),
+          ),
         ),
-        const SizedBox(height: 14),
-        const Text(
-          'Хэрэглэгчийн платформ',
+        const SizedBox(height: 16),
+        Text(
+          'Rently',
           style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: AppColors.primary,
-            letterSpacing: 0.2,
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            color: isDark ? Colors.white : AppColors.primary,
+            letterSpacing: -0.5,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Түрээсийн удирдлагын систем',
+          style: TextStyle(
+            fontSize: 13,
+            color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildCard(AuthState authState, bool showPasswordSection, bool showOrgSelector) {
+  Widget _buildCard(BuildContext context, bool isDark, AuthState authState,
+      bool showPasswordSection, bool showOrgSelector) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1A2826) : Colors.white,
         borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.07),
-            blurRadius: 30,
-            offset: const Offset(0, 10),
-          ),
-          BoxShadow(
-            color: AppColors.primary.withOpacity(0.04),
-            blurRadius: 0,
-            spreadRadius: 1,
-          ),
-        ],
+        border: isDark ? Border.all(color: const Color(0xFF2D3B39)) : null,
+        boxShadow: isDark
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.07),
+                  blurRadius: 30,
+                  offset: const Offset(0, 10),
+                ),
+              ],
       ),
       padding: const EdgeInsets.all(28),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
+          Text(
             'Нэвтрэх',
             style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: isDark ? Colors.white : AppColors.textPrimary,
+              letterSpacing: -0.3,
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
-            'Та утасны дугаараа оруулан нэвтэрнэ үү.',
+          Text(
+            'Утасны дугаараа оруулан нэвтэрнэ үү.',
             style: TextStyle(
               fontSize: 13,
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w500,
+              color: isDark ? const Color(0xFF64748B) : AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 28),
-          _buildPhoneField(),
+          _buildPhoneField(isDark),
           if (showOrgSelector) ...[
             const SizedBox(height: 16),
-            _buildOrgSelector(),
+            _buildOrgSelector(isDark),
           ],
           AnimatedSize(
             duration: const Duration(milliseconds: 280),
@@ -246,11 +346,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const SizedBox(height: 16),
-                      if (_orgs.length > 1 && _selectedOrgId != null)
-                        _buildSelectedOrgChip(),
-                      if (_orgs.length > 1 && _selectedOrgId != null)
+                      if (_orgs.length > 1 && _selectedOrgId != null) ...[
+                        _buildSelectedOrgChip(isDark),
                         const SizedBox(height: 12),
-                      _buildPasswordField(),
+                      ],
+                      _buildPasswordField(isDark),
                       const SizedBox(height: 24),
                       _buildLoginButton(authState),
                     ],
@@ -258,21 +358,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 : const SizedBox.shrink(),
           ),
           const SizedBox(height: 20),
-          _buildDivider(),
+          _buildDivider(isDark),
           const SizedBox(height: 16),
-          _buildResetButton(),
+          _buildResetButton(isDark),
         ],
       ),
     );
   }
 
-  Widget _buildPhoneField() {
+  Widget _buildPhoneField(bool isDark) {
+    final bg = isDark ? const Color(0xFF111918) : const Color(0xFFF8FAFC);
+    final verifiedBg = isDark ? const Color(0xFF1A3D37) : const Color(0xFFE8F5F2);
+    final enabledBorder = isDark ? const Color(0xFF2D3B39) : const Color(0xFFE2E8F0);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Утас',
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+        Text(
+          'Утасны дугаар',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
+          ),
         ),
         const SizedBox(height: 8),
         TextFormField(
@@ -283,30 +391,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             LengthLimitingTextInputFormatter(8),
           ],
           enabled: !_phoneVerified && !_isCheckingPhone,
-          style: const TextStyle(fontSize: 16, letterSpacing: 1.5, fontWeight: FontWeight.w500),
+          style: TextStyle(
+            fontSize: 16,
+            letterSpacing: 2,
+            fontWeight: FontWeight.w600,
+            color: isDark ? Colors.white : AppColors.textPrimary,
+          ),
           decoration: InputDecoration(
-            hintText: '12345678',
-            hintStyle: const TextStyle(
-              color: AppColors.textTertiary,
+            hintText: '1234 5678',
+            hintStyle: TextStyle(
+              color: isDark ? const Color(0xFF475569) : AppColors.textTertiary,
               letterSpacing: 0,
               fontWeight: FontWeight.normal,
             ),
             filled: true,
-            fillColor: _phoneVerified
-                ? const Color(0xFFE8F5F2)
-                : const Color(0xFFF8FAFC),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide.none,
-            ),
+            fillColor: _phoneVerified ? verifiedBg : bg,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(
-                color: _phoneVerified
-                    ? AppColors.primary
-                    : _phoneError != null
-                        ? AppColors.error
-                        : const Color(0xFFE2E8F0),
+                color: _phoneVerified ? AppColors.primary : _phoneError != null ? AppColors.error : enabledBorder,
                 width: 1.5,
               ),
             ),
@@ -329,10 +433,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     child: SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: AppColors.primary,
-                      ),
+                      child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.primary),
                     ),
                   )
                 : _phoneVerified
@@ -341,7 +442,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         child: Container(
                           margin: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
+                            color: AppColors.primary.withOpacity(0.12),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(Icons.close_rounded, color: AppColors.primary, size: 16),
@@ -381,10 +482,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               children: [
                 const Icon(Icons.info_outline_rounded, size: 13, color: AppColors.error),
                 const SizedBox(width: 4),
-                Text(
-                  _phoneError!,
-                  style: const TextStyle(fontSize: 12, color: AppColors.error),
-                ),
+                Text(_phoneError!, style: const TextStyle(fontSize: 12, color: AppColors.error)),
               ],
             ),
           ),
@@ -392,62 +490,67 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  Widget _buildOrgSelector() {
+  Widget _buildOrgSelector(bool isDark) {
+    final bg = isDark ? const Color(0xFF111918) : const Color(0xFFF8FAFC);
+    final selectedBg = isDark ? const Color(0xFF1A3D37) : const Color(0xFFE8F5F2);
+    final border = isDark ? const Color(0xFF2D3B39) : const Color(0xFFE2E8F0);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Байгууллага сонгоно уу',
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
+          ),
         ),
         const SizedBox(height: 8),
         ..._orgs.map((org) => Padding(
           padding: const EdgeInsets.only(bottom: 8),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => setState(() => _selectedOrgId = org.id),
-              borderRadius: BorderRadius.circular(14),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: _selectedOrgId == org.id
-                      ? const Color(0xFFE8F5F2)
-                      : const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: _selectedOrgId == org.id
-                        ? AppColors.primary
-                        : const Color(0xFFE2E8F0),
-                    width: 1.5,
+          child: InkWell(
+            onTap: () => setState(() => _selectedOrgId = org.id),
+            borderRadius: BorderRadius.circular(14),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: _selectedOrgId == org.id ? selectedBg : bg,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: _selectedOrgId == org.id ? AppColors.primary : border,
+                  width: 1.5,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.business_rounded, color: AppColors.primary, size: 20),
                   ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.business_rounded, color: AppColors.primary, size: 20),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        org.ner,
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      org.ner,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : AppColors.textPrimary,
                       ),
                     ),
-                    AnimatedOpacity(
-                      opacity: _selectedOrgId == org.id ? 1 : 0,
-                      duration: const Duration(milliseconds: 150),
-                      child: const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 20),
-                    ),
-                  ],
-                ),
+                  ),
+                  AnimatedOpacity(
+                    opacity: _selectedOrgId == org.id ? 1 : 0,
+                    duration: const Duration(milliseconds: 150),
+                    child: const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 20),
+                  ),
+                ],
               ),
             ),
           ),
@@ -456,12 +559,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  Widget _buildSelectedOrgChip() {
+  Widget _buildSelectedOrgChip(bool isDark) {
     final org = _orgs.firstWhere((o) => o.id == _selectedOrgId, orElse: () => _orgs.first);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFE8F5F2),
+        color: isDark ? const Color(0xFF1A3D37) : const Color(0xFFE8F5F2),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.primary.withOpacity(0.3)),
       ),
@@ -487,32 +590,41 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  Widget _buildPasswordField() {
+  Widget _buildPasswordField(bool isDark) {
+    final bg = isDark ? const Color(0xFF111918) : const Color(0xFFF8FAFC);
+    final border = isDark ? const Color(0xFF2D3B39) : const Color(0xFFE2E8F0);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Нууц үг',
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
+          ),
         ),
         const SizedBox(height: 8),
         TextFormField(
           controller: _passwordController,
           obscureText: _obscurePassword,
           autofocus: true,
-          style: const TextStyle(fontSize: 16),
+          style: TextStyle(
+            fontSize: 16,
+            color: isDark ? Colors.white : AppColors.textPrimary,
+          ),
           decoration: InputDecoration(
             hintText: '••••••••',
-            hintStyle: const TextStyle(color: AppColors.textTertiary),
-            filled: true,
-            fillColor: const Color(0xFFF8FAFC),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide.none,
+            hintStyle: TextStyle(
+              color: isDark ? const Color(0xFF475569) : AppColors.textTertiary,
             ),
+            filled: true,
+            fillColor: bg,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
+              borderSide: BorderSide(color: border, width: 1.5),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
@@ -527,7 +639,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               icon: Icon(
                 _obscurePassword ? Icons.visibility_rounded : Icons.visibility_off_rounded,
                 size: 20,
-                color: AppColors.textTertiary,
+                color: isDark ? const Color(0xFF64748B) : AppColors.textTertiary,
               ),
               onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
             ),
@@ -552,18 +664,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           gradient: authState.isLoading
               ? null
               : const LinearGradient(
-                  colors: [AppColors.primary, AppColors.primaryLight],
+                  colors: [AppColors.primaryDark, AppColors.primary, AppColors.primaryLight],
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
                 ),
+          color: authState.isLoading ? AppColors.primaryLight : null,
           borderRadius: BorderRadius.circular(16),
           boxShadow: authState.isLoading
               ? []
               : [
                   BoxShadow(
                     color: AppColors.primary.withOpacity(0.4),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
+                    blurRadius: 18,
+                    offset: const Offset(0, 7),
                   ),
                 ],
         ),
@@ -573,7 +686,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             backgroundColor: Colors.transparent,
             shadowColor: Colors.transparent,
             foregroundColor: Colors.white,
-            disabledBackgroundColor: AppColors.primaryLight,
+            disabledBackgroundColor: Colors.transparent,
             disabledForegroundColor: Colors.white70,
             elevation: 0,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -589,7 +702,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     ),
                     SizedBox(width: 10),
-                    Text('Уншиж байна...', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                    Text('Нэвтэрч байна...', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                   ],
                 )
               : const Text('Нэвтрэх', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
@@ -598,60 +711,143 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  Widget _buildDivider() {
-    return Row(
+  Widget _buildBiometricButton(bool isDark) {
+    final icon = Platform.isIOS ? Icons.face_rounded : Icons.fingerprint_rounded;
+    final label = Platform.isIOS ? 'Face ID-ээр нэвтрэх' : 'Хурууны хээгээр нэвтрэх';
+
+    return Column(
       children: [
-        Expanded(child: Divider(color: AppColors.divider)),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          child: Text(
-            'Эсвэл',
-            style: TextStyle(fontSize: 12, color: AppColors.textTertiary, fontWeight: FontWeight.w500),
+        Row(
+          children: [
+            Expanded(child: Divider(color: isDark ? const Color(0xFF2D3B39) : AppColors.divider)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Text(
+                'Эсвэл',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? const Color(0xFF475569) : AppColors.textTertiary,
+                ),
+              ),
+            ),
+            Expanded(child: Divider(color: isDark ? const Color(0xFF2D3B39) : AppColors.divider)),
+          ],
+        ),
+        const SizedBox(height: 16),
+        GestureDetector(
+          onTap: _isBiometricLoading ? null : _doBiometricLogin,
+          child: Container(
+            height: 56,
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1A2826) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.primary.withOpacity(0.4), width: 1.5),
+              boxShadow: isDark
+                  ? []
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+            ),
+            child: _isBiometricLoading
+                ? const Center(
+                    child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.primary),
+                    ),
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(icon, color: AppColors.primary, size: 26),
+                      const SizedBox(width: 10),
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
           ),
         ),
-        Expanded(child: Divider(color: AppColors.divider)),
       ],
     );
   }
 
-  Widget _buildResetButton() {
+  Widget _buildDivider(bool isDark) {
+    return Row(
+      children: [
+        Expanded(child: Divider(color: isDark ? const Color(0xFF2D3B39) : AppColors.divider)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Text(
+            'Эсвэл',
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark ? const Color(0xFF475569) : AppColors.textTertiary,
+            ),
+          ),
+        ),
+        Expanded(child: Divider(color: isDark ? const Color(0xFF2D3B39) : AppColors.divider)),
+      ],
+    );
+  }
+
+  Widget _buildResetButton(bool isDark) {
     return SizedBox(
       height: 52,
       child: OutlinedButton(
         onPressed: () => context.push('/reset-password'),
         style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: AppColors.primary, width: 1.5),
+          side: BorderSide(
+            color: isDark ? const Color(0xFF2D3B39) : AppColors.primary,
+            width: 1.5,
+          ),
           foregroundColor: AppColors.primary,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
-        child: const Text(
-          'Нууц үг сэргээх',
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-        ),
+        child: const Text('Нууц үг сэргээх', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
       ),
     );
   }
 
-  Widget _buildFooter() {
+  Widget _buildFooter(bool isDark) {
     return Column(
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text(
+            Text(
               'Powered by ',
-              style: TextStyle(fontSize: 12, color: AppColors.textTertiary),
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? const Color(0xFF475569) : AppColors.textTertiary,
+              ),
             ),
-            const Text(
+            Text(
               'ZEVTABS LLC',
-              style: TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? AppColors.primaryLight : AppColors.primary,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ],
         ),
         const SizedBox(height: 4),
-        const Text(
+        Text(
           'v1.0.0',
-          style: TextStyle(fontSize: 11, color: AppColors.textTertiary),
+          style: TextStyle(
+            fontSize: 11,
+            color: isDark ? const Color(0xFF334155) : AppColors.textTertiary,
+          ),
         ),
       ],
     );

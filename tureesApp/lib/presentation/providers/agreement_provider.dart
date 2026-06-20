@@ -10,7 +10,21 @@ final agreementsProvider = FutureProvider<List<AgreementModel>>((ref) async {
   if (user == null) return [];
   final filter = ref.watch(agreementFilterProvider);
   final repo = ref.read(agreementRepositoryProvider);
-  return repo.getAgreements(register: user.register ?? '', tuluv: filter);
+  final agreements = await repo.getAgreements(register: user.register ?? '', tuluv: filter);
+
+  // Fetch real-time uldegdel from /uldegdelBodyo for each agreement in parallel
+  final updated = await Future.wait(
+    agreements.map((a) async {
+      try {
+        final data = await repo.getUldegdel(a.gereeniiDugaar, a.barilgiinId);
+        final uldegdel = (data['uldegdel'] as num?)?.toDouble() ?? a.uldegdel;
+        return a.copyWith(uldegdel: uldegdel);
+      } catch (_) {
+        return a;
+      }
+    }),
+  );
+  return updated;
 });
 
 final selectedAgreementProvider = StateProvider<AgreementModel?>((ref) => null);

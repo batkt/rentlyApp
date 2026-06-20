@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../dashboard/dashboard_screen.dart';
+import '../duudlaga/duudlaga_screen.dart';
 import '../payment/payment_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../settings/settings_screen.dart';
@@ -24,11 +25,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _screens = [
-      const DashboardScreen(),
-      const PaymentScreen(),
-      const NotificationsScreen(),
-      const SettingsScreen(),
+    _screens = const [
+      DashboardScreen(),
+      DuudlagaScreen(),
+      PaymentScreen(),
+      NotificationsScreen(),
+      SettingsScreen(),
     ];
   }
 
@@ -36,6 +38,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final currentIndex = ref.watch(_navIndexProvider);
     final unreadCount = ref.watch(unreadCountProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       body: Stack(
@@ -47,31 +50,51 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           const _FloatingChatBubble(),
         ],
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: context.appSurface,
-          border: Border(top: BorderSide(color: context.appDivider, width: 1)),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _NavItem(icon: Icons.home_rounded, label: 'Нүүр', index: 0, current: currentIndex),
-                _NavItem(icon: Icons.payment_rounded, label: 'Төлбөр', index: 1, current: currentIndex),
-                _NavItem(
-                  icon: Icons.notifications_rounded,
-                  label: 'Мэдэгдэл',
-                  index: 2,
-                  current: currentIndex,
-                  badge: unreadCount > 0 ? unreadCount : null,
-                ),
-                _NavItem(icon: Icons.person_rounded, label: 'Профайл', index: 3, current: currentIndex),
-              ],
-            ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: currentIndex,
+        onDestinationSelected: (i) => ref.read(_navIndexProvider.notifier).state = i,
+        backgroundColor: isDark ? const Color(0xFF1E2A28) : AppColors.surface,
+        indicatorColor: isDark ? const Color(0xFF1A3D37) : AppColors.primaryContainer,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: isDark ? Colors.transparent : Colors.black12,
+        elevation: 0,
+        height: 68,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        destinations: [
+          const NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home_rounded),
+            label: 'Нүүр',
           ),
-        ),
+          const NavigationDestination(
+            icon: Icon(Icons.campaign_outlined),
+            selectedIcon: Icon(Icons.campaign_rounded),
+            label: 'Дуудлага',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.payment_outlined),
+            selectedIcon: Icon(Icons.payment_rounded),
+            label: 'Төлбөр',
+          ),
+          NavigationDestination(
+            icon: Badge(
+              isLabelVisible: unreadCount > 0,
+              label: Text(unreadCount > 99 ? '99+' : '$unreadCount'),
+              child: const Icon(Icons.notifications_outlined),
+            ),
+            selectedIcon: Badge(
+              isLabelVisible: unreadCount > 0,
+              label: Text(unreadCount > 99 ? '99+' : '$unreadCount'),
+              child: const Icon(Icons.notifications_rounded),
+            ),
+            label: 'Мэдэгдэл',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.person_outline_rounded),
+            selectedIcon: Icon(Icons.person_rounded),
+            label: 'Профайл',
+          ),
+        ],
       ),
     );
   }
@@ -96,16 +119,15 @@ class _FloatingChatBubbleState extends ConsumerState<_FloatingChatBubble>
     super.initState();
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 1400),
     )..repeat(reverse: true);
-    _pulseAnim = Tween<double>(begin: 1.0, end: 1.15).animate(
+    _pulseAnim = Tween<double>(begin: 1.0, end: 1.12).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final size = MediaQuery.sizeOf(context);
-      setState(() => _position = Offset(size.width - 72, size.height * 0.6));
-
+      setState(() => _position = Offset(size.width - 72, size.height * 0.55));
       ref.read(conversationsProvider.notifier).load();
     });
   }
@@ -121,12 +143,12 @@ class _FloatingChatBubbleState extends ConsumerState<_FloatingChatBubble>
     if (convState.conversations.isNotEmpty) {
       final conv = convState.conversations.first;
       context.push('/chat/${conv.id}', extra: conv);
+    } else if (convState.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(convState.error!), backgroundColor: AppColors.error),
+      );
     } else {
-      convState.error != null
-          ? ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(convState.error!), backgroundColor: AppColors.error),
-            )
-          : context.push('/chat/loading');
+      context.push('/chat/loading');
     }
   }
 
@@ -145,13 +167,12 @@ class _FloatingChatBubbleState extends ConsumerState<_FloatingChatBubble>
           setState(() {
             _position = Offset(
               (_position.dx + details.delta.dx).clamp(0, size.width - 60),
-              (_position.dy + details.delta.dy).clamp(0, size.height - 120),
+              (_position.dy + details.delta.dy).clamp(0, size.height - 140),
             );
           });
         },
         onPanEnd: (_) {
           setState(() => _isDragging = false);
-          // snap to nearest horizontal edge
           final size = MediaQuery.sizeOf(context);
           final snapX = _position.dx < size.width / 2 ? 12.0 : size.width - 72.0;
           setState(() => _position = Offset(snapX, _position.dy));
@@ -159,16 +180,11 @@ class _FloatingChatBubbleState extends ConsumerState<_FloatingChatBubble>
         onTap: _isDragging ? null : _openChat,
         child: AnimatedBuilder(
           animation: _pulseAnim,
-          builder: (_, child) {
-            return Transform.scale(
-              scale: _isDragging ? 1.1 : (hasConv ? _pulseAnim.value : 1.0),
-              child: child,
-            );
-          },
-          child: _ChatBubble(
-            isLoading: convState.isLoading,
-            hasConv: hasConv,
+          builder: (_, child) => Transform.scale(
+            scale: _isDragging ? 1.1 : (hasConv ? _pulseAnim.value : 1.0),
+            child: child,
           ),
+          child: _ChatBubble(isLoading: convState.isLoading, hasConv: hasConv),
         ),
       ),
     );
@@ -184,15 +200,15 @@ class _ChatBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      elevation: 8,
-      shadowColor: AppColors.primary.withOpacity(0.4),
+      elevation: 10,
+      shadowColor: AppColors.primary.withOpacity(0.5),
       shape: const CircleBorder(),
       child: Container(
         width: 56,
         height: 56,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           shape: BoxShape.circle,
-          gradient: const LinearGradient(
+          gradient: LinearGradient(
             colors: [AppColors.primaryLight, AppColors.primary],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -204,79 +220,6 @@ class _ChatBubble extends StatelessWidget {
                 child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
               )
             : const Icon(Icons.chat_bubble_rounded, color: Colors.white, size: 26),
-      ),
-    );
-  }
-}
-
-class _NavItem extends ConsumerWidget {
-  final IconData icon;
-  final String label;
-  final int index;
-  final int current;
-  final int? badge;
-
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.index,
-    required this.current,
-    this.badge,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final isSelected = index == current;
-    final color = isSelected ? AppColors.primary : AppColors.textTertiary;
-
-    return GestureDetector(
-      onTap: () => ref.read(_navIndexProvider.notifier).state = index,
-      behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 72,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary.withOpacity(0.12) : Colors.transparent,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(icon, color: color, size: 24),
-                ),
-                if (badge != null)
-                  Positioned(
-                    top: -2,
-                    right: -2,
-                    child: Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: const BoxDecoration(color: AppColors.error, shape: BoxShape.circle),
-                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                      child: Text(
-                        badge! > 99 ? '99+' : '$badge',
-                        style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                color: isSelected ? AppColors.primary : AppColors.textTertiary,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

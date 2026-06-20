@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd /c/Users/buynini/tureesShine && find . -type f -name \"*.json\" -o -name \"*.js\" -o -name \"*.jsx\" -o -name \"*.ts\" -o -name \"*.tsx\" | head -100)",
+      "Read(//c/c/Users/buynini/**)",
+      "Bash(xargs grep -l \"Bearer\\\\|Authorization\\\\|token\")"
+    ]
+  }
+}

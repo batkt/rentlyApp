@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/chat_model.dart';
 import '../../data/models/user_model.dart';
@@ -134,6 +136,21 @@ class MessagesNotifier extends StateNotifier<MessagesState> {
       state = state.copyWith(isSending: false, messages: [...state.messages, msg]);
     } catch (e) {
       state = state.copyWith(isSending: false, error: 'Мессеж илгээхэд алдаа гарлаа');
+    }
+  }
+
+  Future<void> sendWithImage(File imageFile, {String? text}) async {
+    state = state.copyWith(isSending: true);
+    try {
+      final url = await _repo.uploadImage(imageFile);
+      if (url == null) {
+        state = state.copyWith(isSending: false, error: 'Зураг байршуулахад алдаа гарлаа');
+        return;
+      }
+      final msg = await _repo.sendMessageWithImage(_convId, text, url);
+      state = state.copyWith(isSending: false, messages: [...state.messages, msg]);
+    } catch (_) {
+      state = state.copyWith(isSending: false, error: 'Зураг илгээхэд алдаа гарлаа');
     }
   }
 

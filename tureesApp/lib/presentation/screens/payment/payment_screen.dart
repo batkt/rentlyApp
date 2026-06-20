@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../data/models/agreement_model.dart';
+import '../../../data/repositories/agreement_repository.dart';
 import '../../providers/agreement_provider.dart';
 import '../../providers/payment_provider.dart';
 import '../../widgets/common/app_button.dart';
@@ -23,15 +24,15 @@ class PaymentScreen extends ConsumerStatefulWidget {
 class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   final _amountController = TextEditingController();
   AgreementModel? _selectedAgreement;
+  double? _realUldegdel;
+  bool _loadingUldegdel = false;
 
   @override
   void initState() {
     super.initState();
     _selectedAgreement = widget.selectedAgreement;
     if (_selectedAgreement != null) {
-      _amountController.text = _selectedAgreement!.uldegdel > 0
-          ? _selectedAgreement!.uldegdel.toStringAsFixed(2)
-          : '';
+      _fetchRealUldegdel(_selectedAgreement!);
     }
   }
 
@@ -40,6 +41,36 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     _amountController.dispose();
     super.dispose();
   }
+
+  Future<void> _fetchRealUldegdel(AgreementModel agreement) async {
+    setState(() {
+      _loadingUldegdel = true;
+      _realUldegdel = null;
+    });
+    try {
+      final repo = ref.read(agreementRepositoryProvider);
+      final data = await repo.getUldegdel(agreement.gereeniiDugaar, agreement.barilgiinId);
+      final uldegdel = (data['uldegdel'] as num?)?.toDouble() ?? 0.0;
+      if (!mounted) return;
+      setState(() {
+        _realUldegdel = uldegdel;
+        _loadingUldegdel = false;
+      });
+      // Auto-fill the amount if there is a debt
+      if (uldegdel > 0 && _amountController.text.isEmpty) {
+        _amountController.text = uldegdel.toStringAsFixed(0);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _realUldegdel = _selectedAgreement?.uldegdel;
+        _loadingUldegdel = false;
+      });
+    }
+  }
+
+  double get _displayUldegdel => _realUldegdel ?? _selectedAgreement?.uldegdel ?? 0;
+  bool get _hasDebt => _displayUldegdel > 0;
 
   Future<void> _generateQpay() async {
     final rawText = _amountController.text.replaceAll(',', '').replaceAll(' ', '');
@@ -67,26 +98,39 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating),
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: AppColors.error,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final paymentState = ref.watch(paymentNotifierProvider);
     final agreementsAsync = ref.watch(agreementsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Төлбөр')),
+      backgroundColor: context.appBackground,
+      appBar: AppBar(
+        title: const Text('Төлбөр төлөх'),
+        backgroundColor: isDark ? const Color(0xFF1E2A28) : AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildAgreementSelector(agreementsAsync),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             if (_selectedAgreement != null) _buildBalanceSummary(),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             _buildAmountInput(),
             const SizedBox(height: 8),
             _buildQuickAmounts(),
@@ -102,7 +146,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Гэрээ сонгох', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+        Text(
+          'Гэрээ сонгох',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+        ),
         const SizedBox(height: 10),
         agreementsAsync.when(
           loading: () => const ShimmerList(itemCount: 1, itemHeight: 60),
@@ -114,17 +161,20 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             if (widget.selectedAgreement != null) {
               return _SelectedAgreementTile(
                 agreement: _selectedAgreement!,
-                onClear: () => setState(() {
-                  _selectedAgreement = null;
-                  _amountController.clear();
-                }),
+                onClear: () {
+                  setState(() {
+                    _selectedAgreement = null;
+                    _realUldegdel = null;
+                    _amountController.clear();
+                  });
+                },
               );
             }
 
             return Container(
               decoration: BoxDecoration(
                 color: context.appCardBg,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: context.appDivider),
               ),
               child: DropdownButtonHideUnderline(
@@ -132,22 +182,26 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                   value: _selectedAgreement,
                   isExpanded: true,
                   dropdownColor: context.appCardBg,
-                  hint: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: Text('Гэрээ сонгох...'),
+                  hint: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text('Гэрээ сонгох...', style: TextStyle(color: context.appTextTertiary)),
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                   items: active.map((a) => DropdownMenuItem(
                     value: a,
-                    child: Text('${a.tenantName} – ${a.gereeniiDugaar}', overflow: TextOverflow.ellipsis),
+                    child: Text(
+                      '${a.tenantName} – ${a.gereeniiDugaar}',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: context.appTextPrimary),
+                    ),
                   )).toList(),
                   onChanged: (v) {
                     setState(() {
                       _selectedAgreement = v;
-                      if (v != null && v.uldegdel > 0) {
-                        _amountController.text = v.uldegdel.toStringAsFixed(2);
-                      }
+                      _realUldegdel = null;
+                      _amountController.clear();
                     });
+                    if (v != null) _fetchRealUldegdel(v);
                   },
                 ),
               ),
@@ -159,44 +213,82 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   }
 
   Widget _buildBalanceSummary() {
-    final ag = _selectedAgreement!;
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: ag.hasDebt ? context.appErrorLight : context.appSuccessLight,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: ag.hasDebt ? AppColors.error.withOpacity(0.2) : AppColors.success.withOpacity(0.2)),
+        color: _hasDebt ? context.appErrorLight : context.appSuccessLight,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: _hasDebt ? AppColors.error.withOpacity(0.25) : AppColors.success.withOpacity(0.25),
+        ),
       ),
       child: Row(
         children: [
-          Icon(
-            ag.hasDebt ? Icons.warning_rounded : Icons.check_circle_rounded,
-            color: ag.hasDebt ? AppColors.error : AppColors.success,
-            size: 20,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(ag.hasDebt ? 'Нийт өр' : 'Үлдэгдэл', style: Theme.of(context).textTheme.bodySmall),
-                Text(
-                  AppFormatters.currency(ag.uldegdel),
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 18,
-                    color: ag.hasDebt ? AppColors.error : AppColors.success,
-                  ),
-                ),
-              ],
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: (_hasDebt ? AppColors.error : AppColors.success).withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              _hasDebt ? Icons.warning_rounded : Icons.check_circle_rounded,
+              color: _hasDebt ? AppColors.error : AppColors.success,
+              size: 22,
             ),
           ),
-          if (ag.hasDebt)
+          const SizedBox(width: 12),
+          Expanded(
+            child: _loadingUldegdel
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Үлдэгдэл тооцоолж байна...', style: Theme.of(context).textTheme.bodySmall),
+                      const SizedBox(height: 4),
+                      LinearProgressIndicator(
+                        color: AppColors.primary,
+                        backgroundColor: AppColors.primary.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ],
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _hasDebt ? 'Нийт өр' : 'Үлдэгдэл (0)',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: _hasDebt ? AppColors.error : AppColors.success,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        AppFormatters.currency(_displayUldegdel),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 20,
+                          color: _hasDebt ? AppColors.error : AppColors.success,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+          if (_hasDebt && !_loadingUldegdel)
             TextButton(
               onPressed: () {
-                _amountController.text = ag.uldegdel.toStringAsFixed(2);
+                _amountController.text = _displayUldegdel.toStringAsFixed(0);
               },
-              child: const Text('Бүгдийг төлөх', style: TextStyle(fontSize: 12)),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                backgroundColor: AppColors.error.withOpacity(0.1),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text(
+                'Бүгдийг\nтөлөх',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 11, color: AppColors.error, fontWeight: FontWeight.w700),
+              ),
             ),
         ],
       ),
@@ -206,10 +298,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   Widget _buildAmountInput() {
     return AppTextField(
       label: 'Төлөх дүн (₮)',
-      hint: '0.00',
+      hint: '0',
       controller: _amountController,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+      keyboardType: const TextInputType.numberWithOptions(decimal: false),
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
       prefixIcon: Icon(Icons.monetization_on_rounded, size: 18, color: context.appTextTertiary),
     );
   }
@@ -218,17 +310,18 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final amounts = [10000, 50000, 100000, 200000, 500000];
     return Wrap(
       spacing: 8,
+      runSpacing: 8,
       children: amounts.map((amount) => GestureDetector(
-        onTap: () => _amountController.text = amount.toDouble().toStringAsFixed(2),
+        onTap: () => _amountController.text = amount.toString(),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           decoration: BoxDecoration(
             color: context.appInputFill,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: context.appDivider),
           ),
           child: Text(
-            AppFormatters.currency(amount).replaceAll('₮', ''),
+            AppFormatters.currency(amount),
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: context.appTextSecondary),
           ),
         ),
@@ -240,18 +333,21 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Төлбөрийн арга', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+        Text(
+          'Төлбөрийн арга',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+        ),
         const SizedBox(height: 12),
         _PaymentMethodCard(
-          icon: Icons.qr_code_rounded,
+          icon: Icons.qr_code_2_rounded,
           title: 'QPay',
-          subtitle: 'Бүх банкны аппаар төлөх',
+          subtitle: 'Бүх банкны аппаар QR кодоор төлөх',
           isSelected: true,
           onTap: () {},
         ),
         const SizedBox(height: 24),
         AppButton(
-          label: 'Qpay нэхэмжлэл үүсгэх',
+          label: 'QPay нэхэмжлэл үүсгэх',
           onPressed: paymentState.isLoading ? null : _generateQpay,
           isLoading: paymentState.isLoading,
           icon: Icons.qr_code_rounded,
@@ -262,13 +358,19 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: context.appErrorLight,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.error.withOpacity(0.2)),
             ),
             child: Row(
               children: [
                 const Icon(Icons.error_outline, color: AppColors.error, size: 16),
                 const SizedBox(width: 8),
-                Expanded(child: Text(paymentState.error!, style: const TextStyle(color: AppColors.error, fontSize: 13))),
+                Expanded(
+                  child: Text(
+                    paymentState.error!,
+                    style: const TextStyle(color: AppColors.error, fontSize: 13),
+                  ),
+                ),
               ],
             ),
           ),
@@ -290,19 +392,37 @@ class _SelectedAgreementTile extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: context.appPrimaryContainer,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.primary.withOpacity(0.3)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.assignment_rounded, color: AppColors.primary, size: 20),
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.assignment_rounded, color: AppColors.primary, size: 20),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(agreement.tenantName, style: Theme.of(context).textTheme.titleSmall?.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600)),
-                Text(agreement.gereeniiDugaar, style: Theme.of(context).textTheme.bodySmall),
+                Text(
+                  agreement.tenantName,
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+                Text(
+                  agreement.gereeniiDugaar,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               ],
             ),
           ),
@@ -332,10 +452,10 @@ class _PaymentMethodCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: isSelected ? context.appPrimaryContainer : context.appCardBg,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected ? AppColors.primary : context.appDivider,
             width: isSelected ? 2 : 1,
@@ -344,29 +464,42 @@ class _PaymentMethodCard extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 44,
-              height: 44,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
                 color: isSelected ? AppColors.primary : context.appInputFill,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(icon, color: isSelected ? Colors.white : context.appTextTertiary, size: 22),
+              child: Icon(icon, color: isSelected ? Colors.white : context.appTextTertiary, size: 24),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: isSelected ? AppColors.primary : context.appTextPrimary,
-                    fontWeight: FontWeight.w600,
-                  )),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                      color: isSelected ? AppColors.primary : context.appTextPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
                   Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
                 ],
               ),
             ),
             if (isSelected)
-              const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 20),
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check_rounded, color: Colors.white, size: 14),
+              ),
           ],
         ),
       ),

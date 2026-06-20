@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/network/dio_client.dart';
 import '../../core/constants/api_constants.dart';
@@ -43,5 +46,30 @@ class ChatRepository {
 
   Future<void> markAsRead(String conversationId) async {
     await _client.put(ApiConstants.markConversationRead(conversationId));
+  }
+
+  Future<String?> uploadImage(File file) async {
+    try {
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(file.path, filename: file.path.split('/').last),
+      });
+      final res = await _client.post(ApiConstants.upload, data: formData);
+      final data = res.data;
+      return data['url']?.toString() ?? data['path']?.toString();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<MessageModel> sendMessageWithImage(String conversationId, String? text, String imageUrl) async {
+    final res = await _client.post(
+      ApiConstants.conversationMessages(conversationId),
+      data: {
+        if (text != null && text.isNotEmpty) 'text': text,
+        'imageUrl': imageUrl,
+        'role': 'user',
+      },
+    );
+    return MessageModel.fromJson(res.data['data']['msg']);
   }
 }

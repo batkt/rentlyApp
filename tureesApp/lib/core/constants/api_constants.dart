@@ -33,8 +33,10 @@ class ApiConstants {
   static String conversationMessages(String id) => '/chat/conversations/$id/messages';
   static String markConversationRead(String id) => '/chat/conversations/$id/read';
 
-  // Notifications
+  // Notifications & Duudlaga (shared /sonorduulga endpoint)
   static const String notifications = '/sonorduulga';
+  static const String duudlaga = '/sonorduulga';
+  static String duudlagaUpdate(String id) => '/sonorduulga/$id';
 
   // Tasks
   static const String tasks = '/daalgavar';

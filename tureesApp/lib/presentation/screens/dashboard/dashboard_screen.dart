@@ -35,114 +35,155 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     return Scaffold(
       backgroundColor: context.appBackground,
-      body: CustomScrollView(
-        slivers: [
-          _buildAppBar(context, user),
-          SliverToBoxAdapter(child: _buildSummaryCards(agreementsAsync.valueOrNull)),
-          SliverToBoxAdapter(
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () async => ref.refresh(agreementsProvider),
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            _buildSliverAppBar(context, user, agreementsAsync.valueOrNull),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: AppSearchField(
+                  controller: _searchController,
+                  hint: 'Нэр, гэрээний дугаар хайх...',
+                  onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(child: _buildFilterTabs(filter)),
+            _buildAgreementsList(agreementsAsync),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSliverAppBar(BuildContext context, dynamic user, List<AgreementModel>? agreements) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final total = agreements?.length ?? 0;
+    final active = agreements?.where((a) => a.isActive).length ?? 0;
+    final totalDebt = agreements?.fold<double>(0, (s, a) => s + (a.uldegdel > 0 ? a.uldegdel : 0)) ?? 0;
+    final hasDebt = totalDebt > 0;
+
+    return SliverAppBar(
+      expandedHeight: 200,
+      pinned: true,
+      floating: false,
+      backgroundColor: isDark ? const Color(0xFF1E2A28) : AppColors.primary,
+      elevation: 0,
+      flexibleSpace: FlexibleSpaceBar(
+        collapseMode: CollapseMode.pin,
+        background: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isDark
+                  ? [const Color(0xFF1A3D37), const Color(0xFF0D1514)]
+                  : [AppColors.primaryDark, AppColors.primary, AppColors.primaryLight],
+            ),
+          ),
+          child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: AppSearchField(
-                controller: _searchController,
-                hint: 'Нэр, гэрээний дугаар хайх...',
-                onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Сайн байна уу,',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.white.withOpacity(0.7),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            user?.shortName?.isNotEmpty == true ? user!.shortName : 'Хэрэглэгч',
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      _buildRefreshButton(context),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      _HeroStatCard(
+                        label: 'Нийт гэрээ',
+                        value: '$total',
+                        icon: Icons.assignment_rounded,
+                      ),
+                      const SizedBox(width: 10),
+                      _HeroStatCard(
+                        label: 'Идэвхтэй',
+                        value: '$active',
+                        icon: Icons.check_circle_rounded,
+                        color: Colors.greenAccent,
+                      ),
+                      const SizedBox(width: 10),
+                      _HeroStatCard(
+                        label: hasDebt ? 'Нийт өр' : 'Үлдэгдэл',
+                        value: agreements == null
+                            ? '...'
+                            : hasDebt
+                                ? AppFormatters.currency(totalDebt)
+                                : '0₮',
+                        icon: hasDebt ? Icons.warning_rounded : Icons.check_circle_outline_rounded,
+                        color: hasDebt ? Colors.redAccent.shade100 : Colors.greenAccent,
+                        small: totalDebt > 9999999,
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),
-          SliverToBoxAdapter(child: _buildFilterTabs(filter)),
-          _buildAgreementsList(agreementsAsync),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAppBar(BuildContext context, dynamic user) {
-    return SliverAppBar(
-      floating: true,
-      snap: true,
-      backgroundColor: context.appSurface,
-      elevation: 0,
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Сайн байна уу,',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.appTextTertiary),
-          ),
-          Text(
-            user?.shortName?.isNotEmpty == true ? user!.shortName : 'Хэрэглэгч',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-          ),
-        ],
-      ),
-      actions: [
-        IconButton(
-          icon: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: context.appInputFill,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(Icons.refresh_rounded, size: 20, color: context.appTextSecondary),
-          ),
-          onPressed: () => ref.refresh(agreementsProvider),
         ),
-        const SizedBox(width: 8),
-      ],
-      bottom: user?.baiguullagiinId?.isNotEmpty == true
-          ? PreferredSize(
-              preferredSize: const Size.fromHeight(44),
-              child: _OrgBuildingBar(user: user),
-            )
-          : null,
+      ),
+      title: Text(
+        user?.shortName?.isNotEmpty == true ? user!.shortName : 'Нүүр',
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+        ),
+      ),
     );
   }
 
-  Widget _buildSummaryCards(List<AgreementModel>? agreements) {
-    if (agreements == null) return const SizedBox.shrink();
-
-    final total = agreements.length;
-    final active = agreements.where((a) => a.isActive).length;
-    final totalDebt = agreements.fold<double>(0, (sum, a) => sum + (a.uldegdel > 0 ? a.uldegdel : 0));
-    final debtCount = agreements.where((a) => a.uldegdel > 0).length;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-      child: Row(
-        children: [
-          Expanded(child: _SummaryCard(
-            icon: Icons.assignment_rounded,
-            label: 'Нийт гэрээ',
-            value: '$total',
-            color: AppColors.primary,
-            bgColor: AppColors.primaryContainer,
-          )),
-          const SizedBox(width: 10),
-          Expanded(child: _SummaryCard(
-            icon: Icons.check_circle_rounded,
-            label: 'Идэвхтэй',
-            value: '$active',
-            color: AppColors.success,
-            bgColor: AppColors.successLight,
-          )),
-          const SizedBox(width: 10),
-          Expanded(child: _SummaryCard(
-            icon: Icons.warning_rounded,
-            label: 'Нийт үлдэгдэл',
-            value: debtCount > 0 ? AppFormatters.currency(totalDebt) : '—',
-            color: AppColors.error,
-            bgColor: AppColors.errorLight,
-            small: totalDebt > 999999,
-          )),
-        ],
+  Widget _buildRefreshButton(BuildContext context) {
+    return GestureDetector(
+      onTap: () => ref.refresh(agreementsProvider),
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.2)),
+        ),
+        child: const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
       ),
     );
   }
 
   Widget _buildFilterTabs(int? currentFilter) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Row(
         children: [
           Text(
@@ -205,102 +246,57 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 }
 
-class _OrgBuildingBar extends StatelessWidget {
-  final dynamic user;
-
-  const _OrgBuildingBar({required this.user});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Row(
-        children: [
-          Icon(Icons.business_rounded, size: 13, color: context.appTextTertiary),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              user?.baiguullagiinId ?? '',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: context.appTextTertiary,
-                fontSize: 11,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Icon(Icons.apartment_rounded, size: 13, color: context.appTextTertiary),
-          const SizedBox(width: 4),
-          Text(
-            user?.barilgiinId ?? '',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: context.appTextTertiary,
-              fontSize: 11,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SummaryCard extends StatelessWidget {
-  final IconData icon;
+class _HeroStatCard extends StatelessWidget {
   final String label;
   final String value;
+  final IconData icon;
   final Color color;
-  final Color bgColor;
   final bool small;
 
-  const _SummaryCard({
-    required this.icon,
+  const _HeroStatCard({
     required this.label,
     required this.value,
-    required this.color,
-    required this.bgColor,
+    required this.icon,
+    this.color = Colors.white,
     this.small = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: context.appCardBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: context.appDivider),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2)),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(10)),
-            child: Icon(icon, color: color, size: 18),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(color: context.appTextTertiary),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: context.appTextPrimary,
-              fontSize: small ? 11 : 13,
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withOpacity(0.15)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: small ? 10 : 13,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                letterSpacing: -0.2,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.white.withOpacity(0.65),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -324,6 +320,7 @@ class _FilterChip extends ConsumerWidget {
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primary : context.appInputFill,
           borderRadius: BorderRadius.circular(20),
+          border: isSelected ? null : Border.all(color: context.appDivider),
         ),
         child: Text(
           label,

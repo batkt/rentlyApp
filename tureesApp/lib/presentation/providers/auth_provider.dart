@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/services/biometric_service.dart';
 import '../../core/storage/secure_storage.dart';
 import '../../core/socket/socket_service.dart';
 import '../../data/models/user_model.dart';
@@ -10,6 +11,7 @@ final authStateProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
     ref.read(authRepositoryProvider),
     ref.read(secureStorageProvider),
     ref.read(socketServiceProvider),
+    ref.read(biometricServiceProvider),
   );
 });
 
@@ -61,8 +63,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _repo;
   final SecureStorageService _storage;
   final SocketService _socket;
+  final BiometricService _biometric;
 
-  AuthNotifier(this._repo, this._storage, this._socket) : super(const AuthState());
+  AuthNotifier(this._repo, this._storage, this._socket, this._biometric)
+      : super(const AuthState());
 
   Future<void> checkAuth() async {
     state = state.copyWith(isLoading: true);
@@ -185,6 +189,39 @@ class AuthNotifier extends StateNotifier<AuthState> {
     if (msg.contains('404')) return 'Хэрэглэгч олдсонгүй';
     if (msg.contains('SocketException')) return 'Интернет холболт байхгүй';
     return 'Алдаа гарлаа. Дахин оролдоно уу';
+  }
+
+  Future<bool> loginWithBiometric() async {
+    final hasToken = await _storage.isLoggedIn();
+    if (!hasToken) return false;
+
+    final available = await _biometric.isAvailable;
+    if (!available) return false;
+
+    final authenticated = await _biometric.authenticate();
+    if (!authenticated) return false;
+
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final user = await _repo.getUserByToken();
+      if (user != null) {
+        state = state.copyWith(isLoading: false, user: user, isAuthenticated: true);
+        await _socket.connect();
+        _socket.joinOrgRoom(user.baiguullagiinId);
+        _socket.joinUserRoom(user.id);
+        return true;
+      }
+    } catch (_) {}
+    state = state.copyWith(isLoading: false);
+    return false;
+  }
+
+  Future<void> enableBiometric() async {
+    await _storage.saveBiometricEnabled(true);
+  }
+
+  Future<bool> isBiometricEnabled() async {
+    return _storage.isBiometricEnabled();
   }
 
   void clearError() => state = state.copyWith(error: null);

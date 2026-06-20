@@ -33,6 +33,7 @@ class MessageModel {
   final String role; // "user" or "agent"
   final String? ajiltanNer;
   final String content;
+  final String? imageUrl;
   final String? createdAt;
 
   const MessageModel({
@@ -41,10 +42,12 @@ class MessageModel {
     required this.role,
     this.ajiltanNer,
     required this.content,
+    this.imageUrl,
     this.createdAt,
   });
 
   bool get isFromUser => role == 'user';
+  bool get hasImage => imageUrl != null && imageUrl!.isNotEmpty;
 
   factory MessageModel.fromJson(Map<String, dynamic> json) {
     return MessageModel(
@@ -53,6 +56,7 @@ class MessageModel {
       role: json['role']?.toString() ?? 'user',
       ajiltanNer: json['ajiltanNer']?.toString(),
       content: json['text']?.toString() ?? '',
+      imageUrl: json['imageUrl']?.toString() ?? json['image']?.toString(),
       createdAt: json['createdAt']?.toString(),
     );
   }
