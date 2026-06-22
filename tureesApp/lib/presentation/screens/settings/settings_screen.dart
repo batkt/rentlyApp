@@ -148,7 +148,7 @@ class SettingsScreen extends ConsumerWidget {
             const Divider(height: 1),
             ListTile(
               leading: const Icon(Icons.dark_mode_rounded, size: 20, color: AppColors.primary),
-              title: const Text('Харанхуй горим'),
+              title: const Text('Dark Mode'),
               trailing: Switch.adaptive(
                 value: isDark,
                 activeColor: AppColors.primary,

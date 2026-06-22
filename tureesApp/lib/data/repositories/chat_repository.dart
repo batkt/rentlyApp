@@ -27,7 +27,20 @@ class ChatRepository {
       'baiguullagiinId': baiguullagiinId,
       'barilgiinId': barilgiinId,
     });
-    return ConversationModel.fromJson(res.data['data'] as Map<String, dynamic>);
+    final conv = ConversationModel.fromJson(res.data['data'] as Map<String, dynamic>);
+    // If the stored name is a placeholder and we have a real name, patch it.
+    final storedName = conv.khariltsagchiinNer;
+    if (khariltsagchiinNer.isNotEmpty &&
+        khariltsagchiinNer != 'Хэрэглэгч' &&
+        (storedName.isEmpty || storedName == 'Хэрэглэгч')) {
+      try {
+        await _client.put(
+          '${ApiConstants.conversations}/${conv.id}',
+          data: {'khariltsagchiinNer': khariltsagchiinNer},
+        );
+      } catch (_) {}
+    }
+    return conv;
   }
 
   Future<List<MessageModel>> getMessages(String conversationId) async {

@@ -112,7 +112,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                 child: const Icon(Icons.photo_library_rounded, color: AppColors.primary),
               ),
               title: const Text('Зургийн цомгоос', style: TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: const Text('Хадгалсан зурга сонгох'),
+              subtitle: const Text('Хадгалсан зураг сонгох'),
               onTap: () {
                 Navigator.pop(ctx);
                 _pickImage(ImageSource.gallery);
@@ -145,9 +145,12 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(messagesProvider(widget.conversationId));
-    final name = widget.conversation?.khariltsagchiinNer.isNotEmpty == true
-        ? widget.conversation!.khariltsagchiinNer
-        : 'Захиргаа';
+    // Show the agent's name (the admin who replied) from messages; fall back to "Захиргаа"
+    final agentName = state.messages
+        .where((m) => !m.isFromUser && m.ajiltanNer != null && m.ajiltanNer!.isNotEmpty)
+        .lastOrNull
+        ?.ajiltanNer;
+    final name = agentName ?? 'Захиргаа';
 
     ref.listen(messagesProvider(widget.conversationId), (prev, next) {
       if ((prev?.messages.length ?? 0) < next.messages.length) {

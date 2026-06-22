@@ -17,20 +17,20 @@ class PaymentRepository {
     required String gereeniiId,
     required String register,
     required double amount,
-    String? dans,
+    String? dansniiDugaar,
   }) async {
     final res = await _client.post(ApiConstants.qpayGenerate, data: {
       'barilgiinId': barilgiinId,
       'gereeniiId': gereeniiId,
-      'register': register,
-      'amount': amount,
-      if (dans != null) 'dans': dans,
+      'burtgeliinDugaar': register,
+      'dun': amount,
+      if (dansniiDugaar != null) 'dansniiDugaar': dansniiDugaar,
     });
 
     final data = res.data as Map<String, dynamic>;
     return QpayInvoiceModel(
-      invoiceId: data['invoice_id']?.toString() ?? data['invoiceId']?.toString(),
-      qrText: data['qr_text']?.toString() ?? data['qrText']?.toString(),
+      invoiceId: data['id']?.toString() ?? data['invoice_id']?.toString() ?? data['invoiceId']?.toString(),
+      qrText: data['qr_code']?.toString() ?? data['qr_text']?.toString() ?? data['qrText']?.toString(),
       qrImage: data['qr_image']?.toString() ?? data['qrImage']?.toString(),
       urls: (data['urls'] as List?)?.map((e) => QpayUrlModel.fromJson(e)).toList() ?? [],
       amount: amount,

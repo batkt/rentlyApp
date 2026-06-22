@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../dashboard/dashboard_screen.dart';
-import '../duudlaga/duudlaga_screen.dart';
 import '../payment/payment_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../settings/settings_screen.dart';
@@ -27,11 +27,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.initState();
     _screens = const [
       DashboardScreen(),
-      DuudlagaScreen(),
       PaymentScreen(),
       NotificationsScreen(),
       SettingsScreen(),
     ];
+    // Reset to home tab on every fresh mount (prevents stale index after logout/login)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(_navIndexProvider.notifier).state = 0;
+    });
+  }
+
+  bool _canSee(List<String> erkhuud, String key) {
+    return erkhuud.isEmpty || erkhuud.contains(key);
   }
 
   @override
@@ -39,20 +46,75 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final currentIndex = ref.watch(_navIndexProvider);
     final unreadCount = ref.watch(unreadCountProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final user = ref.watch(currentUserProvider);
+    final erkhuud = user?.appErkhuud ?? [];
+
+    final showPayment = _canSee(erkhuud, 'payment');
+    final showNotifications = _canSee(erkhuud, 'notifications');
+    final showProfile = _canSee(erkhuud, 'profile');
+    final showChat = _canSee(erkhuud, 'chat');
+
+    // Map actual screen index → visible destination index
+    final visibleTabs = <int>[0]; // home always visible
+    if (showPayment) visibleTabs.add(1);
+    if (showNotifications) visibleTabs.add(2);
+    if (showProfile) visibleTabs.add(3);
+
+    // Clamp currentIndex to a valid visible tab
+    final safeScreenIndex = visibleTabs.contains(currentIndex) ? currentIndex : 0;
+
+    final destinations = <NavigationDestination>[
+      const NavigationDestination(
+        icon: Icon(Icons.home_outlined),
+        selectedIcon: Icon(Icons.home_rounded),
+        label: 'Нүүр',
+      ),
+      if (showPayment)
+        const NavigationDestination(
+          icon: Icon(Icons.payment_outlined),
+          selectedIcon: Icon(Icons.payment_rounded),
+          label: 'Төлбөр',
+        ),
+      if (showNotifications)
+        NavigationDestination(
+          icon: Badge(
+            isLabelVisible: unreadCount > 0,
+            label: Text(unreadCount > 99 ? '99+' : '$unreadCount'),
+            child: const Icon(Icons.notifications_outlined),
+          ),
+          selectedIcon: Badge(
+            isLabelVisible: unreadCount > 0,
+            label: Text(unreadCount > 99 ? '99+' : '$unreadCount'),
+            child: const Icon(Icons.notifications_rounded),
+          ),
+          label: 'Мэдэгдэл',
+        ),
+      if (showProfile)
+        const NavigationDestination(
+          icon: Icon(Icons.person_outline_rounded),
+          selectedIcon: Icon(Icons.person_rounded),
+          label: 'Профайл',
+        ),
+    ];
+
+    // Visible destination index for the NavigationBar
+    final navBarIndex = visibleTabs.indexOf(safeScreenIndex).clamp(0, destinations.length - 1);
 
     return Scaffold(
       body: Stack(
         children: [
           IndexedStack(
-            index: currentIndex,
+            index: safeScreenIndex,
             children: _screens,
           ),
-          const _FloatingChatBubble(),
+          if (showChat) const _FloatingChatBubble(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: currentIndex,
-        onDestinationSelected: (i) => ref.read(_navIndexProvider.notifier).state = i,
+        selectedIndex: navBarIndex,
+        onDestinationSelected: (i) {
+          ref.read(_navIndexProvider.notifier).state = visibleTabs[i];
+        },
         backgroundColor: isDark ? const Color(0xFF1E2A28) : AppColors.surface,
         indicatorColor: isDark ? const Color(0xFF1A3D37) : AppColors.primaryContainer,
         surfaceTintColor: Colors.transparent,
@@ -60,41 +122,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         elevation: 0,
         height: 68,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        destinations: [
-          const NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home_rounded),
-            label: 'Нүүр',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.campaign_outlined),
-            selectedIcon: Icon(Icons.campaign_rounded),
-            label: 'Дуудлага',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.payment_outlined),
-            selectedIcon: Icon(Icons.payment_rounded),
-            label: 'Төлбөр',
-          ),
-          NavigationDestination(
-            icon: Badge(
-              isLabelVisible: unreadCount > 0,
-              label: Text(unreadCount > 99 ? '99+' : '$unreadCount'),
-              child: const Icon(Icons.notifications_outlined),
-            ),
-            selectedIcon: Badge(
-              isLabelVisible: unreadCount > 0,
-              label: Text(unreadCount > 99 ? '99+' : '$unreadCount'),
-              child: const Icon(Icons.notifications_rounded),
-            ),
-            label: 'Мэдэгдэл',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.person_outline_rounded),
-            selectedIcon: Icon(Icons.person_rounded),
-            label: 'Профайл',
-          ),
-        ],
+        destinations: destinations,
       ),
     );
   }
@@ -142,6 +170,7 @@ class _FloatingChatBubbleState extends ConsumerState<_FloatingChatBubble>
     final convState = ref.read(conversationsProvider);
     if (convState.conversations.isNotEmpty) {
       final conv = convState.conversations.first;
+      ref.read(conversationsProvider.notifier).markRead(conv.id);
       context.push('/chat/${conv.id}', extra: conv);
     } else if (convState.error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -156,6 +185,7 @@ class _FloatingChatBubbleState extends ConsumerState<_FloatingChatBubble>
   Widget build(BuildContext context) {
     final convState = ref.watch(conversationsProvider);
     final hasConv = convState.conversations.isNotEmpty;
+    final unread = convState.conversations.fold<int>(0, (s, c) => s + c.unreadCount);
 
     return Positioned(
       left: _position.dx,
@@ -184,7 +214,7 @@ class _FloatingChatBubbleState extends ConsumerState<_FloatingChatBubble>
             scale: _isDragging ? 1.1 : (hasConv ? _pulseAnim.value : 1.0),
             child: child,
           ),
-          child: _ChatBubble(isLoading: convState.isLoading, hasConv: hasConv),
+          child: _ChatBubble(isLoading: convState.isLoading, hasConv: hasConv, unread: unread),
         ),
       ),
     );
@@ -194,12 +224,13 @@ class _FloatingChatBubbleState extends ConsumerState<_FloatingChatBubble>
 class _ChatBubble extends StatelessWidget {
   final bool isLoading;
   final bool hasConv;
+  final int unread;
 
-  const _ChatBubble({required this.isLoading, required this.hasConv});
+  const _ChatBubble({required this.isLoading, required this.hasConv, this.unread = 0});
 
   @override
   Widget build(BuildContext context) {
-    return Material(
+    final bubble = Material(
       elevation: 10,
       shadowColor: AppColors.primary.withOpacity(0.5),
       shape: const CircleBorder(),
@@ -221,6 +252,34 @@ class _ChatBubble extends StatelessWidget {
               )
             : const Icon(Icons.chat_bubble_rounded, color: Colors.white, size: 26),
       ),
+    );
+
+    if (unread <= 0) return bubble;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        bubble,
+        Positioned(
+          top: -4,
+          right: -4,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+            decoration: BoxDecoration(
+              color: AppColors.error,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white, width: 1.5),
+            ),
+            child: Center(
+              child: Text(
+                unread > 99 ? '99+' : '$unread',
+                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

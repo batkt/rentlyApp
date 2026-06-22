@@ -3,21 +3,26 @@ import '../../data/models/agreement_model.dart';
 import '../../data/repositories/agreement_repository.dart';
 import 'auth_provider.dart';
 
+// null = Бүгд (all), 1 = Идэвхтэй (active). Applied client-side so the
+// header stats and list stay consistent across filter switches.
 final agreementFilterProvider = StateProvider<int?>((ref) => 1);
 
 final agreementsProvider = FutureProvider<List<AgreementModel>>((ref) async {
   final user = ref.watch(currentUserProvider);
   if (user == null) return [];
-  final filter = ref.watch(agreementFilterProvider);
+  final selectedBarilgiinId = ref.watch(selectedBarilgiinIdProvider);
   final repo = ref.read(agreementRepositoryProvider);
-  final agreements = await repo.getAgreements(register: user.register ?? '', tuluv: filter);
+  final agreements = await repo.getAgreements(
+    register: user.register ?? '',
+    barilgiinId: selectedBarilgiinId.isNotEmpty ? selectedBarilgiinId : null,
+    pageSize: 999999,
+  );
 
-  // Fetch real-time uldegdel from /uldegdelBodyo for each agreement in parallel
+  // Fetch the real outstanding balance per agreement via /uldegdelBodyo.
   final updated = await Future.wait(
     agreements.map((a) async {
       try {
-        final data = await repo.getUldegdel(a.gereeniiDugaar, a.barilgiinId);
-        final uldegdel = (data['uldegdel'] as num?)?.toDouble() ?? a.uldegdel;
+        final uldegdel = await repo.getNiitUldegdel(a.gereeniiDugaar, a.barilgiinId);
         return a.copyWith(uldegdel: uldegdel);
       } catch (_) {
         return a;
@@ -49,4 +54,11 @@ final invoiceHistoryProvider = FutureProvider.family<List<Map<String, dynamic>>,
 final uldegdelProvider = FutureProvider.family<Map<String, dynamic>, ({String gereeniiDugaar, String barilgiinId})>((ref, args) async {
   final repo = ref.read(agreementRepositoryProvider);
   return repo.getUldegdel(args.gereeniiDugaar, args.barilgiinId);
+});
+
+typedef NiitUldegdelArgs = ({String gereeniiDugaar, String barilgiinId});
+
+final niitUldegdelProvider = FutureProvider.family<double, NiitUldegdelArgs>((ref, args) async {
+  final repo = ref.read(agreementRepositoryProvider);
+  return repo.getNiitUldegdel(args.gereeniiDugaar, args.barilgiinId);
 });

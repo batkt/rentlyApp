@@ -47,13 +47,88 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                 child: AppSearchField(
                   controller: _searchController,
-                  hint: 'Нэр, гэрээний дугаар хайх...',
+                  hint: 'Нэр, гэрээ, талбайн дугаар хайх...',
                   onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
                 ),
               ),
             ),
             SliverToBoxAdapter(child: _buildFilterTabs(filter)),
             _buildAgreementsList(agreementsAsync),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBarilgaSelector(BuildContext context) {
+    final authState = ref.watch(authStateProvider);
+    final barilguud = authState.barilguud;
+    if (barilguud.length <= 1) return const SizedBox.shrink();
+
+    final selectedId = authState.selectedBarilgiinId ?? authState.user?.barilgiinId ?? '';
+    final selected = barilguud.firstWhere((b) => b.id == selectedId, orElse: () => barilguud.first);
+
+    return GestureDetector(
+      onTap: () => _showBarilgaPicker(context, barilguud, selected.id),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.business_rounded, size: 13, color: Colors.white),
+            const SizedBox(width: 5),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 90),
+              child: Text(
+                selected.ner,
+                style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 3),
+            const Icon(Icons.expand_more_rounded, size: 14, color: Colors.white),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showBarilgaPicker(BuildContext context, List<({String id, String ner})> barilguud, String currentId) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Барилга сонгох', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 12),
+            ...barilguud.map((b) {
+              final isSelected = b.id == currentId;
+              return ListTile(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                tileColor: isSelected ? AppColors.primaryContainer : null,
+                leading: Icon(
+                  Icons.business_rounded,
+                  color: isSelected ? AppColors.primary : AppColors.textTertiary,
+                ),
+                title: Text(b.ner, style: TextStyle(fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal)),
+                trailing: isSelected ? Icon(Icons.check_rounded, color: AppColors.primary) : null,
+                onTap: () {
+                  Navigator.pop(context);
+                  ref.read(authStateProvider.notifier).switchBuilding(b.id);
+                  ref.invalidate(agreementsProvider);
+                },
+              );
+            }),
           ],
         ),
       ),
@@ -105,18 +180,22 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            user?.shortName?.isNotEmpty == true ? user!.shortName : 'Хэрэглэгч',
+                            user?.shortName.isNotEmpty == true
+                                ? user!.shortName
+                                : (user?.primaryPhone.isNotEmpty == true ? user!.primaryPhone : 'Хэрэглэгч'),
                             style: const TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.w800,
                               color: Colors.white,
                               letterSpacing: -0.3,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
                       const Spacer(),
-                      _buildRefreshButton(context),
+                      _buildBarilgaSelector(context),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -136,12 +215,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       ),
                       const SizedBox(width: 10),
                       _HeroStatCard(
-                        label: hasDebt ? 'Нийт өр' : 'Үлдэгдэл',
+                        label: hasDebt ? 'Нийт үлдэгдэл' : 'Үлдэгдэл',
                         value: agreements == null
                             ? '...'
                             : hasDebt
                                 ? AppFormatters.currency(totalDebt)
-                                : '0₮',
+                                : '0.00₮',
                         icon: hasDebt ? Icons.warning_rounded : Icons.check_circle_outline_rounded,
                         color: hasDebt ? Colors.redAccent.shade100 : Colors.greenAccent,
                         small: totalDebt > 9999999,
@@ -153,30 +232,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
           ),
         ),
-      ),
-      title: Text(
-        user?.shortName?.isNotEmpty == true ? user!.shortName : 'Нүүр',
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w700,
-          color: Colors.white,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRefreshButton(BuildContext context) {
-    return GestureDetector(
-      onTap: () => ref.refresh(agreementsProvider),
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withOpacity(0.2)),
-        ),
-        child: const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
       ),
     );
   }
@@ -209,11 +264,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ),
       ),
       data: (agreements) {
-        var filtered = _searchQuery.isEmpty
+        final filter = ref.watch(agreementFilterProvider);
+        var filtered = filter == null
             ? agreements
-            : agreements.where((a) =>
-                a.tenantName.toLowerCase().contains(_searchQuery) ||
-                a.gereeniiDugaar.toLowerCase().contains(_searchQuery)).toList();
+            : agreements.where((a) => a.tuluv == filter).toList();
+
+        if (_searchQuery.isNotEmpty) {
+          filtered = filtered.where((a) =>
+              a.tenantName.toLowerCase().contains(_searchQuery) ||
+              a.gereeniiDugaar.toLowerCase().contains(_searchQuery) ||
+              (a.talbainDugaar?.toLowerCase().contains(_searchQuery) ?? false)).toList();
+        }
 
         if (filtered.isEmpty) {
           return SliverFillRemaining(

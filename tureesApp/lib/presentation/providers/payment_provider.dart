@@ -17,7 +17,7 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
   Future<void> generateQpay({
     required String gereeniiId,
     required double amount,
-    String? dans,
+    String? dansniiDugaar,
   }) async {
     final user = _ref.read(currentUserProvider);
     if (user == null) return;
@@ -29,7 +29,7 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
         gereeniiId: gereeniiId,
         register: user.register ?? '',
         amount: amount,
-        dans: dans,
+        dansniiDugaar: dansniiDugaar,
       );
       state = state.copyWith(isLoading: false, invoice: invoice);
     } catch (e) {

@@ -142,6 +142,11 @@ class ShimmerList extends StatelessWidget {
       highlightColor: isDark ? const Color(0xFF2D3B39) : const Color(0xFFF8FAFC),
       child: ListView.separated(
         padding: const EdgeInsets.all(16),
+        // shrinkWrap + non-scrolling so it can also live inside a Column /
+        // SingleChildScrollView (e.g. the payment screen) without throwing a
+        // "RenderBox was not laid out" unbounded-height error.
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
         itemCount: itemCount,
         separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (_, __) => Container(

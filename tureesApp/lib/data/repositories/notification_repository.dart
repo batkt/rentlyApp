@@ -17,16 +17,53 @@ class NotificationRepository {
   Future<List<NotificationModel>> getNotifications({
     required String khariltsagchiinId,
     int page = 1,
-    int pageSize = 30,
+    int pageSize = 200,
   }) async {
-    final query = {'khariltsagchiinId': khariltsagchiinId};
+    // Mirror the web `useSonorduulga` query: pull every relevant turul so the
+    // Мэдэгдэл / Хүсэлт tabs can categorise them client-side.
+    final query = {
+      'khariltsagchiinId': khariltsagchiinId,
+      'turul': {
+        r'$in': [
+          'medegdel',
+          'shaardlaga',
+          'sanal',
+          'sonorduulga',
+          'duudlaga',
+          'gomdol',
+          'sanalKhuselt',
+        ],
+      },
+    };
     final res = await _client.get(ApiConstants.notifications, queryParameters: {
       'query': jsonEncode(query),
+      'order': jsonEncode({'createdAt': -1}),
       'khuudasniiDugaar': page,
       'khuudasniiKhemjee': pageSize,
     });
     final list = (res.data['jagsaalt'] as List?) ?? [];
     return list.map((e) => NotificationModel.fromJson(e)).toList();
+  }
+
+  /// Submit a tenant request/complaint (Санал хүсэлт / Гомдол) via /sanalKhadgalya,
+  /// matching the web opinion page so it shows up under the Хүсэлт tab.
+  Future<void> submitSanal({
+    required String baiguullagiinId,
+    required String barilgiinId,
+    required String khariltsagchiinId,
+    required String khariltsagchiinNer,
+    required String message,
+    String turul = 'sanal',
+  }) async {
+    await _client.post(ApiConstants.feedback, data: {
+      'baiguullagiinId': baiguullagiinId,
+      'barilgiinId': barilgiinId,
+      'turul': turul,
+      'zurguud': [],
+      'message': message,
+      'khariltsagchiinId': khariltsagchiinId,
+      'khariltsagchiinNer': khariltsagchiinNer,
+    });
   }
 
   Future<void> markNotificationRead(String notificationId) async {

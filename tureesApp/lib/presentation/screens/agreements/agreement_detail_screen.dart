@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/socket/socket_service.dart';
 import '../../../data/models/agreement_model.dart';
 import '../../providers/agreement_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../widgets/common/app_loading.dart';
 
 class AgreementDetailScreen extends ConsumerStatefulWidget {
@@ -24,28 +26,56 @@ class AgreementDetailScreen extends ConsumerStatefulWidget {
 class _AgreementDetailScreenState extends ConsumerState<AgreementDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  String? _socketEvent;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = ref.read(currentUserProvider);
+      if (user != null) {
+        _socketEvent = 'khariltsagch${user.id}';
+        ref.read(socketServiceProvider).on(_socketEvent!, _onSocketEvent);
+      }
+    });
+  }
+
+  void _onSocketEvent(dynamic _) {
+    // Refresh uldegdel and full agreement data on any notification (payment etc.)
+    if (!mounted) return;
+    final initialData = widget.initialData;
+    if (initialData != null) {
+      ref.invalidate(niitUldegdelProvider((
+        gereeniiDugaar: initialData.gereeniiDugaar,
+        barilgiinId: initialData.barilgiinId,
+      )));
+    }
+    ref.invalidate(agreementDetailProvider(widget.agreementId));
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    if (_socketEvent != null) {
+      ref.read(socketServiceProvider).off(_socketEvent!, _onSocketEvent);
+    }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final agreementAsync = widget.initialData != null
-        ? AsyncValue.data(widget.initialData)
-        : ref.watch(agreementDetailProvider(widget.agreementId));
+    // Always fetch the full agreement — initialData is only a placeholder while loading.
+    final agreementAsync = ref.watch(agreementDetailProvider(widget.agreementId));
+    // Use initialData to render immediately while the network request is in flight.
+    final placeholder = widget.initialData;
 
     return Scaffold(
       body: agreementAsync.when(
-        loading: () => const AppLoading(message: 'Ачаалж байна...'),
+        loading: () => placeholder != null
+            ? _buildContent(context, ref, placeholder)
+            : const AppLoading(message: 'Ачаалж байна...'),
         error: (err, _) => AppErrorWidget(
           message: 'Мэдээлэл ачаалахад алдаа гарлаа',
           onRetry: () => ref.refresh(agreementDetailProvider(widget.agreementId)),
@@ -59,18 +89,20 @@ class _AgreementDetailScreenState extends ConsumerState<AgreementDetailScreen>
   }
 
   Widget _buildContent(BuildContext context, WidgetRef ref, AgreementModel agreement) {
-    final uldegdelAsync = ref.watch(uldegdelProvider((
-      gereeniiDugaar: agreement.gereeniiDugaar,
-      barilgiinId: agreement.barilgiinId,
-    )));
-
-    final realUldegdel = uldegdelAsync.whenOrNull(
-      data: (d) => double.tryParse(d['uldegdel']?.toString() ?? '0') ?? 0.0,
-    ) ?? agreement.uldegdel;
-
+    final uldegdelAsync = ref.watch(niitUldegdelProvider((gereeniiDugaar: agreement.gereeniiDugaar, barilgiinId: agreement.barilgiinId)));
+    final realUldegdel = uldegdelAsync.valueOrNull ?? agreement.uldegdel;
     final hasDebt = realUldegdel > 0;
 
-    return NestedScrollView(
+    return RefreshIndicator(
+      onRefresh: () async {
+        ref.invalidate(agreementDetailProvider(widget.agreementId));
+        ref.invalidate(niitUldegdelProvider((
+          gereeniiDugaar: agreement.gereeniiDugaar,
+          barilgiinId: agreement.barilgiinId,
+        )));
+      },
+      color: AppColors.primary,
+      child: NestedScrollView(
       headerSliverBuilder: (context, innerBoxIsScrolled) => [
         SliverAppBar(
           pinned: true,
@@ -92,8 +124,9 @@ class _AgreementDetailScreenState extends ConsumerState<AgreementDetailScreen>
                 label: const Text('Төлөх', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
               ),
           ],
-          expandedHeight: 220,
+          expandedHeight: 270,
           flexibleSpace: FlexibleSpaceBar(
+            titlePadding: EdgeInsets.zero,
             background: Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
@@ -103,40 +136,37 @@ class _AgreementDetailScreenState extends ConsumerState<AgreementDetailScreen>
                 ),
               ),
               child: SafeArea(
+                bottom: false,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 60, 20, 16),
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: agreement.isActive
-                                  ? Colors.white.withOpacity(0.25)
-                                  : Colors.white.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              agreement.isActive ? 'Идэвхтэй' : 'Дуусгавар',
-                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                        ],
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(agreement.isActive ? 0.25 : 0.15),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          agreement.isActive ? 'Идэвхтэй' : 'Дуусгавар',
+                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                        ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
                       Text(
                         agreement.tenantName,
-                        style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w700),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Text(
                         agreement.gereeniiDugaar,
                         style: const TextStyle(color: Colors.white70, fontSize: 13),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
                       _BalanceBadge(uldegdel: realUldegdel, hasDebt: hasDebt, isLoading: uldegdelAsync.isLoading),
                     ],
                   ),
@@ -164,6 +194,7 @@ class _AgreementDetailScreenState extends ConsumerState<AgreementDetailScreen>
           _TransactionsTab(agreement: agreement),
           _InvoiceTab(agreement: agreement),
         ],
+      ),
       ),
     );
   }
@@ -209,7 +240,7 @@ class _BalanceBadge extends StatelessWidget {
                 ),
               const SizedBox(width: 6),
               Text(
-                hasDebt ? 'өр' : 'хэвийн',
+                hasDebt ? '' : '',
                 style: const TextStyle(color: Colors.white70, fontSize: 12),
               ),
             ],
@@ -228,7 +259,7 @@ class _InfoTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       children: [
         _Section(
           title: 'Гэрээний мэдээлэл',
@@ -242,7 +273,7 @@ class _InfoTab extends StatelessWidget {
               value: agreement.utas.isNotEmpty ? AppFormatters.phone(agreement.utas.first) : '-',
             ),
             if (agreement.talbainDugaar != null)
-              _Row(icon: Icons.door_front_door_rounded, label: 'Тасалгаа', value: agreement.talbainDugaar!),
+              _Row(icon: Icons.door_front_door_rounded, label: 'Талбайн №', value: agreement.talbainDugaar!),
             if (agreement.davkhar != null)
               _Row(icon: Icons.layers_rounded, label: 'Давхар', value: agreement.davkhar!),
             if (agreement.talbainKhemjee != null)
@@ -484,6 +515,7 @@ class _Section extends StatelessWidget {
           child: ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
             itemCount: children.length,
             separatorBuilder: (_, __) => const Divider(height: 1),
             itemBuilder: (_, i) => children[i],
@@ -503,13 +535,33 @@ class _Row extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      dense: true,
-      leading: Icon(icon, size: 17, color: AppColors.primary),
-      title: Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.appTextTertiary)),
-      trailing: Text(
-        value,
-        style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 17, color: AppColors.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            flex: 4,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 1),
+              child: Text(
+                label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.appTextTertiary),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            flex: 6,
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
       ),
     );
   }

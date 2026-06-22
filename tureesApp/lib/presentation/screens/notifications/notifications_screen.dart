@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../data/models/notification_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../widgets/cards/notification_card.dart';
@@ -23,7 +24,6 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
     _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(notificationsProvider.notifier).load();
-      ref.read(tasksProvider.notifier).load();
       ref.read(duudlagaProvider.notifier).load();
     });
   }
@@ -46,7 +46,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
           unselectedLabelColor: context.appTextTertiary,
           tabs: const [
             Tab(text: 'Мэдэгдэл'),
-            Tab(text: 'Хүсэлт'),
+            Tab(text: 'Шаардлага'),
             Tab(text: 'Дуудлага'),
           ],
         ),
@@ -61,7 +61,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
               if (_tabController.index == 2) {
                 _showNewDuudlagaDialog(context);
               } else {
-                _showNewTaskDialog(context);
+                _showNewRequestSheet(context);
               }
             },
           ),
@@ -72,75 +72,26 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
         controller: _tabController,
         children: [
           _NotificationsTab(),
-          _TasksTab(onAddTask: () => _showNewTaskDialog(context)),
+          _RequestsTab(onAddRequest: () => _showNewRequestSheet(context)),
           _DuudlagaTab(onAddDuudlaga: () => _showNewDuudlagaDialog(context)),
         ],
       ),
     );
   }
 
-  void _showNewTaskDialog(BuildContext context) {
-    final titleCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-
+  void _showNewRequestSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        decoration: BoxDecoration(
-          color: ctx.appSurface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text('Шинэ хүсэлт', style: Theme.of(ctx).textTheme.headlineSmall),
-                const Spacer(),
-                IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
-              ],
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: titleCtrl,
-              decoration: const InputDecoration(labelText: 'Гарчиг', hintText: 'Хүсэлтийн гарчиг...'),
-              textCapitalization: TextCapitalization.sentences,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: descCtrl,
-              maxLines: 3,
-              decoration: const InputDecoration(labelText: 'Дэлгэрэнгүй', hintText: 'Хүсэлтийн дэлгэрэнгүй мэдээлэл...'),
-              textCapitalization: TextCapitalization.sentences,
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () async {
-                  if (titleCtrl.text.trim().isEmpty) return;
-                  Navigator.pop(ctx);
-                  final title = titleCtrl.text.trim();
-                  final desc = descCtrl.text.trim();
-                  await ref.read(tasksProvider.notifier).submitTask(title, desc);
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Хүсэлт амжилттай илгээгдлээ')),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('Илгээх', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-              ),
-            ),
-          ],
-        ),
+      builder: (ctx) => _RequestFormSheet(
+        onSubmitted: () {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Хүсэлт амжилттай илгээгдлээ')),
+            );
+          }
+        },
       ),
     );
   }
@@ -336,12 +287,12 @@ class _DuudlagaFormSheetState extends ConsumerState<_DuudlagaFormSheet> {
             ),
           ),
           const SizedBox(height: 12),
-          _ReadOnlyField(label: 'Нэр', value: user?.fullName ?? ''),
+          _ReadOnlyField(icon: Icons.person_rounded, value: user?.fullName ?? ''),
           const SizedBox(height: 8),
-          _ReadOnlyField(label: 'Утас', value: user?.primaryPhone ?? ''),
+          _ReadOnlyField(icon: Icons.phone_rounded, value: user?.primaryPhone ?? ''),
           if ((user?.register?.isNotEmpty ?? false)) ...[
             const SizedBox(height: 8),
-            _ReadOnlyField(label: 'Регистр', value: user?.register ?? ''),
+            _ReadOnlyField(icon: Icons.badge_rounded, value: user?.register ?? ''),
           ],
           const SizedBox(height: 20),
           SizedBox(
@@ -437,21 +388,18 @@ class _DuudlagaFormSheetState extends ConsumerState<_DuudlagaFormSheet> {
 }
 
 class _ReadOnlyField extends StatelessWidget {
-  final String label;
+  final IconData icon;
   final String value;
 
-  const _ReadOnlyField({required this.label, required this.value});
+  const _ReadOnlyField({required this.icon, required this.value});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
         SizedBox(
-          width: 72,
-          child: Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.appTextTertiary),
-          ),
+          width: 32,
+          child: Icon(icon, size: 18, color: context.appTextTertiary),
         ),
         Expanded(
           child: Container(
@@ -478,6 +426,9 @@ class _NotificationsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(notificationsProvider);
+    final items = state.notifications
+        .where((n) => n.category == NotifCategory.medegdel)
+        .toList();
 
     if (state.isLoading && state.notifications.isEmpty) {
       return const ShimmerList(itemCount: 5, itemHeight: 80);
@@ -488,8 +439,17 @@ class _NotificationsTab extends ConsumerWidget {
         onRetry: () => ref.read(notificationsProvider.notifier).load(),
       );
     }
-    if (state.notifications.isEmpty) {
-      return const AppEmpty(icon: Icons.notifications_none_rounded, message: 'Мэдэгдэл байхгүй байна');
+    if (items.isEmpty) {
+      return RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () async => ref.read(notificationsProvider.notifier).load(),
+        child: ListView(
+          children: const [
+            SizedBox(height: 120),
+            AppEmpty(icon: Icons.notifications_none_rounded, message: 'Мэдэгдэл байхгүй байна'),
+          ],
+        ),
+      );
     }
 
     return RefreshIndicator(
@@ -497,12 +457,12 @@ class _NotificationsTab extends ConsumerWidget {
       onRefresh: () async => ref.read(notificationsProvider.notifier).load(),
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: state.notifications.length,
+        itemCount: items.length,
         itemBuilder: (context, index) => NotificationCard(
-          notification: state.notifications[index],
+          notification: items[index],
           onTap: () {
-            if (state.notifications[index].isUnread) {
-              ref.read(notificationsProvider.notifier).markRead(state.notifications[index].id);
+            if (items[index].isUnread) {
+              ref.read(notificationsProvider.notifier).markRead(items[index].id);
             }
           },
         ),
@@ -511,41 +471,306 @@ class _NotificationsTab extends ConsumerWidget {
   }
 }
 
-class _TasksTab extends ConsumerWidget {
-  final VoidCallback? onAddTask;
+class _RequestsTab extends ConsumerWidget {
+  final VoidCallback? onAddRequest;
 
-  const _TasksTab({this.onAddTask});
+  const _RequestsTab({this.onAddRequest});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(tasksProvider);
+    final state = ref.watch(notificationsProvider);
+    final items = state.notifications
+        .where((n) => n.category == NotifCategory.request)
+        .toList();
 
-    if (state.isLoading && state.tasks.isEmpty) {
+    if (state.isLoading && state.notifications.isEmpty) {
       return const ShimmerList(itemCount: 4, itemHeight: 80);
     }
-    if (state.error != null && state.tasks.isEmpty) {
+    if (state.error != null && state.notifications.isEmpty) {
       return AppErrorWidget(
         message: 'Хүсэлтүүд ачаалахад алдаа гарлаа',
-        onRetry: () => ref.read(tasksProvider.notifier).load(),
+        onRetry: () => ref.read(notificationsProvider.notifier).load(),
       );
     }
-    if (state.tasks.isEmpty) {
-      return AppEmpty(
-        icon: Icons.build_outlined,
-        message: 'Хүсэлт байхгүй байна',
-        subMessage: 'Засвар үйлчилгээний хүсэлт илгээхийн тулд + товчийг дарна уу',
-        onAction: onAddTask,
-        actionLabel: 'Хүсэлт илгээх',
+    if (items.isEmpty) {
+      return RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () async => ref.read(notificationsProvider.notifier).load(),
+        child: ListView(
+          children: [
+            const SizedBox(height: 80),
+            AppEmpty(
+              icon: Icons.forum_outlined,
+              message: 'Хүсэлт байхгүй байна',
+              subMessage: 'Санал хүсэлт, гомдол илгээхийн тулд + товчийг дарна уу',
+              onAction: onAddRequest,
+              actionLabel: 'Хүсэлт илгээх',
+            ),
+          ],
+        ),
       );
     }
 
     return RefreshIndicator(
       color: AppColors.primary,
-      onRefresh: () async => ref.read(tasksProvider.notifier).load(),
+      onRefresh: () async => ref.read(notificationsProvider.notifier).load(),
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: state.tasks.length,
-        itemBuilder: (context, index) => TaskCard(task: state.tasks[index]),
+        itemCount: items.length,
+        itemBuilder: (context, index) => _RequestCard(notification: items[index]),
+      ),
+    );
+  }
+}
+
+/// Status label + colour for a request/notification, based on `tuluv`.
+/// 0 = pending, 1 = approved/resolved, -1 = declined, else awaiting action.
+({String label, Color color}) notifStatus(int tuluv) {
+  switch (tuluv) {
+    case 1:
+      return (label: 'Зөвшөөрөгдсөн', color: AppColors.success);
+    case -1:
+      return (label: 'Татгалзсан', color: AppColors.error);
+    case 2:
+      return (label: 'Зөвшөөрөх', color: AppColors.info);
+    default:
+      return (label: 'Хүлээгдэж байгаа', color: AppColors.warning);
+  }
+}
+
+class _RequestCard extends StatelessWidget {
+  final NotificationModel notification;
+
+  const _RequestCard({required this.notification});
+
+  @override
+  Widget build(BuildContext context) {
+    // Шаардлага and Гомдол are flagged red; Санал хүсэлт stays blue.
+    final label = notification.requestTypeLabel;
+    final accent = (label == 'Гомдол' || label == 'Шаардлага')
+        ? AppColors.error
+        : AppColors.info;
+    final status = notifStatus(notification.tuluv);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.appCardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: context.appDivider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  label,
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: accent),
+                ),
+              ),
+              const Spacer(),
+              if (notification.createdAt != null)
+                Text(AppFormatters.dateTime(notification.createdAt),
+                    style: Theme.of(context).textTheme.labelSmall),
+            ],
+          ),
+          if (notification.message.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(notification.message, style: Theme.of(context).textTheme.bodyMedium),
+          ],
+          const SizedBox(height: 8),
+          _StatusPill(status: status),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  final ({String label, Color color}) status;
+
+  const _StatusPill({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: status.color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: status.color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 5),
+          Text(status.label,
+              style: TextStyle(fontSize: 11, color: status.color, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Bottom sheet to submit a Санал хүсэлт / Гомдол, mirroring the web opinion page.
+class _RequestFormSheet extends ConsumerStatefulWidget {
+  final VoidCallback? onSubmitted;
+
+  const _RequestFormSheet({this.onSubmitted});
+
+  @override
+  ConsumerState<_RequestFormSheet> createState() => _RequestFormSheetState();
+}
+
+class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
+  final _msgCtrl = TextEditingController();
+  String _turul = 'sanal';
+  bool _loading = false;
+
+  @override
+  void dispose() {
+    _msgCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_msgCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Тайлбар оруулна уу')),
+      );
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      await ref.read(notificationsProvider.notifier).submitRequest(
+            message: _msgCtrl.text.trim(),
+            turul: _turul,
+          );
+      if (!mounted) return;
+      Navigator.pop(context);
+      widget.onSubmitted?.call();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Алдаа: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: context.appSurface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.fromLTRB(24, 20, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('Шинэ хүсэлт', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+              const Spacer(),
+              IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _TurulChoice(
+                label: 'Санал хүсэлт',
+                selected: _turul == 'sanal',
+                color: AppColors.info,
+                onTap: () => setState(() => _turul = 'sanal'),
+              ),
+              const SizedBox(width: 10),
+              _TurulChoice(
+                label: 'Гомдол',
+                selected: _turul == 'gomdol',
+                color: AppColors.warning,
+                onTap: () => setState(() => _turul = 'gomdol'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _msgCtrl,
+            maxLines: 4,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: InputDecoration(
+              labelText: 'Тайлбар',
+              hintText: _turul == 'gomdol' ? 'Гомдлын тайлбар...' : 'Санал хүсэлт...',
+            ),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _loading ? null : _submit,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: _loading
+                  ? const SizedBox(
+                      width: 20, height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Илгээх', style: TextStyle(fontWeight: FontWeight.w600)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TurulChoice extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _TurulChoice({required this.label, required this.selected, required this.color, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? color : context.appInputFill,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: selected ? color : context.appDivider),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: selected ? Colors.white : context.appTextSecondary,
+            ),
+          ),
+        ),
       ),
     );
   }

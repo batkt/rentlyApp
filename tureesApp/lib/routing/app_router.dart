@@ -15,11 +15,19 @@ import '../presentation/screens/payment/qpay_screen.dart';
 import '../presentation/screens/chat/chat_detail_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authStateProvider);
+  // Build the router ONCE. Recreating GoRouter on every auth change spawns a
+  // fresh Navigator GlobalKey and triggers "GlobalKey used multiple times"
+  // crashes on rebuild (e.g. toggling dark mode). Instead, refresh redirects
+  // through a Listenable that fires when auth state changes.
+  final refresh = ValueNotifier<int>(0);
+  ref.listen(authStateProvider, (_, __) => refresh.value++);
+  ref.onDispose(refresh.dispose);
 
   return GoRouter(
     initialLocation: '/login',
+    refreshListenable: refresh,
     redirect: (context, state) {
+      final authState = ref.read(authStateProvider);
       final isLoggedIn = authState.isAuthenticated;
       final isLoading = authState.isLoading;
       final isLoginPage = state.matchedLocation == '/login';
@@ -34,7 +42,10 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
       GoRoute(path: '/org-select', builder: (_, __) => const OrgSelectScreen()),
-      GoRoute(path: '/reset-password', builder: (_, __) => const ResetPasswordScreen()),
+      GoRoute(
+        path: '/reset-password',
+        builder: (_, state) => ResetPasswordScreen(initialPhone: state.extra as String?),
+      ),
       GoRoute(
         path: '/home',
         builder: (_, __) => const HomeScreen(),

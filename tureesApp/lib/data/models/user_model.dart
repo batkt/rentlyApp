@@ -10,6 +10,7 @@ class UserModel {
   final String barilgiinId;
   final String zochinTurul;
   final String? token;
+  final List<String> appErkhuud;
 
   const UserModel({
     required this.id,
@@ -23,6 +24,7 @@ class UserModel {
     required this.barilgiinId,
     required this.zochinTurul,
     this.token,
+    this.appErkhuud = const [],
   });
 
   String get fullName => '$ovog $ner'.trim();
@@ -42,6 +44,7 @@ class UserModel {
       barilgiinId: json['barilgiinId']?.toString() ?? '',
       zochinTurul: json['zochinTurul']?.toString() ?? '',
       token: json['token']?.toString(),
+      appErkhuud: (json['appErkhuud'] as List?)?.map((e) => e.toString()).toList() ?? [],
     );
   }
 

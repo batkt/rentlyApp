@@ -49,8 +49,9 @@ class SocketService {
     _socket?.on(event, handler);
   }
 
-  void off(String event) {
-    _socket?.off(event);
+  /// Pass [handler] to remove only that listener; omit to clear all for [event].
+  void off(String event, [Function(dynamic)? handler]) {
+    _socket?.off(event, handler);
   }
 
   void emit(String event, dynamic data) {

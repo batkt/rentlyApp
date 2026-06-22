@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 class AppFormatters {
-  static final _currencyFormatter = NumberFormat('#,###', 'mn');
+  static final _currencyFormatter = NumberFormat('#,##0.00', 'mn');
   static final _dateFormatter = DateFormat('yyyy.MM.dd');
   static final _dateTimeFormatter = DateFormat('yyyy.MM.dd HH:mm');
 

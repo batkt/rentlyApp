@@ -56,6 +56,20 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
     }
   }
 
+  Future<void> submitRequest({required String message, String turul = 'sanal'}) async {
+    final user = _ref.read(currentUserProvider);
+    if (user == null) return;
+    await _repo.submitSanal(
+      baiguullagiinId: user.baiguullagiinId,
+      barilgiinId: user.barilgiinId,
+      khariltsagchiinId: user.id,
+      khariltsagchiinNer: user.fullName,
+      message: message,
+      turul: turul,
+    );
+    await load();
+  }
+
   Future<void> markRead(String id) async {
     await _repo.markNotificationRead(id);
     state = state.copyWith(
@@ -64,7 +78,8 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
           return NotificationModel(
             id: n.id, title: n.title, message: n.message,
             khariltsagchiinId: n.khariltsagchiinId, baiguullagiinId: n.baiguullagiinId,
-            tuluv: 1, turul: n.turul, createdAt: n.createdAt,
+            tuluv: 1, turul: n.turul, duudlagiinTurul: n.duudlagiinTurul,
+            createdAt: n.createdAt,
           );
         }
         return n;

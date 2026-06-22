@@ -56,7 +56,6 @@ class AuthRepository {
     required String phone,
     required String newPassword,
   }) async {
-    // Step 1: verify phone and get user + one-time token
     final checkRes = await _client.post(
       ApiConstants.resetPasswordCheck,
       data: {'utas': phone},
@@ -71,12 +70,54 @@ class AuthRepository {
     final id = khariltsagch['_id']?.toString();
     if (id == null || id.isEmpty) throw Exception('Хэрэглэгч олдсонгүй');
 
-    // Step 2: update password using the returned token
     final updated = Map<String, dynamic>.from(khariltsagch);
     updated['nuutsUg'] = newPassword;
     await _client.put(
       '${ApiConstants.khariltsagch}/$id',
       data: updated,
+      options: Options(headers: {'Authorization': 'bearer $token'}),
+    );
+  }
+
+  /// Step 1 of OTP password recovery: sends a 6-digit code to the phone via SMS.
+  /// Returns the khariltsagch._id needed for step 2.
+  Future<String> sendRecoveryCode(String phone) async {
+    // ignore: avoid_print
+    print('[OTP] Sending recovery code to phone: $phone');
+    final res = await _client.post(
+      ApiConstants.sergeekhKodAvya,
+      data: {'utas': phone},
+    );
+    // ignore: avoid_print
+    print('[OTP] sendRecoveryCode response: status=${res.statusCode} data=${res.data}');
+    final id = res.data?.toString() ?? '';
+    // ignore: avoid_print
+    print('[OTP] Parsed khariltsagch id: "$id"');
+    return id;
+  }
+
+  /// Step 2: verifies the code. Returns a one-time token.
+  Future<String> verifyRecoveryCode(String id, String code) async {
+    // ignore: avoid_print
+    print('[OTP] Verifying code: id=$id code=$code');
+    final res = await _client.post(
+      ApiConstants.nuutsUgSergeeye,
+      data: {'id': id, 'sergeekhKod': code},
+    );
+    // ignore: avoid_print
+    print('[OTP] verifyRecoveryCode response: status=${res.statusCode} data=${res.data}');
+    final data = res.data as Map<String, dynamic>;
+    final token = data['token']?.toString() ?? '';
+    // ignore: avoid_print
+    print('[OTP] Parsed token: "${token.isEmpty ? "EMPTY" : "ok (${token.length} chars)"}');
+    return token;
+  }
+
+  /// Step 3: updates the password using the one-time token from step 2.
+  Future<void> updatePassword(String id, String newPassword, String token) async {
+    await _client.put(
+      '${ApiConstants.khariltsagch}/$id',
+      data: {'nuutsUg': newPassword},
       options: Options(headers: {'Authorization': 'bearer $token'}),
     );
   }

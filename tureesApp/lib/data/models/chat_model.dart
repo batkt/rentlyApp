@@ -15,6 +15,15 @@ class ConversationModel {
     required this.unreadCount,
   });
 
+  ConversationModel withUnread(int count) => ConversationModel(
+        id: id,
+        khariltsagchiinNer: khariltsagchiinNer,
+        khariltsagchiinId: khariltsagchiinId,
+        lastMessage: lastMessage,
+        lastMessageAt: lastMessageAt,
+        unreadCount: count,
+      );
+
   factory ConversationModel.fromJson(Map<String, dynamic> json) {
     return ConversationModel(
       id: json['_id']?.toString() ?? '',

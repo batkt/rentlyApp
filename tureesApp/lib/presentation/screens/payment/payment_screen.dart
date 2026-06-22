@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../data/models/agreement_model.dart';
@@ -21,11 +22,15 @@ class PaymentScreen extends ConsumerStatefulWidget {
   ConsumerState<PaymentScreen> createState() => _PaymentScreenState();
 }
 
+final _numFmt = NumberFormat('#,##0.##', 'mn');
+
 class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   final _amountController = TextEditingController();
   AgreementModel? _selectedAgreement;
   double? _realUldegdel;
+  String? _dansniiDugaar;
   bool _loadingUldegdel = false;
+  bool _autoSelectDone = false;
 
   @override
   void initState() {
@@ -49,16 +54,20 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     });
     try {
       final repo = ref.read(agreementRepositoryProvider);
-      final data = await repo.getUldegdel(agreement.gereeniiDugaar, agreement.barilgiinId);
-      final uldegdel = (data['uldegdel'] as num?)?.toDouble() ?? 0.0;
+      final results = await Future.wait([
+        repo.getNiitUldegdel(agreement.gereeniiDugaar, agreement.barilgiinId),
+        repo.getDansniiDugaar(agreement.id),
+      ]);
       if (!mounted) return;
+      final uldegdel = results[0] as double;
+      final dans = results[1] as String?;
       setState(() {
         _realUldegdel = uldegdel;
+        _dansniiDugaar = dans;
         _loadingUldegdel = false;
       });
-      // Auto-fill the amount if there is a debt
       if (uldegdel > 0 && _amountController.text.isEmpty) {
-        _amountController.text = uldegdel.toStringAsFixed(0);
+        _amountController.text = _numFmt.format(uldegdel);
       }
     } catch (_) {
       if (!mounted) return;
@@ -88,6 +97,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     await ref.read(paymentNotifierProvider.notifier).generateQpay(
       gereeniiId: _selectedAgreement!.id,
       amount: amount,
+      dansniiDugaar: _dansniiDugaar,
     );
 
     final state = ref.read(paymentNotifierProvider);
@@ -110,7 +120,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final paymentState = ref.watch(paymentNotifierProvider);
     final agreementsAsync = ref.watch(agreementsProvider);
 
@@ -118,9 +127,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       backgroundColor: context.appBackground,
       appBar: AppBar(
         title: const Text('Төлбөр төлөх'),
-        backgroundColor: isDark ? const Color(0xFF1E2A28) : AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -129,8 +135,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           children: [
             _buildAgreementSelector(agreementsAsync),
             const SizedBox(height: 16),
-            if (_selectedAgreement != null) _buildBalanceSummary(),
-            const SizedBox(height: 16),
+            const SizedBox(height: 0),
             _buildAmountInput(),
             const SizedBox(height: 8),
             _buildQuickAmounts(),
@@ -161,13 +166,35 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             if (widget.selectedAgreement != null) {
               return _SelectedAgreementTile(
                 agreement: _selectedAgreement!,
-                onClear: () {
-                  setState(() {
-                    _selectedAgreement = null;
-                    _realUldegdel = null;
-                    _amountController.clear();
-                  });
-                },
+                onClear: null,
+              );
+            }
+
+            // Auto-select single agreement
+            if (active.length == 1 && !_autoSelectDone) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted || _autoSelectDone) return;
+                setState(() {
+                  _autoSelectDone = true;
+                  _selectedAgreement = active.first;
+                  _realUldegdel = null;
+                  _amountController.clear();
+                });
+                _fetchRealUldegdel(active.first);
+              });
+            }
+
+            if (_selectedAgreement != null) {
+              return _SelectedAgreementTile(
+                agreement: _selectedAgreement!,
+                onClear: active.length > 1
+                    ? () => setState(() {
+                          _selectedAgreement = null;
+                          _realUldegdel = null;
+                          _dansniiDugaar = null;
+                          _amountController.clear();
+                        })
+                    : null,
               );
             }
 
@@ -199,6 +226,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                     setState(() {
                       _selectedAgreement = v;
                       _realUldegdel = null;
+                      _dansniiDugaar = null;
                       _amountController.clear();
                     });
                     if (v != null) _fetchRealUldegdel(v);
@@ -212,120 +240,90 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     );
   }
 
-  Widget _buildBalanceSummary() {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _hasDebt ? context.appErrorLight : context.appSuccessLight,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: _hasDebt ? AppColors.error.withOpacity(0.25) : AppColors.success.withOpacity(0.25),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: (_hasDebt ? AppColors.error : AppColors.success).withOpacity(0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              _hasDebt ? Icons.warning_rounded : Icons.check_circle_rounded,
-              color: _hasDebt ? AppColors.error : AppColors.success,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _loadingUldegdel
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Үлдэгдэл тооцоолж байна...', style: Theme.of(context).textTheme.bodySmall),
-                      const SizedBox(height: 4),
-                      LinearProgressIndicator(
-                        color: AppColors.primary,
-                        backgroundColor: AppColors.primary.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ],
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _hasDebt ? 'Нийт өр' : 'Үлдэгдэл (0)',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: _hasDebt ? AppColors.error : AppColors.success,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        AppFormatters.currency(_displayUldegdel),
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 20,
-                          color: _hasDebt ? AppColors.error : AppColors.success,
-                        ),
-                      ),
-                    ],
-                  ),
-          ),
-          if (_hasDebt && !_loadingUldegdel)
-            TextButton(
-              onPressed: () {
-                _amountController.text = _displayUldegdel.toStringAsFixed(0);
-              },
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                backgroundColor: AppColors.error.withOpacity(0.1),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              child: const Text(
-                'Бүгдийг\nтөлөх',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 11, color: AppColors.error, fontWeight: FontWeight.w700),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildAmountInput() {
     return AppTextField(
       label: 'Төлөх дүн (₮)',
       hint: '0',
       controller: _amountController,
       keyboardType: const TextInputType.numberWithOptions(decimal: false),
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      inputFormatters: [_ThousandsSeparatorFormatter()],
       prefixIcon: Icon(Icons.monetization_on_rounded, size: 18, color: context.appTextTertiary),
     );
   }
 
   Widget _buildQuickAmounts() {
-    final amounts = [10000, 50000, 100000, 200000, 500000];
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: amounts.map((amount) => GestureDetector(
-        onTap: () => _amountController.text = amount.toString(),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          decoration: BoxDecoration(
-            color: context.appInputFill,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: context.appDivider),
+    const fixed = [10000, 50000, 100000, 200000, 500000];
+    final uldegdel = _displayUldegdel;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Нийт үлдэгдэл button — shown prominently when there's a balance
+        if (uldegdel > 0 && !_loadingUldegdel) ...[
+          GestureDetector(
+            onTap: () => _amountController.text = _numFmt.format(uldegdel.toInt()),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.error.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.error.withOpacity(0.35), width: 1.5),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.account_balance_wallet_rounded, size: 16, color: AppColors.error),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Нийт үлдэгдэл',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.error),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    AppFormatters.currency(uldegdel),
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.error),
+                  ),
+                ],
+              ),
+            ),
           ),
-          child: Text(
-            AppFormatters.currency(amount),
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: context.appTextSecondary),
-          ),
+          const SizedBox(height: 10),
+        ],
+        // Fixed quick-pick chips
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: fixed.map((amount) {
+            final isSelected = _amountController.text == _numFmt.format(amount);
+            return GestureDetector(
+              onTap: () => setState(() => _amountController.text = _numFmt.format(amount)),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.primary.withOpacity(0.1) : context.appInputFill,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected ? AppColors.primary : context.appDivider,
+                    width: isSelected ? 1.5 : 1,
+                  ),
+                ),
+                child: Text(
+                  AppFormatters.currency(amount),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected ? AppColors.primary : context.appTextSecondary,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
         ),
-      )).toList(),
+      ],
     );
   }
 
@@ -382,7 +380,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
 class _SelectedAgreementTile extends StatelessWidget {
   final AgreementModel agreement;
-  final VoidCallback onClear;
+  final VoidCallback? onClear;
 
   const _SelectedAgreementTile({required this.agreement, required this.onClear});
 
@@ -428,6 +426,32 @@ class _SelectedAgreementTile extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ThousandsSeparatorFormatter extends TextInputFormatter {
+  static final _intFmt = NumberFormat('#,###', 'mn');
+
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    final text = newValue.text;
+    final hasDot = text.contains('.');
+    final parts = text.split('.');
+    final intDigits = parts[0].replaceAll(RegExp(r'[^0-9]'), '');
+    final decDigits = hasDot ? (parts.length > 1 ? parts[1].replaceAll(RegExp(r'[^0-9]'), '') : '') : null;
+
+    if (intDigits.isEmpty && decDigits == null) {
+      return newValue.copyWith(text: '', selection: const TextSelection.collapsed(offset: 0));
+    }
+
+    final intNumber = int.tryParse(intDigits.isEmpty ? '0' : intDigits) ?? 0;
+    var formatted = intDigits.isEmpty ? '0' : _intFmt.format(intNumber);
+    if (decDigits != null) formatted = '$formatted.${decDigits.substring(0, decDigits.length > 2 ? 2 : decDigits.length)}';
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

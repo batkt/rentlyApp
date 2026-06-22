@@ -1,9 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
@@ -11,6 +11,7 @@ import '../../../core/socket/socket_service.dart';
 import '../../../data/models/payment_model.dart';
 import '../../providers/payment_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/agreement_provider.dart';
 import '../../widgets/common/app_button.dart';
 
 class QpayScreen extends ConsumerStatefulWidget {
@@ -54,6 +55,7 @@ class _QpayScreenState extends ConsumerState<QpayScreen> with SingleTickerProvid
   void _onPaymentConfirmed() {
     _pollTimer?.cancel();
     ref.read(paymentNotifierProvider.notifier).markPaid();
+    ref.invalidate(agreementsProvider);
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -80,16 +82,15 @@ class _QpayScreenState extends ConsumerState<QpayScreen> with SingleTickerProvid
   }
 
   Future<void> _openApp(String link) async {
-    final uri = Uri.parse(link);
-    if (await canLaunchUrl(uri)) {
+    try {
+      final uri = Uri.parse(link);
       await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+    } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
     final paymentState = ref.watch(paymentNotifierProvider);
-    final qrText = widget.invoice.qrText ?? '';
 
     return Scaffold(
       appBar: AppBar(
@@ -112,7 +113,7 @@ class _QpayScreenState extends ConsumerState<QpayScreen> with SingleTickerProvid
           children: [
             _buildAmountHeader(),
             const SizedBox(height: 24),
-            _buildQrSection(qrText),
+            _buildQrSection(widget.invoice.qrImage, widget.invoice.qrText),
             const SizedBox(height: 24),
             _buildInstructions(),
             if (widget.invoice.urls.isNotEmpty) ...[
@@ -168,8 +169,12 @@ class _QpayScreenState extends ConsumerState<QpayScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildQrSection(String qrText) {
-    if (qrText.isEmpty) {
+  Widget _buildQrSection(String? qrImage, String? qrText) {
+    final hasImage = qrImage != null && qrImage.isNotEmpty;
+    final hasText = qrText != null && qrText.isNotEmpty;
+    final safeQrText = qrText ?? '';
+
+    if (!hasImage && !hasText) {
       return Container(
         height: 240,
         decoration: BoxDecoration(
@@ -178,6 +183,23 @@ class _QpayScreenState extends ConsumerState<QpayScreen> with SingleTickerProvid
           border: Border.all(color: context.appDivider),
         ),
         child: Center(child: Text('QR код байхгүй', style: TextStyle(color: context.appTextTertiary))),
+      );
+    }
+
+    Widget qrWidget;
+    if (hasImage) {
+      try {
+        final bytes = base64Decode(qrImage);
+        qrWidget = Image.memory(bytes, width: 220, height: 220, fit: BoxFit.contain);
+      } catch (_) {
+        qrWidget = const Icon(Icons.qr_code_2_rounded, size: 120, color: AppColors.primary);
+      }
+    } else {
+      qrWidget = Container(
+        width: 220,
+        height: 220,
+        color: Colors.white,
+        child: Center(child: Text(safeQrText, style: const TextStyle(fontSize: 8))),
       );
     }
 
@@ -203,23 +225,25 @@ class _QpayScreenState extends ConsumerState<QpayScreen> with SingleTickerProvid
           ),
           child: Column(
             children: [
-              QrImageView(data: qrText, size: 220, backgroundColor: Colors.white),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  TextButton.icon(
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: qrText));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Хуулагдлаа'), duration: Duration(seconds: 2)),
-                      );
-                    },
-                    icon: const Icon(Icons.copy_rounded, size: 16),
-                    label: const Text('Хуулах', style: TextStyle(fontSize: 13)),
-                  ),
-                ],
-              ),
+              qrWidget,
+              if (hasText) ...[
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: safeQrText));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Хуулагдлаа'), duration: Duration(seconds: 2)),
+                        );
+                      },
+                      icon: const Icon(Icons.copy_rounded, size: 16),
+                      label: const Text('Хуулах', style: TextStyle(fontSize: 13)),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         );

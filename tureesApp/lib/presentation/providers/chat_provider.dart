@@ -9,7 +9,11 @@ import 'auth_provider.dart';
 
 final conversationsProvider = StateNotifierProvider<ConversationsNotifier, ConversationsState>((ref) {
   final user = ref.watch(currentUserProvider);
-  return ConversationsNotifier(ref.read(chatRepositoryProvider), user);
+  return ConversationsNotifier(
+    ref.read(chatRepositoryProvider),
+    user,
+    ref.read(socketServiceProvider),
+  );
 });
 
 final activeConversationProvider = StateProvider<String?>((ref) => null);
@@ -49,8 +53,38 @@ class ConversationsState {
 class ConversationsNotifier extends StateNotifier<ConversationsState> {
   final ChatRepository _repo;
   final UserModel? _user;
+  final SocketService _socket;
+  String? _event;
 
-  ConversationsNotifier(this._repo, this._user) : super(const ConversationsState());
+  ConversationsNotifier(this._repo, this._user, this._socket) : super(const ConversationsState()) {
+    final user = _user;
+    if (user != null) {
+      _event = 'shineChatKhariult${user.id}';
+      _socket.on(_event!, _onIncoming);
+    }
+  }
+
+  // A reply from an admin/agent just arrived → surface it on the chat bubble.
+  void _onIncoming(dynamic data) {
+    if (data is! Map) return;
+    final msg = data['message'];
+    final isFromUser = msg is Map && msg['role'] == 'user';
+    if (isFromUser) return; // ignore our own echoed messages
+    final convId = data['conversationId']?.toString();
+    final updated = state.conversations
+        .map((c) => (convId == null || c.id == convId) ? c.withUnread(c.unreadCount + 1) : c)
+        .toList();
+    state = state.copyWith(conversations: updated);
+  }
+
+  /// Clear the unread badge once the user has opened the conversation.
+  void markRead(String conversationId) {
+    state = state.copyWith(
+      conversations: state.conversations
+          .map((c) => c.id == conversationId ? c.withUnread(0) : c)
+          .toList(),
+    );
+  }
 
   Future<void> load() async {
     final user = _user;
@@ -59,7 +93,7 @@ class ConversationsNotifier extends StateNotifier<ConversationsState> {
     try {
       final conv = await _repo.getOrCreateConversation(
         khariltsagchiinId: user.id,
-        khariltsagchiinNer: user.fullName,
+        khariltsagchiinNer: user.fullName.isNotEmpty ? user.fullName : user.primaryPhone,
         baiguullagiinId: user.baiguullagiinId,
         barilgiinId: user.barilgiinId,
       );
@@ -67,6 +101,12 @@ class ConversationsNotifier extends StateNotifier<ConversationsState> {
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
+  }
+
+  @override
+  void dispose() {
+    if (_event != null) _socket.off(_event!, _onIncoming);
+    super.dispose();
   }
 }
 
@@ -156,7 +196,7 @@ class MessagesNotifier extends StateNotifier<MessagesState> {
 
   @override
   void dispose() {
-    _socket.off('shineChatKhariult$_userId');
+    _socket.off('shineChatKhariult$_userId', _onNewMessage);
     super.dispose();
   }
 }

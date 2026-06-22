@@ -8,6 +8,7 @@ class AppTheme {
     final base = ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
+      fontFamily: GoogleFonts.notoSans().fontFamily,
       colorScheme: ColorScheme.dark(
         primary: AppColors.primary,
         primaryContainer: const Color(0xFF1A3D37),
@@ -95,6 +96,7 @@ class AppTheme {
   static ThemeData get light {
     final base = ThemeData(
       useMaterial3: true,
+      fontFamily: GoogleFonts.notoSans().fontFamily,
       colorScheme: const ColorScheme.light(
         primary: AppColors.primary,
         primaryContainer: AppColors.primaryContainer,

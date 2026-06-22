@@ -81,6 +81,14 @@ class SecureStorageService {
     return val == 'true';
   }
 
+  Future<void> saveBuildings(String json) async {
+    await _storage.write(key: 'barilguud', value: json);
+  }
+
+  Future<String?> getBuildings() async {
+    return await _storage.read(key: 'barilguud');
+  }
+
   Future<void> write(String key, String value) async {
     await _storage.write(key: key, value: value);
   }

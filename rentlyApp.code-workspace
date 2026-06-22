@@ -8,6 +8,9 @@
 		},
 		{
 			"path": "../tureesBack"
+		},
+		{
+			"path": "../turees"
 		}
 	],
 	"settings": {}

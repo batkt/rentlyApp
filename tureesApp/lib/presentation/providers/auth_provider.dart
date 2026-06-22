@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/services/biometric_service.dart';
@@ -19,6 +21,11 @@ final currentUserProvider = Provider<UserModel?>((ref) {
   return ref.watch(authStateProvider).user;
 });
 
+final selectedBarilgiinIdProvider = Provider<String>((ref) {
+  final s = ref.watch(authStateProvider);
+  return s.selectedBarilgiinId ?? s.user?.barilgiinId ?? '';
+});
+
 class AuthState {
   final bool isLoading;
   final UserModel? user;
@@ -27,6 +34,8 @@ class AuthState {
   final List<OrgSelectionModel> orgOptions;
   final String? pendingPhone;
   final String? pendingPassword;
+  final List<({String id, String ner})> barilguud;
+  final String? selectedBarilgiinId;
 
   const AuthState({
     this.isLoading = false,
@@ -36,6 +45,8 @@ class AuthState {
     this.orgOptions = const [],
     this.pendingPhone,
     this.pendingPassword,
+    this.barilguud = const [],
+    this.selectedBarilgiinId,
   });
 
   AuthState copyWith({
@@ -46,6 +57,9 @@ class AuthState {
     List<OrgSelectionModel>? orgOptions,
     String? pendingPhone,
     String? pendingPassword,
+    List<({String id, String ner})>? barilguud,
+    String? selectedBarilgiinId,
+    bool clearSelectedBarilgiinId = false,
   }) {
     return AuthState(
       isLoading: isLoading ?? this.isLoading,
@@ -55,6 +69,8 @@ class AuthState {
       orgOptions: orgOptions ?? this.orgOptions,
       pendingPhone: pendingPhone ?? this.pendingPhone,
       pendingPassword: pendingPassword ?? this.pendingPassword,
+      barilguud: barilguud ?? this.barilguud,
+      selectedBarilgiinId: clearSelectedBarilgiinId ? null : (selectedBarilgiinId ?? this.selectedBarilgiinId),
     );
   }
 }
@@ -75,7 +91,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (isLoggedIn) {
         final user = await _repo.getUserByToken();
         if (user != null) {
-          state = state.copyWith(isLoading: false, user: user, isAuthenticated: true);
+          final barilguud = await _loadBarilguud();
+          state = state.copyWith(isLoading: false, user: user, isAuthenticated: true, barilguud: barilguud);
           await _socket.connect();
           _socket.joinOrgRoom(user.baiguullagiinId);
           _socket.joinUserRoom(user.id);
@@ -157,7 +174,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       userRegister: user.register,
     );
 
-    state = state.copyWith(isLoading: false, user: user, isAuthenticated: true);
+    final barilguud = await _loadBarilguud();
+    state = state.copyWith(isLoading: false, user: user, isAuthenticated: true, barilguud: barilguud);
     await _socket.connect();
     _socket.joinOrgRoom(user.baiguullagiinId);
     _socket.joinUserRoom(user.id);
@@ -168,6 +186,30 @@ class AuthNotifier extends StateNotifier<AuthState> {
     _socket.disconnect();
     await _storage.clearAll();
     state = const AuthState();
+  }
+
+  Future<void> reloadBarilguud() async {
+    final barilguud = await _loadBarilguud();
+    state = state.copyWith(barilguud: barilguud);
+  }
+
+  Future<void> switchBuilding(String barilgiinId) async {
+    await _storage.write('selected_barilgiinId', barilgiinId);
+    state = state.copyWith(selectedBarilgiinId: barilgiinId);
+  }
+
+  Future<List<({String id, String ner})>> _loadBarilguud() async {
+    try {
+      final json = await _storage.getBuildings();
+      if (json == null || json.isEmpty) return [];
+      final list = jsonDecode(json) as List;
+      return list
+          .map((e) => (id: (e['id'] ?? '').toString(), ner: (e['ner'] ?? '').toString()))
+          .where((b) => b.id.isNotEmpty)
+          .toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   String _parseError(Object e) {

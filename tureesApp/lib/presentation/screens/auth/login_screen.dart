@@ -1,10 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:local_auth/local_auth.dart';
 import '../../../core/services/biometric_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/storage/secure_storage.dart';
@@ -33,7 +33,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   String _lastCheckedPhone = '';
 
   bool _canUseBiometric = false;
-  bool _biometricEnabled = false;
   bool _isBiometricLoading = false;
 
   late AnimationController _fadeController;
@@ -57,7 +56,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     if (mounted) {
       setState(() {
         _canUseBiometric = available && hasToken;
-        _biometricEnabled = enabled;
       });
       // Auto-trigger biometric if previously enabled
       if (available && enabled && hasToken) {
@@ -132,17 +130,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     if (!mounted) return;
 
     if (result == LoginResult.success) {
-      // Offer biometric setup on first successful login
-      if (_canUseBiometric && !_biometricEnabled) {
-        await _offerBiometricSetup();
+      // Save the selected org's buildings so the dashboard can show a selector
+      final org = _orgs.isEmpty
+          ? null
+          : (_selectedOrgId != null
+              ? _orgs.firstWhere((o) => o.id == _selectedOrgId, orElse: () => _orgs.first)
+              : _orgs.first);
+      if (org != null && org.barilguud.isNotEmpty) {
+        final json = jsonEncode(org.barilguud.map((b) => {'id': b.id, 'ner': b.ner}).toList());
+        await ref.read(secureStorageProvider).saveBuildings(json);
+        await ref.read(authStateProvider.notifier).reloadBarilguud();
       }
-      context.go('/home');
+      await _offerBiometricSetup();
+      if (mounted) context.go('/home');
     } else if (result == LoginResult.needsOrgSelection) {
       context.push('/org-select');
     }
   }
 
   Future<void> _offerBiometricSetup() async {
+    final bio = ref.read(biometricServiceProvider);
+    final storage = ref.read(secureStorageProvider);
+    final available = await bio.isAvailable;
+    final alreadyEnabled = await storage.isBiometricEnabled();
+    if (!available || alreadyEnabled || !mounted) return;
+
     final icon = Platform.isIOS ? Icons.face_rounded : Icons.fingerprint_rounded;
     final label = Platform.isIOS ? 'Face ID' : 'Хурууны хээ';
     final confirmed = await showDialog<bool>(
@@ -153,10 +165,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           children: [
             Icon(icon, color: AppColors.primary),
             const SizedBox(width: 10),
-            Text('$label идэвхжүүлэх'),
+            Expanded(child: Text('$label идэвхжүүлэх')),
           ],
         ),
-        content: Text('Дараагаас $label ашиглан хурдан нэвтрэх үү?'),
+        content: Text('Дараагаас $label / хурууны хээгээр хурдан нэвтрэх үү?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Үгүй')),
           FilledButton(
@@ -166,10 +178,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         ],
       ),
     );
-    if (confirmed == true) {
-      await ref.read(authStateProvider.notifier).enableBiometric();
-      setState(() => _biometricEnabled = true);
-    }
+    if (confirmed != true) return;
+
+    // Confirm with an actual face/fingerprint scan before enabling.
+    final ok = await bio.authenticate();
+    if (!ok) return;
+    await ref.read(authStateProvider.notifier).enableBiometric();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$label амжилттай идэвхжлээ'),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
   }
 
   void _resetPhone() {
@@ -804,7 +828,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     return SizedBox(
       height: 52,
       child: OutlinedButton(
-        onPressed: () => context.push('/reset-password'),
+        onPressed: () {
+          final phone = _phoneController.text.trim();
+          if (phone.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Утасны дугаараа оруулна уу'),
+                backgroundColor: AppColors.warning,
+              ),
+            );
+            return;
+          }
+          context.push('/reset-password', extra: phone);
+        },
         style: OutlinedButton.styleFrom(
           side: BorderSide(
             color: isDark ? const Color(0xFF2D3B39) : AppColors.primary,
@@ -857,15 +893,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 class _OrgItem {
   final String id;
   final String ner;
+  final List<({String id, String ner})> barilguud;
 
-  _OrgItem({required this.id, required this.ner});
+  _OrgItem({required this.id, required this.ner, this.barilguud = const []});
 
   factory _OrgItem.fromJson(Map<String, dynamic> json) {
+    final rawBarilguud = json['barilguud'] as List? ?? [];
     return _OrgItem(
       id: json['_id']?.toString() ?? '',
       ner: json['dotoodNer']?.toString().isNotEmpty == true
           ? json['dotoodNer']!.toString()
           : json['ner']?.toString() ?? '',
+      barilguud: rawBarilguud
+          .map((b) => (id: b['_id']?.toString() ?? '', ner: b['ner']?.toString() ?? ''))
+          .where((b) => b.id.isNotEmpty)
+          .toList(),
     );
   }
 }
