@@ -64,7 +64,11 @@ class SecureStorageService {
   }
 
   Future<void> clearAll() async {
+    final biometricEnabled = await isBiometricEnabled();
     await _storage.deleteAll();
+    if (biometricEnabled) {
+      await saveBiometricEnabled(true);
+    }
   }
 
   Future<bool> isLoggedIn() async {

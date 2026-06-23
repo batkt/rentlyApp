@@ -16,56 +16,80 @@ class SettingsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Профайл')),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildProfileHeader(context, user?.fullName ?? 'Хэрэглэгч', user?.primaryPhone ?? ''),
-            const SizedBox(height: 16),
-            _buildUserInfoCard(context, user),
-            const SizedBox(height: 16),
-            _buildSettingsSection(context, ref, isDark),
-            const SizedBox(height: 16),
-            _buildLogoutSection(context, ref),
-            const SizedBox(height: 32),
-          ],
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                _buildProfileHeader(context, user?.fullName ?? 'Хэрэглэгч', user?.primaryPhone ?? ''),
+                const SizedBox(height: 16),
+                _buildUserInfoCard(context, user),
+                const SizedBox(height: 16),
+                _buildSettingsSection(context, ref, isDark),
+                const SizedBox(height: 16),
+                _buildLogoutSection(context, ref),
+                const SizedBox(height: 32),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
   Widget _buildProfileHeader(BuildContext context, String name, String phone) {
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppColors.primaryDark, AppColors.primary],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: context.appCardBg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: context.appDivider),
         ),
-      ),
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-      child: Column(
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white.withOpacity(0.4), width: 2),
-            ),
-            child: Center(
-              child: Text(
-                name.isNotEmpty ? name[0].toUpperCase() : 'Х',
-                style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w700),
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: AppColors.primaryContainer,
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  name.isNotEmpty ? name[0].toUpperCase() : 'Х',
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 14),
-          Text(name, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 4),
-          Text(phone, style: const TextStyle(color: Colors.white70, fontSize: 14)),
-        ],
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    phone,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.appTextTertiary),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -151,7 +175,8 @@ class SettingsScreen extends ConsumerWidget {
               title: const Text('Dark Mode'),
               trailing: Switch.adaptive(
                 value: isDark,
-                activeColor: AppColors.primary,
+                activeThumbColor: AppColors.primary,
+                activeTrackColor: AppColors.primaryContainer,
                 onChanged: (_) => ref.read(themeModeProvider.notifier).toggle(),
               ),
             ),

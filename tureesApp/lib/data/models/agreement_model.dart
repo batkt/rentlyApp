@@ -19,6 +19,7 @@ class AgreementModel {
   final List<TransactionModel> avlaga;
   final List<ZardalModel> zardluud;
   final String? duusakhOgnoo;
+  final List<dynamic> zurguud; // String = image ID, Map = {id, ner, turul:'pdf'}
 
   const AgreementModel({
     required this.id,
@@ -41,6 +42,7 @@ class AgreementModel {
     required this.avlaga,
     required this.zardluud,
     this.duusakhOgnoo,
+    this.zurguud = const [],
   });
 
   String get tenantName => '${ovog ?? ''} $ner'.trim();
@@ -48,7 +50,7 @@ class AgreementModel {
   bool get isActive => tuluv == 1;
   bool get hasDebt => uldegdel > 0;
 
-  AgreementModel copyWith({double? uldegdel}) {
+  AgreementModel copyWith({double? uldegdel, List<dynamic>? zurguud}) {
     return AgreementModel(
       id: id,
       gereeniiDugaar: gereeniiDugaar,
@@ -70,6 +72,7 @@ class AgreementModel {
       avlaga: avlaga,
       zardluud: zardluud,
       duusakhOgnoo: duusakhOgnoo,
+      zurguud: zurguud ?? this.zurguud,
     );
   }
 
@@ -95,6 +98,7 @@ class AgreementModel {
       avlaga: (json['avlaga'] as List?)?.map((e) => TransactionModel.fromJson(e)).toList() ?? [],
       zardluud: (json['zardluud'] as List?)?.map((e) => ZardalModel.fromJson(e)).toList() ?? [],
       duusakhOgnoo: json['duusakhOgnoo']?.toString(),
+      zurguud: (json['zurguud'] as List?) ?? [],
     );
   }
 }
@@ -102,25 +106,40 @@ class AgreementModel {
 class TransactionModel {
   final String id;
   final String? ognoo;
-  final double dun;
+  final double tulukhDun;
+  final double tulsunDun;
+  final double khyamdral;
+  final double uldegdel;
   final String? tailbar;
-  final int? turul;
+  final String? turul;
+  final String? guilgeeKhiisenOgnoo;
 
   const TransactionModel({
     required this.id,
     this.ognoo,
-    required this.dun,
+    required this.tulukhDun,
+    this.tulsunDun = 0,
+    this.khyamdral = 0,
+    this.uldegdel = 0,
     this.tailbar,
     this.turul,
+    this.guilgeeKhiisenOgnoo,
   });
 
   factory TransactionModel.fromJson(Map<String, dynamic> json) {
     return TransactionModel(
       id: json['_id']?.toString() ?? '',
       ognoo: json['ognoo']?.toString(),
-      dun: double.tryParse(json['dun']?.toString() ?? '0') ?? 0.0,
+      tulukhDun: double.tryParse(
+            (json['tulukhDun'] ?? json['dun'])?.toString() ?? '0',
+          ) ??
+          0.0,
+      tulsunDun: double.tryParse(json['tulsunDun']?.toString() ?? '0') ?? 0.0,
+      khyamdral: double.tryParse(json['khyamdral']?.toString() ?? '0') ?? 0.0,
+      uldegdel: double.tryParse(json['uldegdel']?.toString() ?? '0') ?? 0.0,
       tailbar: json['tailbar']?.toString(),
-      turul: int.tryParse(json['turul']?.toString() ?? ''),
+      turul: json['turul']?.toString(),
+      guilgeeKhiisenOgnoo: json['guilgeeKhiisenOgnoo']?.toString(),
     );
   }
 }
@@ -139,10 +158,14 @@ class ZardalModel {
   });
 
   factory ZardalModel.fromJson(Map<String, dynamic> json) {
+    final tulukhDun = (json['tulukhDun'] as num?)?.toDouble() ?? 0.0;
+    final dun = (json['dun'] as num?)?.toDouble() ?? 0.0;
+    final tariff = (json['tariff'] as num?)?.toDouble() ?? 0.0;
+    final finalDun = tulukhDun > 0 ? tulukhDun : (dun > 0 ? dun : tariff);
     return ZardalModel(
       id: json['_id']?.toString() ?? '',
-      ner: json['ner']?.toString() ?? '',
-      dun: double.tryParse(json['dun']?.toString() ?? '0') ?? 0.0,
+      ner: json['tailbar']?.toString() ?? json['ner']?.toString() ?? '',
+      dun: finalDun,
       turul: int.tryParse(json['turul']?.toString() ?? ''),
     );
   }

@@ -194,6 +194,21 @@ class MessagesNotifier extends StateNotifier<MessagesState> {
     }
   }
 
+  Future<void> sendWithAudio(File audioFile) async {
+    state = state.copyWith(isSending: true);
+    try {
+      final url = await _repo.uploadAudio(audioFile);
+      if (url == null) {
+        state = state.copyWith(isSending: false, error: 'Дуу байршуулахад алдаа гарлаа');
+        return;
+      }
+      final msg = await _repo.sendMessageWithAudio(_convId, url);
+      state = state.copyWith(isSending: false, messages: [...state.messages, msg]);
+    } catch (_) {
+      state = state.copyWith(isSending: false, error: 'Дуут мессеж илгээхэд алдаа гарлаа');
+    }
+  }
+
   @override
   void dispose() {
     _socket.off('shineChatKhariult$_userId', _onNewMessage);

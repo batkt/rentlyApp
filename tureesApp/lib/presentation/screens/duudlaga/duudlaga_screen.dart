@@ -48,7 +48,11 @@ class _DuudlagaScreenState extends ConsumerState<DuudlagaScreen> {
         label: const Text('Шинэ дуудлага', style: TextStyle(fontWeight: FontWeight.w700)),
         elevation: 4,
       ),
-      body: RefreshIndicator(
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: () => ref.read(duudlagaProvider.notifier).load(refresh: true),
         child: Builder(builder: (context) {
@@ -86,6 +90,8 @@ class _DuudlagaScreenState extends ConsumerState<DuudlagaScreen> {
             },
           );
         }),
+          ),
+        ),
       ),
     );
   }
@@ -95,6 +101,9 @@ class _DuudlagaScreenState extends ConsumerState<DuudlagaScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.sizeOf(context).width > 600 ? 560 : double.infinity,
+      ),
       builder: (_) => _CreateDuudlagaSheet(
         onCreated: () => ref.read(duudlagaProvider.notifier).load(refresh: true),
       ),

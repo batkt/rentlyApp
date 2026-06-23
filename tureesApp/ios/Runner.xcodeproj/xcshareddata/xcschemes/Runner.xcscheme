@@ -96,6 +96,7 @@
    </AnalyzeAction>
    <ArchiveAction
       buildConfiguration = "Release"
+      customArchiveName = "Rently"
       revealArchiveInOrganizer = "YES">
    </ArchiveAction>
 </Scheme>

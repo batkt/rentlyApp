@@ -41,7 +41,11 @@ class _OrgSelectScreenState extends ConsumerState<OrgSelectScreen> {
           onPressed: () => context.pop(),
         ),
       ),
-      body: Padding(
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -128,6 +132,8 @@ class _OrgSelectScreenState extends ConsumerState<OrgSelectScreen> {
               isLoading: authState.isLoading,
             ),
           ],
+        ),
+          ),
         ),
       ),
     );

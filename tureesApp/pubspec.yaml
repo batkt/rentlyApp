@@ -43,6 +43,12 @@ dependencies:
 
   # Image & File
   image_picker: ^1.1.2
+  file_picker: ^8.1.7
+  path_provider: ^2.1.4
+
+  # Audio recording & playback (voice messages)
+  record: ^4.4.4
+  audioplayers: ^6.1.0
 
   # Biometric Authentication
   local_auth: ^2.3.0

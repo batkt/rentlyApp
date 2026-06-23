@@ -32,6 +32,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final user = ref.watch(currentUserProvider);
     final filter = ref.watch(agreementFilterProvider);
     final agreementsAsync = ref.watch(agreementsProvider);
+    final sw = MediaQuery.sizeOf(context).width;
+    final hPad = ((sw - 720) / 2).clamp(16.0, 48.0);
 
     return Scaffold(
       backgroundColor: context.appBackground,
@@ -44,7 +46,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             _buildSliverAppBar(context, user, agreementsAsync.valueOrNull),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 0),
                 child: AppSearchField(
                   controller: _searchController,
                   hint: 'Нэр, гэрээ, талбайн дугаар хайх...',
@@ -52,8 +54,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
               ),
             ),
-            SliverToBoxAdapter(child: _buildFilterTabs(filter)),
-            _buildAgreementsList(agreementsAsync),
+            SliverToBoxAdapter(child: _buildFilterTabs(filter, hPad)),
+            _buildAgreementsList(agreementsAsync, hPad),
           ],
         ),
       ),
@@ -62,7 +64,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Widget _buildBarilgaSelector(BuildContext context) {
     final authState = ref.watch(authStateProvider);
-    final barilguud = authState.barilguud;
+    final allBarilguud = authState.barilguud;
+    final withAgreements = ref.watch(barilguudWithAgreementsProvider).valueOrNull;
+    final barilguud = withAgreements != null
+        ? allBarilguud.where((b) => withAgreements.contains(b.id)).toList()
+        : allBarilguud;
     if (barilguud.length <= 1) return const SizedBox.shrink();
 
     final selectedId = authState.selectedBarilgiinId ?? authState.user?.barilgiinId ?? '';
@@ -103,6 +109,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.sizeOf(context).width > 600 ? 560 : double.infinity,
+      ),
       builder: (_) => Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         child: Column(
@@ -236,9 +245,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  Widget _buildFilterTabs(int? currentFilter) {
+  Widget _buildFilterTabs(int? currentFilter, double hPad) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 8),
       child: Row(
         children: [
           Text(
@@ -254,7 +263,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  Widget _buildAgreementsList(AsyncValue<List<AgreementModel>> agreementsAsync) {
+  Widget _buildAgreementsList(AsyncValue<List<AgreementModel>> agreementsAsync, double hPad) {
     return agreementsAsync.when(
       loading: () => const SliverFillRemaining(child: ShimmerList()),
       error: (err, _) => SliverFillRemaining(
@@ -286,7 +295,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         }
 
         return SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+          padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 32),
           sliver: SliverList.separated(
             itemCount: filtered.length,
             separatorBuilder: (_, __) => const SizedBox(height: 10),

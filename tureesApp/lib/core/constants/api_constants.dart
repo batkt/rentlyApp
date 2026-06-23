@@ -23,6 +23,9 @@ class ApiConstants {
   static const String saveTransaction = '/tulultOlnoorKhadgalya';
   static const String deleteTransaction = '/tulultUstgaya';
 
+  // Transaction history
+  static String gereeniiTulultAvya(String id) => '/gereeniiTulultAvya/$id';
+
   // Payment
   static const String qpayGenerate = '/qpayGargaya';
   static const String qpayVerify = '/qpayShalgay';
@@ -51,8 +54,18 @@ class ApiConstants {
   static const String duudlagaKhadgalya = '/appWebDuudlagaKhadgalya';
   static String duudlagaTuluv(String id) => '/medegdel/$id';
 
+  // Invoice breakdown
+  static const String tulburiinZadargaaAvya = '/tulburiinZadargaaAvya';
+
   // Upload
   static const String upload = '/upload';
+  static const String zuragKhadgalya = '/zuragKhadgalya';
+  static const String fileKhadgalya = '/fileKhadgalya';
+  static const String gereeniiZurguudKhadgalakh = '/gereeniiZurguudKhadgalakh';
+  static String zuragAvya(String baiguullagiinId, String id) =>
+      '$baseUrl/zuragAvya/jpg/$baiguullagiinId/$id';
+  static String fileAvya(String baiguullagiinId, String id) =>
+      '$baseUrl/fileAvya/$baiguullagiinId/$id';
 
   // Feedback
   static const String feedback = '/sanalKhadgalya';

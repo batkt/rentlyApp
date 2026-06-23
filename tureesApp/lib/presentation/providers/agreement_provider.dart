@@ -62,3 +62,25 @@ final niitUldegdelProvider = FutureProvider.family<double, NiitUldegdelArgs>((re
   final repo = ref.read(agreementRepositoryProvider);
   return repo.getNiitUldegdel(args.gereeniiDugaar, args.barilgiinId);
 });
+
+final transactionHistoryProvider =
+    FutureProvider.family<List<Map<String, dynamic>>, String>((ref, gereeniiId) async {
+  final repo = ref.read(agreementRepositoryProvider);
+  return repo.getTransactionHistory(gereeniiId);
+});
+
+/// Set of barilgiinIds that have at least one agreement for the current user.
+/// Used to filter the building picker so only buildings with contracts are shown.
+final barilguudWithAgreementsProvider = FutureProvider<Set<String>>((ref) async {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return {};
+  final repo = ref.read(agreementRepositoryProvider);
+  final all = await repo.getAgreements(
+    register: user.register ?? '',
+    pageSize: 999999,
+  );
+  return all.map((a) => a.barilgiinId).where((id) => id.isNotEmpty).toSet();
+});
+
+// Mutable state for zurguud (files) of the currently opened agreement
+final agreementZurguudProvider = StateProvider.family<List<dynamic>, String>((ref, agreementId) => []);

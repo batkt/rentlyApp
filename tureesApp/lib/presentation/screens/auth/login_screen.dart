@@ -236,7 +236,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       body: SafeArea(
         child: FadeTransition(
           opacity: _fadeAnim,
-          child: SingleChildScrollView(
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Form(
               key: _formKey,
@@ -255,6 +259,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   const SizedBox(height: 24),
                 ],
               ),
+            ),
+          ),
             ),
           ),
         ),
@@ -879,7 +885,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         ),
         const SizedBox(height: 4),
         Text(
-          'v1.0.0',
+          'v3.0.0',
           style: TextStyle(
             fontSize: 11,
             color: isDark ? const Color(0xFF334155) : AppColors.textTertiary,

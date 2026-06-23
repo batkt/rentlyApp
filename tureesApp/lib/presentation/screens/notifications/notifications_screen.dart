@@ -68,13 +68,19 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
           const SizedBox(width: 8),
         ],
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _NotificationsTab(),
-          _RequestsTab(onAddRequest: () => _showNewRequestSheet(context)),
-          _DuudlagaTab(onAddDuudlaga: () => _showNewDuudlagaDialog(context)),
-        ],
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _NotificationsTab(),
+              _RequestsTab(onAddRequest: () => _showNewRequestSheet(context)),
+              _DuudlagaTab(onAddDuudlaga: () => _showNewDuudlagaDialog(context)),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -84,6 +90,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.sizeOf(context).width > 600 ? 560 : double.infinity,
+      ),
       builder: (ctx) => _RequestFormSheet(
         onSubmitted: () {
           if (mounted) {
@@ -101,6 +110,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.sizeOf(context).width > 600 ? 560 : double.infinity,
+      ),
       builder: (ctx) => _DuudlagaFormSheet(
         onSubmitted: () {
           ref.read(duudlagaProvider.notifier).load();

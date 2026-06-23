@@ -43,6 +43,7 @@ class MessageModel {
   final String? ajiltanNer;
   final String content;
   final String? imageUrl;
+  final String? audioUrl;
   final String? createdAt;
 
   const MessageModel({
@@ -52,11 +53,13 @@ class MessageModel {
     this.ajiltanNer,
     required this.content,
     this.imageUrl,
+    this.audioUrl,
     this.createdAt,
   });
 
   bool get isFromUser => role == 'user';
   bool get hasImage => imageUrl != null && imageUrl!.isNotEmpty;
+  bool get hasAudio => audioUrl != null && audioUrl!.isNotEmpty;
 
   factory MessageModel.fromJson(Map<String, dynamic> json) {
     return MessageModel(
@@ -66,6 +69,7 @@ class MessageModel {
       ajiltanNer: json['ajiltanNer']?.toString(),
       content: json['text']?.toString() ?? '',
       imageUrl: json['imageUrl']?.toString() ?? json['image']?.toString(),
+      audioUrl: json['audioUrl']?.toString(),
       createdAt: json['createdAt']?.toString(),
     );
   }

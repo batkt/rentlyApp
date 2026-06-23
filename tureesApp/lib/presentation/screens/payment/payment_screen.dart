@@ -79,7 +79,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   }
 
   double get _displayUldegdel => _realUldegdel ?? _selectedAgreement?.uldegdel ?? 0;
-  bool get _hasDebt => _displayUldegdel > 0;
 
   Future<void> _generateQpay() async {
     final rawText = _amountController.text.replaceAll(',', '').replaceAll(' ', '');
@@ -128,20 +127,25 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       appBar: AppBar(
         title: const Text('Төлбөр төлөх'),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildAgreementSelector(agreementsAsync),
             const SizedBox(height: 16),
-            const SizedBox(height: 0),
             _buildAmountInput(),
             const SizedBox(height: 8),
             _buildQuickAmounts(),
             const SizedBox(height: 24),
             _buildPaymentMethods(paymentState),
           ],
+          ),
+          ),
         ),
       ),
     );

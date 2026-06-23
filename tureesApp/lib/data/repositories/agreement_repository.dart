@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/network/dio_client.dart';
 import '../../core/constants/api_constants.dart';
@@ -92,5 +94,67 @@ class AgreementRepository {
   Future<double> getNiitUldegdel(String gereeniiDugaar, String barilgiinId) async {
     final res = await getUldegdel(gereeniiDugaar, barilgiinId);
     return double.tryParse(res['uldegdel']?.toString() ?? '0') ?? 0.0;
+  }
+
+  /// Fetches the payment breakdown for the month of [ognoo] for agreement [gereeniiId].
+  /// Returns raw map with keys: umnukhSariinTulsun, umnukhSariinUrTulbur,
+  /// niitUldegdel, eneSardTulukhDun, nekhemjlekhDeerGarakh, baritsaaAshiglasanDun.
+  Future<Map<String, dynamic>> getTulburZadargaa(String gereeniiId, String ognoo) async {
+    final date = DateTime.tryParse(ognoo) ?? DateTime.now();
+    final year = date.year;
+    final month = date.month;
+    final start = '$year-${month.toString().padLeft(2, '0')}-01 00:00:00';
+    final lastDay = DateTime(year, month + 1, 0).day;
+    final end = '$year-${month.toString().padLeft(2, '0')}-${lastDay.toString().padLeft(2, '0')} 23:59:59';
+    final res = await _client.post(ApiConstants.tulburiinZadargaaAvya, data: {
+      'id': gereeniiId,
+      'ekhlekhOgnoo': start,
+      'duusakhOgnoo': end,
+      'nekhemjlekhAvakhOgnoo': end,
+    });
+    final list = res.data as List?;
+    return (list != null && list.isNotEmpty) ? (list.first as Map<String, dynamic>) : {};
+  }
+
+  Future<String> uploadImage(File file, String baiguullagiinId) async {
+    final formData = FormData.fromMap({
+      'file': await MultipartFile.fromFile(file.path, filename: 'image.jpg'),
+      'turul': 'jpg',
+      'baiguullagiinId': baiguullagiinId,
+    });
+    final res = await _client.postFormData(ApiConstants.zuragKhadgalya, formData);
+    return res.data['id']?.toString() ?? '';
+  }
+
+  Future<String> uploadFile(File file, String baiguullagiinId, String originalName) async {
+    final formData = FormData.fromMap({
+      'file': await MultipartFile.fromFile(file.path, filename: originalName),
+      'baiguullagiinId': baiguullagiinId,
+    });
+    final res = await _client.postFormData(ApiConstants.fileKhadgalya, formData);
+    return res.data['id']?.toString() ?? '';
+  }
+
+  Future<void> saveZurguud(String gereeniiId, List<dynamic> zurguud) async {
+    await _client.post(ApiConstants.gereeniiZurguudKhadgalakh, data: {
+      'gereeniiId': gereeniiId,
+      'zurguud': zurguud,
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> getTransactionHistory(String gereeniiId) async {
+    final now = DateTime.now();
+    final lastDay = DateTime(now.year, now.month + 1, 0);
+    final duusakhOgnoo =
+        '${lastDay.year}-${lastDay.month.toString().padLeft(2, '0')}-${lastDay.day.toString().padLeft(2, '0')} 23:59:59';
+    final res = await _client.get(
+      ApiConstants.gereeniiTulultAvya(gereeniiId),
+      queryParameters: {'duusakhOgnoo': duusakhOgnoo},
+    );
+    final data = res.data;
+    if (data is List) {
+      return data.cast<Map<String, dynamic>>();
+    }
+    return [];
   }
 }

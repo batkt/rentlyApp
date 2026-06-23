@@ -44,7 +44,11 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: Builder(
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: Builder(
         builder: (context) {
           if (state.isLoading && state.conversations.isEmpty) {
             return const ShimmerList(itemCount: 6, itemHeight: 70);
@@ -78,6 +82,8 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
             ),
           );
         },
+          ),
+        ),
       ),
     );
   }

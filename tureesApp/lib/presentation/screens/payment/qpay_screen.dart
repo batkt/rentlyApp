@@ -107,22 +107,28 @@ class _QpayScreenState extends ConsumerState<QpayScreen> with SingleTickerProvid
             ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            _buildAmountHeader(),
-            const SizedBox(height: 24),
-            _buildQrSection(widget.invoice.qrImage, widget.invoice.qrText),
-            const SizedBox(height: 24),
-            _buildInstructions(),
-            if (widget.invoice.urls.isNotEmpty) ...[
-              const SizedBox(height: 24),
-              _buildBankApps(),
-            ],
-            const SizedBox(height: 24),
-            _buildActions(paymentState),
-          ],
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                _buildAmountHeader(),
+                const SizedBox(height: 24),
+                _buildQrSection(widget.invoice.qrImage, widget.invoice.qrText),
+                const SizedBox(height: 24),
+                _buildInstructions(),
+                if (widget.invoice.urls.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  _buildBankApps(),
+                ],
+                const SizedBox(height: 24),
+                _buildActions(paymentState),
+              ],
+            ),
+          ),
         ),
       ),
     );

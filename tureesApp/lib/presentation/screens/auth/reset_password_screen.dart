@@ -180,7 +180,11 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
           },
         ),
       ),
-      body: SingleChildScrollView(
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -191,6 +195,8 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
             if (_step == _Step.otp) _buildOtpStep(),
             if (_step == _Step.password) _buildPasswordStep(),
           ],
+        ),
+          ),
         ),
       ),
     );

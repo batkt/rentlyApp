@@ -85,4 +85,28 @@ class ChatRepository {
     );
     return MessageModel.fromJson(res.data['data']['msg']);
   }
+
+  Future<String?> uploadAudio(File file) async {
+    try {
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(file.path, filename: 'voice_${DateTime.now().millisecondsSinceEpoch}.m4a'),
+      });
+      final res = await _client.post(ApiConstants.upload, data: formData);
+      final data = res.data;
+      return data['url']?.toString() ?? data['path']?.toString();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<MessageModel> sendMessageWithAudio(String conversationId, String audioUrl) async {
+    final res = await _client.post(
+      ApiConstants.conversationMessages(conversationId),
+      data: {
+        'audioUrl': audioUrl,
+        'role': 'user',
+      },
+    );
+    return MessageModel.fromJson(res.data['data']['msg']);
+  }
 }

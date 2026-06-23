@@ -14,7 +14,7 @@ class AppFormatters {
   static String date(dynamic value) {
     if (value == null) return '-';
     try {
-      final dt = value is DateTime ? value : DateTime.parse(value.toString());
+      final dt = (value is DateTime ? value : DateTime.parse(value.toString())).toLocal();
       return _dateFormatter.format(dt);
     } catch (_) {
       return value.toString();
@@ -24,7 +24,7 @@ class AppFormatters {
   static String dateTime(dynamic value) {
     if (value == null) return '-';
     try {
-      final dt = value is DateTime ? value : DateTime.parse(value.toString());
+      final dt = (value is DateTime ? value : DateTime.parse(value.toString())).toLocal();
       return _dateTimeFormatter.format(dt);
     } catch (_) {
       return value.toString();
