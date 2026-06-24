@@ -93,13 +93,6 @@ class _AgreementDetailScreenState extends ConsumerState<AgreementDetailScreen>
   }
 
   Widget _buildContent(BuildContext context, WidgetRef ref, AgreementModel agreement) {
-    final uldegdelAsync = ref.watch(niitUldegdelProvider((
-      gereeniiDugaar: agreement.gereeniiDugaar,
-      barilgiinId: agreement.barilgiinId,
-    )));
-    final realUldegdel = uldegdelAsync.valueOrNull ?? agreement.uldegdel;
-    final hasDebt = realUldegdel > 0;
-
     return RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(agreementDetailProvider(widget.agreementId));
@@ -117,9 +110,18 @@ class _AgreementDetailScreenState extends ConsumerState<AgreementDetailScreen>
             pinned: true,
             snap: false,
             floating: false,
-            backgroundColor: AppColors.primary,
+            backgroundColor: AppColors.primaryDark,
             foregroundColor: Colors.white,
             elevation: 0,
+            flexibleSpace: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppColors.primaryDark, AppColors.primary],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
+            ),
             leading: IconButton(
               icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
               onPressed: () => context.pop(),
@@ -131,25 +133,24 @@ class _AgreementDetailScreenState extends ConsumerState<AgreementDetailScreen>
                 Text(
                   agreement.tenantName,
                   style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700),
-                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                  softWrap: true,
                 ),
                 Text(
                   agreement.gereeniiDugaar,
-                  style: const TextStyle(color: Colors.white60, fontSize: 11),
+                  style: const TextStyle(color: Colors.white70, fontSize: 11),
+                  maxLines: 1,
+                  softWrap: true,
                 ),
               ],
             ),
             actions: [
-              Container(
-                margin: const EdgeInsets.only(right: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(agreement.isActive ? 0.2 : 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  agreement.isActive ? 'Идэвхтэй' : 'Дуусгавар',
-                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+              Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: Icon(
+                  agreement.isActive ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                  color: agreement.isActive ? const Color(0xFF69F0AE) : Colors.white38,
+                  size: 18,
                 ),
               ),
               if (agreement.isActive)
@@ -160,43 +161,25 @@ class _AgreementDetailScreenState extends ConsumerState<AgreementDetailScreen>
                 ),
             ],
             bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(90),
-              child: Container(
-                color: AppColors.primary,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
-                      child: Row(
-                        children: [
-                          _BalanceBadge(
-                            uldegdel: realUldegdel,
-                            hasDebt: hasDebt,
-                            isLoading: uldegdelAsync.isLoading,
-                          ),
-                          const Spacer(),
-                          if (agreement.uneKhemjee != null)
-                            _InfoChip(icon: Icons.monetization_on_rounded, label: AppFormatters.currency(agreement.uneKhemjee)),
-                        ],
-                      ),
-                    ),
-                    TabBar(
-                      controller: _tabController,
-                      indicatorColor: Colors.white,
-                      labelColor: Colors.white,
-                      unselectedLabelColor: Colors.white60,
-                      indicatorWeight: 2.5,
-                      labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                      tabs: const [
-                        Tab(text: 'Мэдээлэл'),
-                        Tab(text: 'Гүйлгээ'),
-                        Tab(text: 'Нэхэмжлэх'),
-                        Tab(text: 'Файл'),
-                      ],
-                    ),
-                  ],
+              preferredSize: const Size.fromHeight(46),
+              child: TabBar(
+                controller: _tabController,
+                indicator: BoxDecoration(
+                  color: Colors.white.withOpacity(0.22),
+                  borderRadius: BorderRadius.circular(20),
                 ),
+                indicatorSize: TabBarIndicatorSize.tab,
+                indicatorPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+                dividerColor: Colors.transparent,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white60,
+                labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                tabs: const [
+                  Tab(text: 'Мэдээлэл'),
+                  Tab(text: 'Гүйлгээ'),
+                  Tab(text: 'Нэхэмжлэх'),
+                  Tab(text: 'Файл'),
+                ],
               ),
             ),
           ),
@@ -215,78 +198,6 @@ class _AgreementDetailScreenState extends ConsumerState<AgreementDetailScreen>
   }
 }
 
- 
-class _BalanceBadge extends StatelessWidget {
-  final double uldegdel;
-  final bool hasDebt;
-  final bool isLoading;
-
-  const _BalanceBadge({required this.uldegdel, required this.hasDebt, required this.isLoading});
-
-  @override
-  Widget build(BuildContext context) {
-    const amber = Color(0xFFF59E0B);
-    final iconColor = hasDebt ? amber : AppColors.success;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 10, offset: const Offset(0, 3)),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            hasDebt ? Icons.warning_amber_rounded : Icons.check_circle_rounded,
-            color: iconColor,
-            size: 15,
-          ),
-          const SizedBox(width: 7),
-          if (isLoading)
-            const SizedBox(
-              width: 14, height: 14,
-              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
-            )
-          else
-            Text(
-              AppFormatters.currency(uldegdel),
-              style: const TextStyle(color: Color(0xFF1E293B), fontSize: 15, fontWeight: FontWeight.w800),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _InfoChip({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 11, color: Colors.white70),
-          const SizedBox(width: 4),
-          Text(label, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500)),
-        ],
-      ),
-    );
-  }
-}
 
 // ────────────────────────────────────────────────────
 // Info Tab
@@ -335,7 +246,7 @@ class _InfoTab extends StatelessWidget {
             title: 'Зардлын мэдээлэл',
             icon: Icons.receipt_rounded,
             children: agreement.zardluud.map((z) => _Row(
-              icon: Icons.circle_rounded,
+              icon: _zardalIcon(z.ner),
               label: z.ner,
               value: AppFormatters.currency(z.dun),
             )).toList(),
@@ -350,6 +261,17 @@ class _InfoTab extends StatelessWidget {
 // ────────────────────────────────────────────────────
 // Transactions Tab — grouped by month
 // ────────────────────────────────────────────────────
+
+IconData _zardalIcon(String ner) {
+  final n = ner.toLowerCase();
+  if (n.contains('цахилгаан')) return Icons.bolt_rounded;
+  if (n.contains('менежмент')) return Icons.manage_accounts_rounded;
+  if (n.contains('засвар')) return Icons.build_rounded;
+  if (n.contains('ус')) return Icons.water_drop_rounded;
+  if (n.contains('дулаан')) return Icons.local_fire_department_rounded;
+  if (n.contains('хог')) return Icons.delete_outline_rounded;
+  return Icons.receipt_long_rounded;
+}
 
 String _turulNer(String? turul) {
   switch (turul) {

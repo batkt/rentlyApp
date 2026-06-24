@@ -233,7 +233,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0D1514) : const Color(0xFFEDF7F5),
-      body: SafeArea(
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        behavior: HitTestBehavior.opaque,
+        child: SafeArea(
         child: FadeTransition(
           opacity: _fadeAnim,
           child: Align(
@@ -263,6 +266,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           ),
             ),
           ),
+        ),
         ),
       ),
     );

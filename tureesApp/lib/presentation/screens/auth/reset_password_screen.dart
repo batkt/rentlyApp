@@ -180,7 +180,10 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
           },
         ),
       ),
-      body: Align(
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        behavior: HitTestBehavior.opaque,
+        child: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 520),
@@ -197,6 +200,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
           ],
         ),
           ),
+        ),
         ),
       ),
     );
@@ -302,6 +306,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
           hint: '••••••••',
           controller: _newPasswordController,
           obscureText: _obscure1,
+          keyboardType: TextInputType.number,
           prefixIcon: const Icon(Icons.lock_rounded, size: 18, color: AppColors.textTertiary),
           suffixIcon: IconButton(
             icon: Icon(
@@ -323,6 +328,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
           hint: '••••••••',
           controller: _confirmController,
           obscureText: _obscure2,
+          keyboardType: TextInputType.number,
           prefixIcon: const Icon(Icons.lock_rounded, size: 18, color: AppColors.textTertiary),
           suffixIcon: IconButton(
             icon: Icon(

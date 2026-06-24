@@ -88,7 +88,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       return;
     }
     if (amount == null || amount <= 0) {
-      _showError('Зөв дүн оруулна уу');
+      _showError('Мөнгөн дүн оруулна уу');
       return;
     }
     FocusScope.of(context).unfocus();
@@ -127,7 +127,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       appBar: AppBar(
         title: const Text('Төлбөр төлөх'),
       ),
-      body: Align(
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        behavior: HitTestBehavior.opaque,
+        child: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
@@ -146,6 +149,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           ],
           ),
           ),
+        ),
         ),
       ),
     );
