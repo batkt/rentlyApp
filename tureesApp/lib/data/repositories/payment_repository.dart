@@ -33,7 +33,7 @@ class PaymentRepository {
       qrText: data['qr_code']?.toString() ?? data['qr_text']?.toString() ?? data['qrText']?.toString(),
       qrImage: data['qr_image']?.toString() ?? data['qrImage']?.toString(),
       urls: (data['urls'] as List?)?.map((e) => QpayUrlModel.fromJson(e)).toList() ?? [],
-      amount: amount,
+      amount: double.tryParse(data['_actualDun']?.toString() ?? '') ?? amount,
       gereeniiId: gereeniiId,
     );
   }

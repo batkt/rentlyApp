@@ -278,7 +278,7 @@ class _QpayScreenState extends ConsumerState<QpayScreen> with SingleTickerProvid
             children: [
               Icon(Icons.info_outline_rounded, color: AppColors.primary, size: 16),
               SizedBox(width: 8),
-              Text('Хэрхэн төлэх', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 13)),
+              Text('Хэрхэн төлөх', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 13)),
             ],
           ),
           const SizedBox(height: 10),
