@@ -122,12 +122,7 @@ class SettingsScreen extends ConsumerWidget {
               const Divider(height: 1),
               _InfoRow(icon: Icons.mail_rounded, label: 'И-мэйл', value: user.mail!),
             ],
-            const Divider(height: 1),
-            _InfoRow(
-              icon: Icons.security_rounded,
-              label: 'Хэрэглэгчийн төрөл',
-              value: _roleLabel(user.zochinTurul),
-            ),
+            
           ],
         ),
       ),
