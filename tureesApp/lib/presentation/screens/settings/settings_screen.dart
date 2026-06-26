@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/common/app_button.dart';
+import '../home/home_screen.dart' show chatVisibleProvider;
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -129,20 +130,8 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  String _roleLabel(String? role) {
-    switch (role) {
-      case 'oршин суугч':
-      case 'suugch':
-        return 'Оршин суугч';
-      case 'tureeslegch':
-      case 'tenant':
-        return 'Түрээслэгч';
-      default:
-        return role ?? 'Хэрэглэгч';
-    }
-  }
-
   Widget _buildSettingsSection(BuildContext context, WidgetRef ref, bool isDark) {
+    final chatVisible = ref.watch(chatVisibleProvider);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
@@ -163,6 +152,18 @@ class SettingsScreen extends ConsumerWidget {
               icon: Icons.notifications_rounded,
               label: 'Мэдэгдлийн тохиргоо',
               onTap: () {},
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_rounded, size: 20, color: AppColors.primary),
+              title: const Text('Чат харуулах'),
+              subtitle: chatVisible ? null : const Text('Нуугдсан — эндэс идэвхжүүлэх'),
+              trailing: Switch.adaptive(
+                value: chatVisible,
+                activeThumbColor: AppColors.primary,
+                activeTrackColor: AppColors.primaryContainer,
+                onChanged: (v) => ref.read(chatVisibleProvider.notifier).state = v,
+              ),
             ),
             const Divider(height: 1),
             ListTile(
@@ -188,36 +189,29 @@ class SettingsScreen extends ConsumerWidget {
         label: 'Гарах',
         variant: ButtonVariant.danger,
         icon: Icons.logout_rounded,
-        onPressed: () => _confirmLogout(context, ref),
-      ),
-    );
-  }
-
-  void _confirmLogout(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Гарахыг баталгаажуулах'),
-        content: const Text('Та системээс гарахдаа итгэлтэй байна уу?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Болих'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await ref.read(authStateProvider.notifier).logout();
-              if (context.mounted) context.go('/login');
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.error,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        onPressed: () async {
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Гарах уу?'),
+              content: const Text('Системээс гарахдаа итгэлтэй байна уу?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Болих'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                  child: const Text('Гарах'),
+                ),
+              ],
             ),
-            child: const Text('Гарах'),
-          ),
-        ],
+          );
+          if (confirmed != true) return;
+          await ref.read(authStateProvider.notifier).logout();
+          if (context.mounted) context.go('/login');
+        },
       ),
     );
   }

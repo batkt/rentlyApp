@@ -91,11 +91,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (isLoggedIn) {
         final user = await _repo.getUserByToken();
         if (user != null) {
-          final barilguud = await _loadBarilguud();
+          // Load from cache; if empty, fetch from server in background
+          var barilguud = await _loadBarilguud();
           state = state.copyWith(isLoading: false, user: user, isAuthenticated: true, barilguud: barilguud);
           await _socket.connect();
           _socket.joinOrgRoom(user.baiguullagiinId);
           _socket.joinUserRoom(user.id);
+          _refreshBarilguud(user.baiguullagiinId);
           return;
         }
       }
@@ -103,6 +105,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (_) {
       state = state.copyWith(isLoading: false, isAuthenticated: false);
     }
+  }
+
+  void _refreshBarilguud(String orgId) async {
+    try {
+      final fetched = await _repo.getBarilguud(orgId);
+      if (fetched.isNotEmpty) {
+        await _storage.saveBuildings(jsonEncode(
+          fetched.map((b) => {'id': b.id, 'ner': b.ner}).toList(),
+        ));
+        state = state.copyWith(barilguud: fetched);
+      }
+    } catch (_) {}
   }
 
   Future<LoginResult> login(String phone, String password, {String? baiguullagiinId}) async {
@@ -174,7 +188,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
       userRegister: user.register,
     );
 
-    final barilguud = await _loadBarilguud();
+    // Fetch org buildings fresh on every login so the dashboard selector is populated
+    var barilguud = await _repo.getBarilguud(user.baiguullagiinId);
+    if (barilguud.isNotEmpty) {
+      await _storage.saveBuildings(jsonEncode(
+        barilguud.map((b) => {'id': b.id, 'ner': b.ner}).toList(),
+      ));
+    } else {
+      barilguud = await _loadBarilguud();
+    }
     state = state.copyWith(isLoading: false, user: user, isAuthenticated: true, barilguud: barilguud);
     await _socket.connect();
     _socket.joinOrgRoom(user.baiguullagiinId);

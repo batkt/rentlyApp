@@ -13,6 +13,21 @@ class AuthRepository {
 
   AuthRepository(this._client);
 
+  Future<List<({String id, String ner})>> getBarilguud(String orgId) async {
+    try {
+      final res = await _client.get('${ApiConstants.organization}/$orgId');
+      final data = res.data as Map<String, dynamic>?;
+      if (data == null) return [];
+      final list = data['barilguud'] as List? ?? [];
+      return list
+          .map((b) => (id: (b['_id'] ?? '').toString(), ner: (b['ner'] ?? '').toString()))
+          .where((b) => b.id.isNotEmpty)
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
   Future<Map<String, dynamic>> verifyPhone(String phone) async {
     final res = await _client.post(ApiConstants.verifyPhone, data: {'utas': phone});
     return res.data as Map<String, dynamic>;

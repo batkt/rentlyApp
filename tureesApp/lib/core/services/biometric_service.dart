@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
 
@@ -24,6 +25,13 @@ class BiometricService {
     } catch (_) {
       return [];
     }
+  }
+
+  Future<bool> get isFaceAuth async {
+    final types = await availableTypes;
+    if (types.contains(BiometricType.face)) return true;
+    if (types.contains(BiometricType.fingerprint)) return false;
+    return Platform.isIOS; // fallback: Face ID on iOS, fingerprint on Android
   }
 
   Future<bool> authenticate() async {

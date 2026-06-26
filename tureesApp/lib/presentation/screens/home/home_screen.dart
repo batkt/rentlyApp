@@ -12,6 +12,10 @@ import '../settings/settings_screen.dart';
 
 final _navIndexProvider = StateProvider<int>((ref) => 0);
 
+/// Controls whether the floating chat bubble is visible.
+/// Hidden via drag-to-bottom; restored from Settings.
+final chatVisibleProvider = StateProvider<bool>((ref) => true);
+
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -107,7 +111,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             index: safeScreenIndex,
             children: _screens,
           ),
-          if (showChat) const _FloatingChatBubble(),
+          if (showChat && ref.watch(chatVisibleProvider) && safeScreenIndex < 2) const _FloatingChatBubble(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -139,6 +143,7 @@ class _FloatingChatBubbleState extends ConsumerState<_FloatingChatBubble>
     with SingleTickerProviderStateMixin {
   Offset _position = const Offset(20, 200);
   bool _isDragging = false;
+  bool _isNearDropZone = false;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnim;
 
@@ -183,40 +188,83 @@ class _FloatingChatBubbleState extends ConsumerState<_FloatingChatBubble>
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
     final convState = ref.watch(conversationsProvider);
     final hasConv = convState.conversations.isNotEmpty;
     final unread = convState.conversations.fold<int>(0, (s, c) => s + c.unreadCount);
 
-    return Positioned(
-      left: _position.dx,
-      top: _position.dy,
-      child: GestureDetector(
-        onPanStart: (_) => setState(() => _isDragging = true),
-        onPanUpdate: (details) {
-          final size = MediaQuery.sizeOf(context);
-          setState(() {
-            _position = Offset(
-              (_position.dx + details.delta.dx).clamp(0, size.width - 60),
-              (_position.dy + details.delta.dy).clamp(0, size.height - 140),
-            );
-          });
-        },
-        onPanEnd: (_) {
-          setState(() => _isDragging = false);
-          final size = MediaQuery.sizeOf(context);
-          final snapX = _position.dx < size.width / 2 ? 12.0 : size.width - 72.0;
-          setState(() => _position = Offset(snapX, _position.dy));
-        },
-        onTap: _isDragging ? null : _openChat,
-        child: AnimatedBuilder(
-          animation: _pulseAnim,
-          builder: (_, child) => Transform.scale(
-            scale: _isDragging ? 1.1 : (hasConv ? _pulseAnim.value : 1.0),
-            child: child,
+    return Stack(
+      children: [
+        // Drop zone: X circle at bottom center, visible while dragging
+        if (_isDragging)
+          Positioned(
+            bottom: 48,
+            left: 0,
+            right: 0,
+            child: IgnorePointer(
+              child: Center(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  width: _isNearDropZone ? 72 : 60,
+                  height: _isNearDropZone ? 72 : 60,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _isNearDropZone
+                        ? AppColors.error
+                        : Colors.black.withOpacity(0.55),
+                    border: Border.all(color: Colors.white.withOpacity(0.5), width: 2),
+                    boxShadow: _isNearDropZone
+                        ? [BoxShadow(color: AppColors.error.withOpacity(0.4), blurRadius: 16, spreadRadius: 2)]
+                        : [],
+                  ),
+                  child: Icon(Icons.close_rounded, color: Colors.white, size: _isNearDropZone ? 34 : 28),
+                ),
+              ),
+            ),
           ),
-          child: _ChatBubble(isLoading: convState.isLoading, hasConv: hasConv, unread: unread),
+        // Draggable bubble
+        Positioned(
+          left: _position.dx,
+          top: _position.dy,
+          child: GestureDetector(
+            onPanStart: (_) => setState(() => _isDragging = true),
+            onPanUpdate: (details) {
+              final newPos = Offset(
+                (_position.dx + details.delta.dx).clamp(0, size.width - 60),
+                (_position.dy + details.delta.dy).clamp(0, size.height - 60),
+              );
+              // Drop zone: bottom 25% of screen, within 110px of horizontal center
+              final near = newPos.dy > size.height * 0.72 &&
+                  (newPos.dx + 28 - size.width / 2).abs() < 110;
+              setState(() {
+                _position = newPos;
+                _isNearDropZone = near;
+              });
+            },
+            onPanEnd: (_) {
+              if (_isNearDropZone) {
+                ref.read(chatVisibleProvider.notifier).state = false;
+                setState(() { _isDragging = false; _isNearDropZone = false; });
+                return;
+              }
+              setState(() { _isDragging = false; _isNearDropZone = false; });
+              final snapX = _position.dx < size.width / 2 ? 12.0 : size.width - 72.0;
+              setState(() => _position = Offset(snapX, _position.dy));
+            },
+            onTap: _isDragging ? null : _openChat,
+            child: AnimatedBuilder(
+              animation: _pulseAnim,
+              builder: (_, child) => Transform.scale(
+                scale: _isDragging
+                    ? (_isNearDropZone ? 0.85 : 1.1)
+                    : (hasConv ? _pulseAnim.value : 1.0),
+                child: child,
+              ),
+              child: _ChatBubble(isLoading: convState.isLoading, hasConv: hasConv, unread: unread),
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 }

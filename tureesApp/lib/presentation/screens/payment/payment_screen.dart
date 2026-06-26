@@ -39,6 +39,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     if (_selectedAgreement != null) {
       _fetchRealUldegdel(_selectedAgreement!);
     }
+    // Reset any stale QPay invoice from a previous session so the old amount
+    // is never carried over to this payment.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(paymentNotifierProvider.notifier).reset();
+    });
   }
 
   @override
@@ -171,13 +176,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             final active = agreements.where((a) => a.isActive).toList();
             if (active.isEmpty) return const AppEmpty(message: 'Идэвхтэй гэрээ байхгүй');
 
-            if (widget.selectedAgreement != null) {
-              return _SelectedAgreementTile(
-                agreement: _selectedAgreement!,
-                onClear: null,
-              );
-            }
-
             // Auto-select single agreement
             if (active.length == 1 && !_autoSelectDone) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -193,6 +191,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             }
 
             if (_selectedAgreement != null) {
+              // Show a change button whenever there is more than one active
+              // agreement — even when the screen was opened with a pre-selected
+              // agreement from AgreementDetailScreen.
               return _SelectedAgreementTile(
                 agreement: _selectedAgreement!,
                 onClear: active.length > 1
@@ -432,6 +433,18 @@ class _SelectedAgreementTile extends StatelessWidget {
               ],
             ),
           ),
+          if (onClear != null)
+            GestureDetector(
+              onTap: onClear,
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.swap_horiz_rounded, color: AppColors.primary, size: 18),
+              ),
+            ),
         ],
       ),
     );

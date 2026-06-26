@@ -20,6 +20,7 @@ class ApiConstants {
   static const String geree = '/geree';
   static const String gereeBalance = '/gereeniiToololtAvya';
   static const String uldegdelBodyo = '/uldegdelBodyo';
+  static const String bulkUldegdelBodyo = '/bulkUldegdelBodyo';
   static const String saveTransaction = '/tulultOlnoorKhadgalya';
   static const String deleteTransaction = '/tulultUstgaya';
 

@@ -50,7 +50,24 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final list = await _repo.getNotifications(khariltsagchiinId: user.id);
-      state = state.copyWith(isLoading: false, notifications: list);
+      final ovog = user.ovog;
+      final ner = user.ner;
+      final processed = list.map((n) {
+        var msg = n.message;
+        if (msg.contains('<ovog>') || msg.contains('<ner>')) {
+          msg = msg.replaceAll('<ovog>', ovog).replaceAll('<ner>', ner);
+        }
+        if (msg == n.message) return n;
+        return NotificationModel(
+          id: n.id, title: n.title, message: msg,
+          khariltsagchiinId: n.khariltsagchiinId,
+          baiguullagiinId: n.baiguullagiinId,
+          tuluv: n.tuluv, turul: n.turul,
+          duudlagiinTurul: n.duudlagiinTurul,
+          createdAt: n.createdAt,
+        );
+      }).toList();
+      state = state.copyWith(isLoading: false, notifications: processed);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
@@ -84,6 +101,22 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
         }
         return n;
       }).toList(),
+    );
+  }
+
+  Future<void> markAllRead() async {
+    final unread = state.notifications.where((n) => n.isUnread).toList();
+    if (unread.isEmpty) return;
+    await Future.wait(unread.map((n) => _repo.markNotificationRead(n.id)));
+    state = state.copyWith(
+      notifications: state.notifications.map((n) => n.isUnread
+          ? NotificationModel(
+              id: n.id, title: n.title, message: n.message,
+              khariltsagchiinId: n.khariltsagchiinId, baiguullagiinId: n.baiguullagiinId,
+              tuluv: 1, turul: n.turul, duudlagiinTurul: n.duudlagiinTurul,
+              createdAt: n.createdAt,
+            )
+          : n).toList(),
     );
   }
 }

@@ -57,8 +57,8 @@ class AppColors {
   // Status chips
   static const Color activeChip = Color(0xFF16A34A);
   static const Color activeChipBg = Color(0xFFDCFCE7);
-  static const Color inactiveChip = Color(0xFF64748B);
-  static const Color inactiveChipBg = Color(0xFFF1F5F9);
+  static const Color inactiveChip = Color(0xFFD97706);
+  static const Color inactiveChipBg = Color(0xFFFEF3C7);
   static const Color overdueChip = Color(0xFFDC2626);
   static const Color overdueChipBg = Color(0xFFFEE2E2);
   static const Color pendingChip = Color(0xFFF59E0B);

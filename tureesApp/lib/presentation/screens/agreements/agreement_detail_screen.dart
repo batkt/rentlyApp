@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:webview_flutter/webview_flutter.dart' as webview_flutter;
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/constants/api_constants.dart';
@@ -275,12 +276,13 @@ IconData _zardalIcon(String ner) {
 
 String _turulNer(String? turul) {
   switch (turul) {
-    case 'khuvaari': return 'Түрээс';
+    case 'khuvaari': return 'Түрээсийн төлбөр';
     case 'avlaga': return 'Авлага';
     case 'aldangi': return 'Алданги';
     case 'bank': return 'Банк';
     case 'qpay': return 'QPay';
     case 'khyamdral': return 'Хямдрал';
+    case 'khungulult': return 'Хөнгөлөлт';
     case 'torguuli': return 'Торгууль';
     case 'voucher': return 'Ваучер';
     case 'barter': return 'Бартер';
@@ -318,6 +320,46 @@ class _TransactionsTab extends ConsumerWidget {
     }
   }
 
+  // API gives uldegdel:0 for aldangi (penalty) rows, making their running balance
+  // invisible. We compute the display balance only for those rows, leaving all
+  // other rows' uldegdel untouched (the API value is already correct for them).
+  static List<Map<String, dynamic>> _enrichWithAldangi(List<Map<String, dynamic>> txs) {
+    // Sort a working copy: oldest-first, aldangi last within same date, so
+    // lastKnownUldegdel is the correct prior balance when we hit an aldangi row.
+    final sorted = List<Map<String, dynamic>>.from(txs)
+      ..sort((a, b) {
+        if ((a['ekhniiUldegdelEsekh'] as bool?) == true) return -1;
+        if ((b['ekhniiUldegdelEsekh'] as bool?) == true) return 1;
+        final da = (a['ognoo'] ?? a['guilgeeKhiisenOgnoo'] ?? '').toString();
+        final db = (b['ognoo'] ?? b['guilgeeKhiisenOgnoo'] ?? '').toString();
+        final cmp = da.compareTo(db);
+        if (cmp != 0) return cmp;
+        final aA = (a['aldangiinTuukhEsekh'] as bool?) == true;
+        final bA = (b['aldangiinTuukhEsekh'] as bool?) == true;
+        if (aA != bA) return aA ? 1 : -1;
+        return 0;
+      });
+
+    double lastKnownUldegdel = 0;
+    final fixedUldegdel = <Map<String, dynamic>, double>{};
+    for (final tx in sorted) {
+      final raw = (tx['uldegdel'] as num?)?.toDouble() ?? 0.0;
+      if ((tx['aldangiinTuukhEsekh'] as bool?) == true && raw == 0) {
+        final amt = (tx['aldangi'] as num?)?.toDouble()
+            ?? (tx['tulukhDun'] as num?)?.toDouble() ?? 0.0;
+        fixedUldegdel[tx] = lastKnownUldegdel + amt;
+      } else if (raw > 0) {
+        lastKnownUldegdel = raw;
+      }
+    }
+
+    if (fixedUldegdel.isEmpty) return txs;
+    return txs.map((tx) {
+      final fixed = fixedUldegdel[tx];
+      return fixed != null ? {...tx, '_displayUldegdel': fixed} : tx;
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final txAsync = ref.watch(transactionHistoryProvider(agreement.id));
@@ -333,9 +375,12 @@ class _TransactionsTab extends ConsumerWidget {
           return const AppEmpty(icon: Icons.receipt_long_outlined, message: 'Гүйлгээ байхгүй байна');
         }
 
+        // Enrich with computed running balance that includes accumulated aldangi
+        final enrichedTxs = _enrichWithAldangi(txs);
+
         // Group by month, newest first
         final grouped = <String, List<Map<String, dynamic>>>{};
-        for (final tx in txs.reversed) {
+        for (final tx in enrichedTxs.reversed) {
           final dateStr = tx['ognoo']?.toString() ?? tx['guilgeeKhiisenOgnoo']?.toString();
           final key = _monthKey(dateStr);
           grouped.putIfAbsent(key, () => []).add(tx);
@@ -357,7 +402,7 @@ class _TransactionsTab extends ConsumerWidget {
             double totalTulukhDun = 0;
             for (final tx in monthTxs) {
               final turul = tx['turul']?.toString() ?? '';
-              if (!paymentTypes.contains(turul) && turul != 'khyamdral') {
+              if (!paymentTypes.contains(turul) && turul != 'khyamdral' && turul != 'khungulult') {
                 totalTulukhDun += (tx['tulukhDun'] as num?)?.toDouble() ?? 0.0;
               }
             }
@@ -474,19 +519,25 @@ class _MonthTransactionsSheet extends StatelessWidget {
                 final turul = tx['turul']?.toString() ?? '';
                 final isEkhniiUldegdel = tx['ekhniiUldegdelEsekh'] == true;
                 final isPayment = _paymentTypes.contains(turul);
-                final isKhyamdral = turul == 'khyamdral';
+                final isKhyamdral = turul == 'khyamdral' || turul == 'khungulult';
                 final isAldangi = turul == 'aldangi';
                 final tulukhDun = (tx['tulukhDun'] as num?)?.toDouble() ?? 0.0;
                 final tulsunDun = (tx['tulsunDun'] as num?)?.toDouble() ?? 0.0;
                 final tulsunAldangi = (tx['tulsunAldangi'] as num?)?.toDouble() ?? 0.0;
                 final khyamdral = (tx['khyamdral'] as num?)?.toDouble() ?? 0.0;
-                final rawUldegdel = (tx['uldegdel'] as num?)?.toDouble() ?? 0.0;
-                final uldegdel = (isKhyamdral && rawUldegdel < 0) ? 0.0 : rawUldegdel;
+                // Use pre-computed balance (includes accumulated aldangi from _enrichWithAldangi)
+                final rawUldegdel = (tx['_displayUldegdel'] as num?)?.toDouble()
+                    ?? (tx['uldegdel'] as num?)?.toDouble() ?? 0.0;
+                // Web zeroes negative uldegdel for 'khyamdral' only
+                final uldegdel = (turul == 'khyamdral' && rawUldegdel < 0) ? 0.0 : rawUldegdel;
                 final ekhniiUldegdel = (tx['ekhniiUldegdel'] as num?)?.toDouble() ?? 0.0;
                 final tailbar = tx['tailbar']?.toString() ?? '';
                 final dateStr = tx['ognoo']?.toString() ?? tx['guilgeeKhiisenOgnoo']?.toString();
                 final turulNer = isEkhniiUldegdel ? 'Эхний үлдэгдэл' : _turulNer(turul);
-                final description = tailbar.isNotEmpty ? tailbar : turulNer;
+                // khuvaari always shows "Түрээсийн төлбөр" matching web; others prefer tailbar
+                final description = turul == 'khuvaari'
+                    ? 'Түрээсийн төлбөр'
+                    : (tailbar.isNotEmpty ? tailbar : turulNer);
 
                 double displayAmount;
                 if (isPayment) {
@@ -497,9 +548,11 @@ class _MonthTransactionsSheet extends StatelessWidget {
                   displayAmount = tulukhDun;
                 }
 
+                // khungulult reduces balance → same green direction as payments
+                final isCredit = isPayment || isKhyamdral;
                 final amountColor = isEkhniiUldegdel
                     ? AppColors.info
-                    : isPayment
+                    : isCredit
                         ? AppColors.success
                         : isAldangi
                             ? AppColors.error
@@ -517,18 +570,18 @@ class _MonthTransactionsSheet extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: isEkhniiUldegdel
                               ? AppColors.info.withOpacity(0.15)
-                              : (isPayment ? AppColors.success : isAldangi ? AppColors.error : AppColors.primary)
+                              : (isCredit ? AppColors.success : isAldangi ? AppColors.error : AppColors.primary)
                                   .withOpacity(0.12),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(
                           isEkhniiUldegdel
                               ? Icons.account_balance_wallet_rounded
-                              : isPayment ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                              : isCredit ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
                           size: 17,
                           color: isEkhniiUldegdel
                               ? AppColors.info
-                              : isPayment ? AppColors.success : isAldangi ? AppColors.error : AppColors.primary,
+                              : isCredit ? AppColors.success : isAldangi ? AppColors.error : AppColors.primary,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -700,7 +753,10 @@ class _InvoiceTab extends ConsumerWidget {
             final inv = item as Map<String, dynamic>;
             final createdAt = inv['nekhemjlekhiinOgnoo']?.toString() ?? inv['createdAt']?.toString();
             final invMedeelel = inv['medeelel'] as Map<String, dynamic>?;
-            final amount = (invMedeelel?['eneSardTulukhDun'] as num?)?.toDouble() ?? 0.0;
+            // niitUldegdel = total invoice amount (matches "Нийт үнэ" in invoice HTML)
+            final amount = (invMedeelel?['niitUldegdel'] as num?)?.toDouble()
+                ?? (invMedeelel?['eneSardTulukhDun'] as num?)?.toDouble()
+                ?? 0.0;
 
             return GestureDetector(
               onTap: () => _showDetail(context, inv, agreement),
@@ -768,59 +824,46 @@ class _InvoiceDetailSheet extends ConsumerStatefulWidget {
 }
 
 class _InvoiceDetailSheetState extends ConsumerState<_InvoiceDetailSheet> {
-  Map<String, dynamic>? _zadargaa;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchZadargaa();
-  }
-
-  Future<void> _fetchZadargaa() async {
-    try {
-      final ognoo = widget.inv['nekhemjlekhiinOgnoo']?.toString()
-          ?? widget.inv['createdAt']?.toString()
-          ?? DateTime.now().toIso8601String();
-      final repo = ref.read(agreementRepositoryProvider);
-      final result = await repo.getTulburZadargaa(widget.agreement.id, ognoo);
-      if (mounted) setState(() { _zadargaa = result; _loading = false; });
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final inv = widget.inv;
     final createdAt = inv['nekhemjlekhiinOgnoo']?.toString() ?? inv['createdAt']?.toString();
     final dans = inv['nekhemjlekhiinDans']?.toString();
     final invMedeelel = inv['medeelel'] as Map<String, dynamic>?;
+
+    // All values come directly from medeelel (already computed by backend)
+    final umnukhUldegdel = (invMedeelel?['umnukhSariinUrTulbur'] as num?)?.toDouble() ?? 0.0;
+    final eneSardTulukhDun = (invMedeelel?['eneSardTulukhDun'] as num?)?.toDouble() ?? 0.0;
+    final niitUldegdel = (invMedeelel?['niitUldegdel'] as num?)?.toDouble() ?? 0.0;
+    final aldangi = (invMedeelel?['aldangiinUldegdel'] as num?)?.toDouble() ?? 0.0;
+
+    // Задаргаа: rent (after discount) + aldangi + other zardluud net of their discounts
     final talbainNiitUne = (invMedeelel?['talbainNiitUne'] as num?)?.toDouble() ?? 0.0;
+    final rentDiscount = (invMedeelel?['khungulult'] as num?)?.toDouble() ?? 0.0;
+    final rentNet = talbainNiitUne - rentDiscount;
+
     final rawZardluud = (invMedeelel?['zardluud'] as List?) ?? [];
     final breakdownItems = <Map<String, dynamic>>[
-      if (talbainNiitUne > 0) {'tailbar': 'Түрээсийн төлбөр', 'tulukhDun': talbainNiitUne},
+      if (rentNet > 0) {'tailbar': 'Түрээсийн төлбөр', 'dun': rentNet, 'discount': rentDiscount},
+      if (aldangi > 0) {'tailbar': 'Алданги', 'dun': aldangi, 'discount': 0.0},
       for (final z in rawZardluud)
-        if (z is Map && (z['tulukhDun'] as num? ?? 0) > 0)
-          {'tailbar': z['tailbar']?.toString() ?? z['ner']?.toString() ?? '-', 'tulukhDun': (z['tulukhDun'] as num).toDouble()},
+        if (z is Map) ...() {
+          final tailbar = z['tailbar']?.toString() ?? '';
+          // Skip Хөнгөлөлт — it's the rent discount already applied above
+          if (tailbar == 'Хөнгөлөлт' || tailbar == 'Хөнгөлөлт') return [];
+          final gross = (z['tulukhDun'] as num?)?.toDouble() ?? 0.0;
+          final disc = (z['khungulult'] as num?)?.toDouble() ?? 0.0;
+          final net = gross - disc;
+          if (net <= 0 && gross <= 0) return [];
+          return [{'tailbar': tailbar.isNotEmpty ? tailbar : '-', 'dun': net > 0 ? net : gross, 'discount': disc}];
+        }(),
     ];
 
-    final umnukhUrDun = ((_zadargaa?['umnukhSariinUrTulbur'] as List?)?.firstOrNull as Map?)?['uldegdel'];
-    final umnukhTulsunDun = ((_zadargaa?['umnukhSariinTulsun'] as List?)?.firstOrNull as Map?)?['uldegdel'];
-    final niitUldegdelRaw = ((_zadargaa?['niitUldegdel'] as List?)?.firstOrNull as Map?)?['uldegdel'];
-    final eneSardRaw = ((_zadargaa?['eneSardTulukhDun'] as List?)?.firstOrNull as Map?)?['uldegdel'];
-
-    final umnukhUldegdel = (umnukhUrDun as num?)?.toDouble() != null
-        ? ((umnukhUrDun as num).toDouble()) - ((umnukhTulsunDun as num?)?.toDouble() ?? 0.0)
-        : 0.0;
-    final niitUldegdel = (niitUldegdelRaw as num?)?.toDouble() ?? 0.0;
-    final eneSardTulukhDun = (eneSardRaw as num?)?.toDouble()
-        ?? (invMedeelel?['eneSardTulukhDun'] as num?)?.toDouble()
-        ?? 0.0;
+    final htmlContent = inv['nekhemjlekh']?.toString() ?? inv['content']?.toString();
 
     return DraggableScrollableSheet(
       expand: false,
-      initialChildSize: 0.6,
+      initialChildSize: 0.65,
       maxChildSize: 0.92,
       minChildSize: 0.35,
       builder: (ctx, scrollController) => Container(
@@ -841,72 +884,145 @@ class _InvoiceDetailSheetState extends ConsumerState<_InvoiceDetailSheet> {
                 children: [
                   Icon(Icons.receipt_long_rounded, color: AppColors.primary, size: 20),
                   const SizedBox(width: 8),
-                  Text(
-                    'Нэхэмжлэлийн дэлгэрэнгүй',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  Expanded(
+                    child: Text(
+                      'Нэхэмжлэлийн дэлгэрэнгүй',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                    ),
                   ),
+                  if (htmlContent != null && htmlContent.isNotEmpty)
+                    TextButton.icon(
+                      onPressed: () => Navigator.of(context, rootNavigator: true).push(
+                        MaterialPageRoute(
+                          builder: (_) => _InvoiceHtmlScreen(html: htmlContent),
+                        ),
+                      ),
+                      icon: const Icon(Icons.open_in_new_rounded, size: 15),
+                      label: const Text('Харах', style: TextStyle(fontSize: 12)),
+                      style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+                    ),
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            Divider(height: 16, color: context.appDivider),
             Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : ListView(
-                      controller: scrollController,
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      children: [
-                        _InvDetailRow(label: 'Огноо', value: createdAt != null ? AppFormatters.date(createdAt) : '-'),
-                        if (dans != null && dans.isNotEmpty)
-                          _InvDetailRow(label: 'Дансны дугаар', value: dans),
-                        if (umnukhUldegdel != 0)
-                          _InvDetailRow(
-                            label: 'Өмнөх төлбөрийн үлдэгдэл',
-                            value: AppFormatters.currency(umnukhUldegdel),
-                            valueColor: umnukhUldegdel > 0 ? AppColors.error : AppColors.success,
-                          ),
-                        _InvDetailRow(label: 'Энэ сарын төлбөр', value: AppFormatters.currency(eneSardTulukhDun)),
-                        if (niitUldegdel > 0)
-                          _InvDetailRow(
-                            label: 'Нийт дүн',
-                            value: AppFormatters.currency(niitUldegdel),
-                            valueColor: AppColors.error,
-                          ),
-                        if (breakdownItems.isNotEmpty) ...[
-                          const SizedBox(height: 16),
-                          Text('Задаргаа', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-                          const SizedBox(height: 8),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: context.appSurface,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: context.appDivider),
-                            ),
-                            child: Column(
-                              children: [
-                                for (int i = 0; i < breakdownItems.length; i++) ...[
-                                  if (i > 0) Divider(height: 1, color: context.appDivider),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                    child: Row(
+              child: ListView(
+                controller: scrollController,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                children: [
+                  _InvDetailRow(label: 'Огноо', value: createdAt != null ? AppFormatters.date(createdAt) : '-'),
+                  if (dans != null && dans.isNotEmpty)
+                    _InvDetailRow(label: 'Дансны дугаар', value: dans),
+                  if (umnukhUldegdel != 0)
+                    _InvDetailRow(
+                      label: 'Өмнөх үлдэгдэл',
+                      value: AppFormatters.currency(umnukhUldegdel.abs()),
+                      valueColor: umnukhUldegdel > 0 ? AppColors.error : AppColors.success,
+                    ),
+                  if (eneSardTulukhDun > 0)
+                    _InvDetailRow(label: 'Энэ сарын төлбөр', value: AppFormatters.currency(eneSardTulukhDun)),
+                  if (niitUldegdel > 0)
+                    _InvDetailRow(
+                      label: 'Нийт дүн',
+                      value: AppFormatters.currency(niitUldegdel),
+                      valueColor: AppColors.error,
+                    ),
+                  if (breakdownItems.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Text('Задаргаа', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: context.appSurface,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: context.appDivider),
+                      ),
+                      child: Column(
+                        children: [
+                          for (int i = 0; i < breakdownItems.length; i++) ...[
+                            if (i > 0) Divider(height: 1, color: context.appDivider),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Expanded(child: Text(breakdownItems[i]['tailbar']?.toString() ?? '-', style: Theme.of(context).textTheme.bodyMedium)),
-                                        Text(AppFormatters.currency((breakdownItems[i]['tulukhDun'] as num?)?.toDouble() ?? 0.0), style: const TextStyle(fontWeight: FontWeight.w600)),
+                                        Text(
+                                          breakdownItems[i]['tailbar']?.toString() ?? '-',
+                                          style: Theme.of(context).textTheme.bodyMedium,
+                                        ),
+                                        if ((breakdownItems[i]['discount'] as double? ?? 0) > 0)
+                                          Text(
+                                            'Хөнгөлөлт: -${AppFormatters.currency(breakdownItems[i]['discount'] as double)}',
+                                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                              color: AppColors.success,
+                                              fontSize: 11,
+                                            ),
+                                          ),
                                       ],
                                     ),
                                   ),
+                                  Text(
+                                    AppFormatters.currency(breakdownItems[i]['dun'] as double? ?? 0),
+                                    style: const TextStyle(fontWeight: FontWeight.w600),
+                                  ),
                                 ],
-                              ],
+                              ),
                             ),
-                          ),
+                          ],
                         ],
-                        const SizedBox(height: 32),
-                      ],
+                      ),
                     ),
+                  ],
+                  const SizedBox(height: 32),
+                ],
+              ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+// ────────────────────────────────────────────────────
+// Full-screen HTML invoice viewer
+// ────────────────────────────────────────────────────
+
+class _InvoiceHtmlScreen extends StatefulWidget {
+  final String html;
+  const _InvoiceHtmlScreen({required this.html});
+
+  @override
+  State<_InvoiceHtmlScreen> createState() => _InvoiceHtmlScreenState();
+}
+
+class _InvoiceHtmlScreenState extends State<_InvoiceHtmlScreen> {
+  late final webview_flutter.WebViewController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = webview_flutter.WebViewController()
+      ..setJavaScriptMode(webview_flutter.JavaScriptMode.unrestricted)
+      ..loadHtmlString(
+        '<html><head><meta name="viewport" content="width=device-width,initial-scale=1">'
+        '<style>body{margin:0;padding:8px;font-family:sans-serif;}</style></head>'
+        '<body>${widget.html}</body></html>',
+      );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Нэхэмжлэх'),
+        backgroundColor: AppColors.primaryDark,
+        foregroundColor: Colors.white,
+      ),
+      body: webview_flutter.WebViewWidget(controller: _controller),
     );
   }
 }

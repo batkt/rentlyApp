@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -34,6 +33,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   bool _canUseBiometric = false;
   bool _isBiometricLoading = false;
+  bool _isFaceAuth = false;
 
   late AnimationController _fadeController;
   late Animation<double> _fadeAnim;
@@ -53,9 +53,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     final available = await bio.isAvailable;
     final enabled = await storage.isBiometricEnabled();
     final hasToken = await storage.isLoggedIn();
+    final faceAuth = available ? await bio.isFaceAuth : false;
     if (mounted) {
       setState(() {
         _canUseBiometric = available && hasToken;
+        _isFaceAuth = faceAuth;
       });
       // Auto-trigger biometric if previously enabled
       if (available && enabled && hasToken) {
@@ -155,8 +157,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     final alreadyEnabled = await storage.isBiometricEnabled();
     if (!available || alreadyEnabled || !mounted) return;
 
-    final icon = Platform.isIOS ? Icons.face_rounded : Icons.fingerprint_rounded;
-    final label = Platform.isIOS ? 'Face ID' : 'Хурууны хээ';
+    final face = await ref.read(biometricServiceProvider).isFaceAuth;
+    final icon = face ? Icons.face_rounded : Icons.fingerprint_rounded;
+    final label = face ? 'Face ID' : 'Хурууны хээ';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -746,8 +749,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }
 
   Widget _buildBiometricButton(bool isDark) {
-    final icon = Platform.isIOS ? Icons.face_rounded : Icons.fingerprint_rounded;
-    final label = Platform.isIOS ? 'Face ID-ээр нэвтрэх' : 'Хурууны хээгээр нэвтрэх';
+    final icon = _isFaceAuth ? Icons.face_rounded : Icons.fingerprint_rounded;
+    final label = _isFaceAuth ? 'Face ID-ээр нэвтрэх' : 'Хурууны хээгээр нэвтрэх';
 
     return Column(
       children: [

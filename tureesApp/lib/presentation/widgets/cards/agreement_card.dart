@@ -99,6 +99,19 @@ class AgreementCard extends StatelessWidget {
                             ],
                           ),
                         ],
+                        if (!isActive && agreement.duusakhOgnoo != null) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(Icons.event_busy_rounded, size: 13, color: AppColors.inactiveChip),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Цуцалсан: ${AppFormatters.date(agreement.duusakhOgnoo)}',
+                                style: theme.textTheme.bodySmall?.copyWith(color: AppColors.inactiveChip),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),

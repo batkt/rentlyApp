@@ -17,19 +17,25 @@ final agreementsProvider = FutureProvider<List<AgreementModel>>((ref) async {
     barilgiinId: selectedBarilgiinId.isNotEmpty ? selectedBarilgiinId : null,
     pageSize: 999999,
   );
+  if (agreements.isEmpty) return agreements;
 
-  // Fetch the real outstanding balance per agreement via /uldegdelBodyo.
-  final updated = await Future.wait(
-    agreements.map((a) async {
-      try {
-        final uldegdel = await repo.getNiitUldegdel(a.gereeniiDugaar, a.barilgiinId);
-        return a.copyWith(uldegdel: uldegdel);
-      } catch (_) {
-        return a;
-      }
-    }),
-  );
-  return updated;
+  // Single bulk call instead of N individual /uldegdelBodyo requests.
+  try {
+    final ids = agreements.map((a) => a.id).toList();
+    final bulkMap = await repo.getBulkUldegdel(
+      ids,
+      barilgiinId: selectedBarilgiinId.isNotEmpty ? selectedBarilgiinId : null,
+      baiguullagiinId: user.baiguullagiinId,
+    );
+    return agreements.map((a) {
+      final entry = bulkMap[a.id];
+      if (entry == null) return a;
+      final uldegdel = (entry['uldegdel'] as num?)?.toDouble() ?? a.uldegdel;
+      return a.copyWith(uldegdel: uldegdel > 0 ? uldegdel : 0);
+    }).toList();
+  } catch (_) {
+    return agreements;
+  }
 });
 
 final selectedAgreementProvider = StateProvider<AgreementModel?>((ref) => null);

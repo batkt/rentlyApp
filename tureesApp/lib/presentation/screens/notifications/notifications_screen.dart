@@ -52,6 +52,16 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
         ),
         actions: [
           IconButton(
+            tooltip: 'Бүгдийг уншсан болгох',
+            icon: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: context.appInputFill, borderRadius: BorderRadius.circular(10)),
+              child: Icon(Icons.done_all_rounded, size: 20, color: context.appTextSecondary),
+            ),
+            onPressed: () => ref.read(notificationsProvider.notifier).markAllRead(),
+          ),
+          const SizedBox(width: 4),
+          IconButton(
             icon: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(color: context.appInputFill, borderRadius: BorderRadius.circular(10)),

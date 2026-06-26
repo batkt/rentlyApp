@@ -51,6 +51,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   controller: _searchController,
                   hint: 'Нэр, гэрээ, талбайн дугаар хайх...',
                   onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
+                  onClear: () => setState(() => _searchQuery = ''),
                 ),
               ),
             ),
@@ -65,17 +66,29 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Widget _buildBarilgaSelector(BuildContext context) {
     final authState = ref.watch(authStateProvider);
     final allBarilguud = authState.barilguud;
-    final withAgreements = ref.watch(barilguudWithAgreementsProvider).valueOrNull;
-    final barilguud = withAgreements != null
-        ? allBarilguud.where((b) => withAgreements.contains(b.id)).toList()
+    if (allBarilguud.length <= 1) return const SizedBox.shrink();
+
+    // Filter to buildings where this user has at least one contract
+    final contractIds = ref.watch(barilguudWithAgreementsProvider).valueOrNull;
+    final barilguud = contractIds != null
+        ? allBarilguud.where((b) => contractIds.contains(b.id)).toList()
         : allBarilguud;
+
     if (barilguud.length <= 1) return const SizedBox.shrink();
 
     final selectedId = authState.selectedBarilgiinId ?? authState.user?.barilgiinId ?? '';
     final selected = barilguud.firstWhere((b) => b.id == selectedId, orElse: () => barilguud.first);
 
+    final agreements = ref.watch(agreementsProvider).valueOrNull;
+    final countPerBuilding = <String, int>{};
+    if (agreements != null) {
+      for (final a in agreements) {
+        countPerBuilding[a.barilgiinId] = (countPerBuilding[a.barilgiinId] ?? 0) + 1;
+      }
+    }
+
     return GestureDetector(
-      onTap: () => _showBarilgaPicker(context, barilguud, selected.id),
+      onTap: () => _showBarilgaPicker(context, barilguud, selected.id, countPerBuilding),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
@@ -97,6 +110,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+            if ((countPerBuilding[selected.id] ?? 0) > 0) ...[
+              const SizedBox(width: 5),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.25),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${countPerBuilding[selected.id]}',
+                  style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
             const SizedBox(width: 3),
             const Icon(Icons.expand_more_rounded, size: 14, color: Colors.white),
           ],
@@ -105,7 +132,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  void _showBarilgaPicker(BuildContext context, List<({String id, String ner})> barilguud, String currentId) {
+  void _showBarilgaPicker(
+    BuildContext context,
+    List<({String id, String ner})> barilguud,
+    String currentId,
+    Map<String, int> countPerBuilding,
+  ) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
@@ -122,6 +154,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             const SizedBox(height: 12),
             ...barilguud.map((b) {
               final isSelected = b.id == currentId;
+              final count = countPerBuilding[b.id] ?? 0;
               return ListTile(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 tileColor: isSelected ? AppColors.primaryContainer : null,
@@ -130,7 +163,31 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   color: isSelected ? AppColors.primary : AppColors.textTertiary,
                 ),
                 title: Text(b.ner, style: TextStyle(fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal)),
-                trailing: isSelected ? Icon(Icons.check_rounded, color: AppColors.primary) : null,
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (count > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isSelected ? AppColors.primary : AppColors.primaryContainer,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '$count',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: isSelected ? Colors.white : AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    if (isSelected) ...[
+                      const SizedBox(width: 6),
+                      Icon(Icons.check_rounded, color: AppColors.primary),
+                    ],
+                  ],
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   ref.read(authStateProvider.notifier).switchBuilding(b.id);

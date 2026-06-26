@@ -96,6 +96,23 @@ class AgreementRepository {
     return double.tryParse(res['uldegdel']?.toString() ?? '0') ?? 0.0;
   }
 
+  /// Fetches outstanding balances for multiple agreements in one request.
+  /// Returns map of { gereeniiId → {uldegdel, aldangiinUldegdel, ...} }.
+  Future<Map<String, Map<String, dynamic>>> getBulkUldegdel(
+    List<String> gereeniiIds, {
+    String? barilgiinId,
+    String? baiguullagiinId,
+  }) async {
+    if (gereeniiIds.isEmpty) return {};
+    final res = await _client.post(ApiConstants.bulkUldegdelBodyo, data: {
+      'gereeniiIds': gereeniiIds,
+      if (barilgiinId != null && barilgiinId.isNotEmpty) 'barilgiinId': barilgiinId,
+      if (baiguullagiinId != null && baiguullagiinId.isNotEmpty) 'baiguullagiinId': baiguullagiinId,
+    });
+    final data = res.data as Map<String, dynamic>? ?? {};
+    return data.map((k, v) => MapEntry(k, (v as Map<String, dynamic>? ?? {})));
+  }
+
   /// Fetches the payment breakdown for the month of [ognoo] for agreement [gereeniiId].
   /// Returns raw map with keys: umnukhSariinTulsun, umnukhSariinUrTulbur,
   /// niitUldegdel, eneSardTulukhDun, nekhemjlekhDeerGarakh, baritsaaAshiglasanDun.
