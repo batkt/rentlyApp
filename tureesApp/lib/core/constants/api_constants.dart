@@ -41,6 +41,7 @@ class ApiConstants {
 
   // Notifications & Duudlaga (shared /sonorduulga endpoint)
   static const String notifications = '/sonorduulga';
+  static const String sonorduulgaKharlaa = '/sonorduulgaKharlaa';
   static const String duudlaga = '/sonorduulga';
   static String duudlagaUpdate(String id) => '/sonorduulga/$id';
 

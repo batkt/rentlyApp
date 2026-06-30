@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../data/models/notification_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/notification_provider.dart';
@@ -38,6 +39,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // Reset to home tab on every fresh mount (prevents stale index after logout/login)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) ref.read(_navIndexProvider.notifier).state = 0;
+      // Load conversations early so the chat toast listener has data when a
+      // message arrives even before the floating bubble is first rendered.
+      if (mounted) ref.read(conversationsProvider.notifier).load();
     });
   }
 
@@ -63,6 +67,67 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (showPayment) visibleTabs.add(1);
     if (showNotifications) visibleTabs.add(2);
     if (showProfile) visibleTabs.add(3);
+
+    // Real-time notification banner
+    ref.listen<NotificationModel?>(incomingNotificationProvider, (_, next) {
+      if (next == null || !mounted) return;
+      final title = next.title.isNotEmpty ? next.title : 'Шинэ мэдэгдэл';
+      final body = next.message;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              if (body.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(body, style: const TextStyle(fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
+              ],
+            ],
+          ),
+          backgroundColor: AppColors.primary,
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+            label: 'Харах',
+            textColor: Colors.white,
+            onPressed: () {
+              ref.read(incomingNotificationProvider.notifier).state = null;
+              ref.read(_navIndexProvider.notifier).state = 2;
+            },
+          ),
+        ),
+      );
+      Future.microtask(() {
+        if (mounted) ref.read(incomingNotificationProvider.notifier).state = null;
+      });
+    });
+
+    // Chat message banner — fires when unread count increases while not on chat screen
+    ref.listen<ConversationsState>(conversationsProvider, (prev, next) {
+      if (!mounted) return;
+      final prevCount = prev?.conversations.fold<int>(0, (s, c) => s + c.unreadCount) ?? 0;
+      final nextCount = next.conversations.fold<int>(0, (s, c) => s + c.unreadCount);
+      if (nextCount <= prevCount) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Таньд шинэ чат мессеж ирлээ'),
+          backgroundColor: AppColors.primary,
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+            label: 'Нээх',
+            textColor: Colors.white,
+            onPressed: () {
+              final conv = ref.read(conversationsProvider).conversations.firstOrNull;
+              if (conv != null && context.mounted) {
+                ref.read(conversationsProvider.notifier).markRead(conv.id);
+                context.push('/chat/${conv.id}', extra: conv);
+              }
+            },
+          ),
+        ),
+      );
+    });
 
     // Clamp currentIndex to a valid visible tab
     final safeScreenIndex = visibleTabs.contains(currentIndex) ? currentIndex : 0;
@@ -160,7 +225,10 @@ class _FloatingChatBubbleState extends ConsumerState<_FloatingChatBubble>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final size = MediaQuery.sizeOf(context);
-      setState(() => _position = Offset(size.width - 72, size.height * 0.55));
+      final topPad = MediaQuery.of(context).padding.top;
+      final minY = topPad + 8;
+      final initY = (size.height * 0.55).clamp(minY, size.height - 100.0);
+      setState(() => _position = Offset(size.width - 72, initY));
       ref.read(conversationsProvider.notifier).load();
     });
   }
@@ -229,9 +297,10 @@ class _FloatingChatBubbleState extends ConsumerState<_FloatingChatBubble>
           child: GestureDetector(
             onPanStart: (_) => setState(() => _isDragging = true),
             onPanUpdate: (details) {
+              final topPad = MediaQuery.of(context).padding.top + 8;
               final newPos = Offset(
                 (_position.dx + details.delta.dx).clamp(0, size.width - 60),
-                (_position.dy + details.delta.dy).clamp(0, size.height - 60),
+                (_position.dy + details.delta.dy).clamp(topPad, size.height - 100),
               );
               // Drop zone: bottom 25% of screen, within 110px of horizontal center
               final near = newPos.dy > size.height * 0.72 &&

@@ -1,11 +1,21 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/socket/socket_service.dart';
 import '../../data/models/notification_model.dart';
 import '../../data/models/task_model.dart';
 import '../../data/repositories/notification_repository.dart';
 import 'auth_provider.dart';
 
+/// Latest notification received via socket — home screen listens to show a banner.
+final incomingNotificationProvider = StateProvider<NotificationModel?>((ref) => null);
+
 final notificationsProvider = StateNotifierProvider<NotificationsNotifier, NotificationsState>((ref) {
-  return NotificationsNotifier(ref.read(notificationRepositoryProvider), ref);
+  final user = ref.watch(currentUserProvider);
+  return NotificationsNotifier(
+    ref.read(notificationRepositoryProvider),
+    ref,
+    ref.read(socketServiceProvider),
+    user?.id,
+  );
 });
 
 final unreadCountProvider = Provider<int>((ref) {
@@ -41,8 +51,36 @@ class NotificationsState {
 class NotificationsNotifier extends StateNotifier<NotificationsState> {
   final NotificationRepository _repo;
   final Ref _ref;
+  final SocketService _socket;
+  final String? _userId;
 
-  NotificationsNotifier(this._repo, this._ref) : super(const NotificationsState());
+  NotificationsNotifier(this._repo, this._ref, this._socket, this._userId)
+      : super(const NotificationsState()) {
+    if (_userId != null) {
+      _socket.on('khariltsagch$_userId', _onSocketNotification);
+    }
+  }
+
+  void _onSocketNotification(dynamic data) {
+    if (data is! Map) return;
+    try {
+      final notif = NotificationModel.fromJson(Map<String, dynamic>.from(data as Map));
+      if (notif.id.isEmpty) return;
+      final alreadyExists = state.notifications.any((n) => n.id == notif.id);
+      if (!alreadyExists) {
+        state = state.copyWith(notifications: [notif, ...state.notifications]);
+        _ref.read(incomingNotificationProvider.notifier).state = notif;
+      }
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    if (_userId != null) {
+      _socket.off('khariltsagch$_userId', _onSocketNotification);
+    }
+    super.dispose();
+  }
 
   Future<void> load() async {
     final user = _ref.read(currentUserProvider);
@@ -105,11 +143,13 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
   }
 
   Future<void> markAllRead() async {
-    final unread = state.notifications.where((n) => n.isUnread).toList();
-    if (unread.isEmpty) return;
-    await Future.wait(unread.map((n) => _repo.markNotificationRead(n.id)));
+    final unreadMedegdel = state.notifications
+        .where((n) => n.isUnread && n.category == NotifCategory.medegdel)
+        .toList();
+    if (unreadMedegdel.isEmpty) return;
+    await Future.wait(unreadMedegdel.map((n) => _repo.markNotificationRead(n.id)));
     state = state.copyWith(
-      notifications: state.notifications.map((n) => n.isUnread
+      notifications: state.notifications.map((n) => (n.isUnread && n.category == NotifCategory.medegdel)
           ? NotificationModel(
               id: n.id, title: n.title, message: n.message,
               khariltsagchiinId: n.khariltsagchiinId, baiguullagiinId: n.baiguullagiinId,

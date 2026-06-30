@@ -157,7 +157,6 @@ class SettingsScreen extends ConsumerWidget {
             ListTile(
               leading: const Icon(Icons.chat_bubble_rounded, size: 20, color: AppColors.primary),
               title: const Text('Чат харуулах'),
-              subtitle: chatVisible ? null : const Text('Нуугдсан — эндэс идэвхжүүлэх'),
               trailing: Switch.adaptive(
                 value: chatVisible,
                 activeThumbColor: AppColors.primary,

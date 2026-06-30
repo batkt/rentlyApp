@@ -67,7 +67,7 @@ class NotificationRepository {
   }
 
   Future<void> markNotificationRead(String notificationId) async {
-    await _client.put('${ApiConstants.notifications}/$notificationId', data: {'tuluv': 1});
+    await _client.post(ApiConstants.sonorduulgaKharlaa, data: {'id': notificationId});
   }
 
   Future<List<TaskModel>> getTasks({
@@ -110,7 +110,8 @@ class NotificationRepository {
     int pageSize = 20,
   }) async {
     final res = await _client.get(ApiConstants.notifications, queryParameters: {
-      'query': '{"khariltsagchiinId":"$khariltsagchiinId","turul":"duudlaga"}',
+      'query': jsonEncode({'khariltsagchiinId': khariltsagchiinId, 'turul': 'duudlaga'}),
+      'order': jsonEncode({'createdAt': -1}),
       'khuudasniiDugaar': page,
       'khuudasniiKhemjee': pageSize,
     });

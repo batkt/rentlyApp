@@ -148,10 +148,13 @@ class MessagesNotifier extends StateNotifier<MessagesState> {
   }
 
   void _onNewMessage(dynamic data) {
-    if (data is Map && data['conversationId'] == _convId) {
-      final msgData = data['message'];
-      if (msgData is Map<String, dynamic>) {
-        final msg = MessageModel.fromJson(msgData);
+    if (data is! Map) return;
+    if (data['conversationId']?.toString() != _convId) return;
+    final msgData = data['message'];
+    if (msgData is Map) {
+      final msg = MessageModel.fromJson(Map<String, dynamic>.from(msgData));
+      final alreadyExists = state.messages.any((m) => m.id == msg.id && m.id.isNotEmpty);
+      if (!alreadyExists) {
         state = state.copyWith(messages: [...state.messages, msg]);
       }
     }

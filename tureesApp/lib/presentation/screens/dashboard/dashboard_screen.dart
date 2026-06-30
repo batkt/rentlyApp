@@ -66,7 +66,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Widget _buildBarilgaSelector(BuildContext context) {
     final authState = ref.watch(authStateProvider);
     final allBarilguud = authState.barilguud;
-    if (allBarilguud.length <= 1) return const SizedBox.shrink();
 
     // Filter to buildings where this user has at least one contract
     final contractIds = ref.watch(barilguudWithAgreementsProvider).valueOrNull;

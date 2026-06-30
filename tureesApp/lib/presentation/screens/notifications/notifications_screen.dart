@@ -539,7 +539,14 @@ class _RequestsTab extends ConsumerWidget {
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(vertical: 8),
         itemCount: items.length,
-        itemBuilder: (context, index) => _RequestCard(notification: items[index]),
+        itemBuilder: (context, index) => _RequestCard(
+          notification: items[index],
+          onTap: () {
+            if (items[index].isUnread) {
+              ref.read(notificationsProvider.notifier).markRead(items[index].id);
+            }
+          },
+        ),
       ),
     );
   }
@@ -562,8 +569,9 @@ class _RequestsTab extends ConsumerWidget {
 
 class _RequestCard extends StatelessWidget {
   final NotificationModel notification;
+  final VoidCallback? onTap;
 
-  const _RequestCard({required this.notification});
+  const _RequestCard({required this.notification, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -574,7 +582,9 @@ class _RequestCard extends StatelessWidget {
         : AppColors.info;
     final status = notifStatus(notification.tuluv);
 
-    return Container(
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -611,6 +621,7 @@ class _RequestCard extends StatelessWidget {
           const SizedBox(height: 8),
           _StatusPill(status: status),
         ],
+      ),
       ),
     );
   }

@@ -81,11 +81,17 @@ final barilguudWithAgreementsProvider = FutureProvider<Set<String>>((ref) async 
   final user = ref.watch(currentUserProvider);
   if (user == null) return {};
   final repo = ref.read(agreementRepositoryProvider);
+  // Fetch agreements by phone number (primaryPhone) as requested: "check by utasniiDugaar"
   final all = await repo.getAgreements(
+    register: user.primaryPhone.isNotEmpty ? user.primaryPhone : (user.register ?? ''),
+    pageSize: 999999,
+  );
+  final allByReg = await repo.getAgreements(
     register: user.register ?? '',
     pageSize: 999999,
   );
-  return all.map((a) => a.barilgiinId).where((id) => id.isNotEmpty).toSet();
+  final combined = {...all, ...allByReg};
+  return combined.map((a) => a.barilgiinId).where((id) => id.isNotEmpty).toSet();
 });
 
 // Mutable state for zurguud (files) of the currently opened agreement

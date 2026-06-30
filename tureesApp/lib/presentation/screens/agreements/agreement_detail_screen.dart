@@ -320,12 +320,11 @@ class _TransactionsTab extends ConsumerWidget {
     }
   }
 
-  // API gives uldegdel:0 for aldangi (penalty) rows, making their running balance
-  // invisible. We compute the display balance only for those rows, leaving all
-  // other rows' uldegdel untouched (the API value is already correct for them).
+  // Recompute the running balance from scratch for every row, mirroring the
+  // tureesShine formula: uldegdel += tulukhDun - tulsunDun - khyamdral - tulsunAldangi.
+  // This is needed because the API omits tulsunAldangi from its stored uldegdel values
+  // and also sets uldegdel=0 for aldangi (penalty accumulation) rows.
   static List<Map<String, dynamic>> _enrichWithAldangi(List<Map<String, dynamic>> txs) {
-    // Sort a working copy: oldest-first, aldangi last within same date, so
-    // lastKnownUldegdel is the correct prior balance when we hit an aldangi row.
     final sorted = List<Map<String, dynamic>>.from(txs)
       ..sort((a, b) {
         if ((a['ekhniiUldegdelEsekh'] as bool?) == true) return -1;
@@ -340,23 +339,30 @@ class _TransactionsTab extends ConsumerWidget {
         return 0;
       });
 
-    double lastKnownUldegdel = 0;
-    final fixedUldegdel = <Map<String, dynamic>, double>{};
+    double uldegdel = 0;
+    final computed = <Map<String, dynamic>, double>{};
     for (final tx in sorted) {
-      final raw = (tx['uldegdel'] as num?)?.toDouble() ?? 0.0;
-      if ((tx['aldangiinTuukhEsekh'] as bool?) == true && raw == 0) {
-        final amt = (tx['aldangi'] as num?)?.toDouble()
-            ?? (tx['tulukhDun'] as num?)?.toDouble() ?? 0.0;
-        fixedUldegdel[tx] = lastKnownUldegdel + amt;
-      } else if (raw > 0) {
-        lastKnownUldegdel = raw;
+      if ((tx['ekhniiUldegdelEsekh'] as bool?) == true) {
+        uldegdel = (tx['uldegdel'] as num?)?.toDouble() ?? 0.0;
+        continue;
       }
+      // Aldangi rows store penalty in 'aldangi' field; others use tulukhDun.
+      final isAldangiRow = (tx['aldangiinTuukhEsekh'] as bool?) == true;
+      final tulukhDun = isAldangiRow
+          ? ((tx['aldangi'] as num?)?.toDouble() ?? (tx['tulukhDun'] as num?)?.toDouble() ?? 0.0)
+          : ((tx['tulukhDun'] as num?)?.toDouble() ?? 0.0);
+      final tulsunDun = (tx['tulsunDun'] as num?)?.toDouble() ?? 0.0;
+      final tulsunAldangi = (tx['tulsunAldangi'] as num?)?.toDouble() ?? 0.0;
+      final khyamdral = (tx['khyamdral'] as num?)?.toDouble() ?? 0.0;
+      uldegdel = uldegdel + tulukhDun - tulsunDun - khyamdral - tulsunAldangi;
+      if (tx['turul']?.toString() == 'khyamdral' && uldegdel < 0) uldegdel = 0;
+      computed[tx] = uldegdel;
     }
 
-    if (fixedUldegdel.isEmpty) return txs;
+    if (computed.isEmpty) return txs;
     return txs.map((tx) {
-      final fixed = fixedUldegdel[tx];
-      return fixed != null ? {...tx, '_displayUldegdel': fixed} : tx;
+      final c = computed[tx];
+      return c != null ? {...tx, '_displayUldegdel': c} : tx;
     }).toList();
   }
 
