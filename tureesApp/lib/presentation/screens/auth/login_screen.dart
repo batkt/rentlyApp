@@ -34,6 +34,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   bool _canUseBiometric = false;
   bool _isBiometricLoading = false;
   bool _isFaceAuth = false;
+  String _savedPhone = '';
+  bool _biometricEnabled = false;
+  bool _hasSavedToken = false;
+  bool _showBiometricLoginButton = false;
 
   late AnimationController _fadeController;
   late Animation<double> _fadeAnim;
@@ -53,16 +57,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     final available = await bio.isAvailable;
     final enabled = await storage.isBiometricEnabled();
     final hasToken = await storage.isLoggedIn();
+    final savedPhone = await storage.read('utas');
     final faceAuth = available ? await bio.isFaceAuth : false;
-    if (mounted) {
-      setState(() {
-        _canUseBiometric = available && hasToken;
-        _isFaceAuth = faceAuth;
-      });
-      // Auto-trigger biometric if previously enabled
-      if (available && enabled && hasToken) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => _doBiometricLogin());
-      }
+    if (!mounted) return;
+    setState(() {
+      _savedPhone = savedPhone ?? '';
+      _biometricEnabled = enabled && available;
+      _hasSavedToken = hasToken;
+      _canUseBiometric = available && hasToken;
+      _isFaceAuth = faceAuth;
+    });
+    // Auto-trigger biometric if previously enabled and token exists
+    if (available && enabled && hasToken) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _doBiometricLogin());
     }
   }
 
@@ -110,6 +117,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         _phoneVerified = true;
         _orgs = orgs;
         _selectedOrgId = orgs.length == 1 ? orgs.first.id : null;
+        // Show biometric icon next to login button if this phone has biometric set up
+        _showBiometricLoginButton = _biometricEnabled && _hasSavedToken && phone == _savedPhone;
       });
     } catch (_) {
       if (!mounted) return;
@@ -208,6 +217,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       _orgs = [];
       _selectedOrgId = null;
       _lastCheckedPhone = '';
+      _showBiometricLoginButton = false;
     });
   }
 
@@ -256,7 +266,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   _buildHeader(isDark),
                   const SizedBox(height: 28),
                   _buildCard(context, isDark, authState, showPasswordSection, showOrgSelector),
-                  if (_canUseBiometric) ...[
+                  if (_canUseBiometric && !_showBiometricLoginButton) ...[
                     const SizedBox(height: 20),
                     _buildBiometricButton(isDark),
                   ],
@@ -389,7 +399,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       ],
                       _buildPasswordField(isDark),
                       const SizedBox(height: 24),
-                      _buildLoginButton(authState),
+                      Row(
+                        children: [
+                          Expanded(child: _buildLoginButton(authState)),
+                          if (_showBiometricLoginButton) ...[
+                            const SizedBox(width: 10),
+                            _buildBiometricIconButton(isDark),
+                          ],
+                        ],
+                      ),
                     ],
                   )
                 : const SizedBox.shrink(),
@@ -746,6 +764,58 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         ),
       ),
     );
+  }
+
+  // Square icon button shown next to the login button when biometric is available.
+  Widget _buildBiometricIconButton(bool isDark) {
+    final icon = _isFaceAuth ? Icons.face_rounded : Icons.fingerprint_rounded;
+    return SizedBox(
+      width: 54,
+      height: 54,
+      child: GestureDetector(
+        onTap: _isBiometricLoading ? null : _handleBiometricLoginInstead,
+        child: Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1A2826) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.primary, width: 1.5),
+            boxShadow: isDark
+                ? []
+                : [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 4))],
+          ),
+          child: _isBiometricLoading
+              ? const Center(
+                  child: SizedBox(
+                    width: 20, height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.primary),
+                  ),
+                )
+              : Icon(icon, color: AppColors.primary, size: 28),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleBiometricLoginInstead() async {
+    setState(() => _isBiometricLoading = true);
+    final success = await ref.read(authStateProvider.notifier).loginWithBiometric();
+    if (!mounted) return;
+    setState(() => _isBiometricLoading = false);
+    if (success) {
+      context.go('/home');
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_isFaceAuth
+              ? 'Face ID амжилтгүй. Нууц үгийг оруулна уу.'
+              : 'Хурууны хээ амжилтгүй. Нууц үгийг оруулна уу.'),
+          backgroundColor: AppColors.warning,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    }
   }
 
   Widget _buildBiometricButton(bool isDark) {

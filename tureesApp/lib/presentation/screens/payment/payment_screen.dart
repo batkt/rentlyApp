@@ -59,20 +59,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     });
     try {
       final repo = ref.read(agreementRepositoryProvider);
-      final results = await Future.wait([
-        repo.getNiitUldegdel(agreement.gereeniiDugaar, agreement.barilgiinId),
-        repo.getDansniiDugaar(agreement.id),
-      ]);
+      final info = await repo.getLatestInvoiceInfo(agreement.id);
       if (!mounted) return;
-      final uldegdel = results[0] as double;
-      final dans = results[1] as String?;
+      final uldegdel = info.niitUldegdel;
       setState(() {
         _realUldegdel = uldegdel;
-        _dansniiDugaar = dans;
+        _dansniiDugaar = info.dansniiDugaar;
         _loadingUldegdel = false;
       });
-      if (uldegdel > 0 && _amountController.text.isEmpty) {
-        _amountController.text = _numFmt.format(uldegdel);
+      if ((uldegdel ?? 0) > 0 && _amountController.text.isEmpty) {
+        _amountController.text = _numFmt.format(uldegdel!.toInt());
       }
     } catch (_) {
       if (!mounted) return;
@@ -284,10 +280,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.account_balance_wallet_rounded, size: 16, color: AppColors.error),
+                      const Icon(Icons.receipt_long_rounded, size: 16, color: AppColors.error),
                       const SizedBox(width: 8),
                       const Text(
-                        'Нийт үлдэгдэл',
+                        'Нэхэмжлэлийн нийт дүн',
                         style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.error),
                       ),
                     ],

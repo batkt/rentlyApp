@@ -19,7 +19,11 @@ final notificationsProvider = StateNotifierProvider<NotificationsNotifier, Notif
 });
 
 final unreadCountProvider = Provider<int>((ref) {
-  return ref.watch(notificationsProvider).notifications.where((n) => n.isUnread).length;
+  // Only count medegdel category — pending requests have tuluv==0 as their approval
+  // status (not a "read" state), so including them inflates the badge incorrectly.
+  return ref.watch(notificationsProvider).notifications
+      .where((n) => n.isUnread && n.category == NotifCategory.medegdel)
+      .length;
 });
 
 final tasksProvider = StateNotifierProvider<TasksNotifier, TasksState>((ref) {

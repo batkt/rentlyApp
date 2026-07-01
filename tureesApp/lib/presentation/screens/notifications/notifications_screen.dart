@@ -498,6 +498,37 @@ class _RequestsTab extends ConsumerWidget {
 
   const _RequestsTab({this.onAddRequest});
 
+  void _showApproveDialog(BuildContext context, WidgetRef ref, NotificationModel notif) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Зөвшөөрөх үү?', style: TextStyle(fontWeight: FontWeight.w700)),
+        content: Text(
+          notif.message.isNotEmpty ? notif.message : 'Энэхүү хүсэлтийг зөвшөөрөх үү?',
+          style: const TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Үгүй'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              ref.read(notificationsProvider.notifier).markRead(notif.id);
+            },
+            child: const Text('Зөвшөөрөх'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(notificationsProvider);
@@ -541,11 +572,9 @@ class _RequestsTab extends ConsumerWidget {
         itemCount: items.length,
         itemBuilder: (context, index) => _RequestCard(
           notification: items[index],
-          onTap: () {
-            if (items[index].isUnread) {
-              ref.read(notificationsProvider.notifier).markRead(items[index].id);
-            }
-          },
+          onTap: items[index].tuluv == 0
+              ? () => _showApproveDialog(context, ref, items[index])
+              : null,
         ),
       ),
     );

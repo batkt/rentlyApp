@@ -111,7 +111,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (nextCount <= prevCount) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Таньд шинэ чат мессеж ирлээ'),
+          content: const Text('Таньд шинэ  мессеж ирлээ'),
           backgroundColor: AppColors.primary,
           behavior: SnackBarBehavior.floating,
           action: SnackBarAction(

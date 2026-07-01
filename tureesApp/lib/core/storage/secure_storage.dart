@@ -65,9 +65,21 @@ class SecureStorageService {
 
   Future<void> clearAll() async {
     final biometricEnabled = await isBiometricEnabled();
-    await _storage.deleteAll();
     if (biometricEnabled) {
-      await saveBiometricEnabled(true);
+      // Keep token, phone, and biometric_enabled so the user can re-authenticate
+      // with Face ID / fingerprint on next launch without entering a password.
+      await Future.wait([
+        _storage.delete(key: StorageKeys.userRole),
+        _storage.delete(key: StorageKeys.orgId),
+        _storage.delete(key: StorageKeys.buildingId),
+        _storage.delete(key: StorageKeys.userId),
+        _storage.delete(key: StorageKeys.userName),
+        _storage.delete(key: StorageKeys.userRegister),
+        _storage.delete(key: 'barilguud'),
+        _storage.delete(key: 'selected_barilgiinId'),
+      ]);
+    } else {
+      await _storage.deleteAll();
     }
   }
 

@@ -301,7 +301,7 @@ class _TransactionsTab extends ConsumerWidget {
   static String _monthKey(String? dateStr) {
     if (dateStr == null) return '';
     try {
-      final d = DateTime.parse(dateStr);
+      final d = DateTime.parse(dateStr).toLocal();
       return '${d.year}-${d.month.toString().padLeft(2, '0')}';
     } catch (_) {
       return '';
@@ -311,7 +311,7 @@ class _TransactionsTab extends ConsumerWidget {
   static String _monthLabel(String? dateStr) {
     if (dateStr == null) return 'Тодорхойгүй';
     try {
-      final d = DateTime.parse(dateStr);
+      final d = DateTime.parse(dateStr).toLocal();
       const months = ['1-р сар', '2-р сар', '3-р сар', '4-р сар', '5-р сар', '6-р сар',
         '7-р сар', '8-р сар', '9-р сар', '10-р сар', '11-р сар', '12-р сар'];
       return '${d.year} / ${months[d.month - 1]}';
@@ -320,15 +320,15 @@ class _TransactionsTab extends ConsumerWidget {
     }
   }
 
-  // Recompute the running balance from scratch for every row, mirroring the
-  // tureesShine formula: uldegdel += tulukhDun - tulsunDun - khyamdral - tulsunAldangi.
-  // This is needed because the API omits tulsunAldangi from its stored uldegdel values
-  // and also sets uldegdel=0 for aldangi (penalty accumulation) rows.
+  // Recompute the running balance in chronological order, matching the web's
+  // GuilgeeniiTuukh Khuulga formula: uldegdel += tulukhDun - tulsunDun - khyamdral.
+  // ekhniiUldegdelEsekh rows are processed at their date position (NOT moved to front)
+  // because they act as a "balance override" at a specific point in time, exactly
+  // like the web's forEach over the API-ordered (chronological) array.
+  // tulsunAldangi is NOT subtracted (aldangiTuukhKharakhEsekh=false default).
   static List<Map<String, dynamic>> _enrichWithAldangi(List<Map<String, dynamic>> txs) {
     final sorted = List<Map<String, dynamic>>.from(txs)
       ..sort((a, b) {
-        if ((a['ekhniiUldegdelEsekh'] as bool?) == true) return -1;
-        if ((b['ekhniiUldegdelEsekh'] as bool?) == true) return 1;
         final da = (a['ognoo'] ?? a['guilgeeKhiisenOgnoo'] ?? '').toString();
         final db = (b['ognoo'] ?? b['guilgeeKhiisenOgnoo'] ?? '').toString();
         final cmp = da.compareTo(db);
@@ -343,21 +343,22 @@ class _TransactionsTab extends ConsumerWidget {
     final computed = <Map<String, dynamic>, double>{};
     for (final tx in sorted) {
       if ((tx['ekhniiUldegdelEsekh'] as bool?) == true) {
+        // Balance override: the server already computed the correct accumulated
+        // balance up to and including this row's own tulukhDun. Use it as-is.
         uldegdel = (tx['uldegdel'] as num?)?.toDouble() ?? 0.0;
+        computed[tx] = uldegdel;
+        debugPrint('[Guilgee] ekhniiUldegdelEsekh override → uldegdel=$uldegdel (ognoo=${tx['ognoo']})');
         continue;
       }
-      // Aldangi rows store penalty in 'aldangi' field; others use tulukhDun.
-      final isAldangiRow = (tx['aldangiinTuukhEsekh'] as bool?) == true;
-      final tulukhDun = isAldangiRow
-          ? ((tx['aldangi'] as num?)?.toDouble() ?? (tx['tulukhDun'] as num?)?.toDouble() ?? 0.0)
-          : ((tx['tulukhDun'] as num?)?.toDouble() ?? 0.0);
+      final tulukhDun = (tx['tulukhDun'] as num?)?.toDouble() ?? 0.0;
       final tulsunDun = (tx['tulsunDun'] as num?)?.toDouble() ?? 0.0;
-      final tulsunAldangi = (tx['tulsunAldangi'] as num?)?.toDouble() ?? 0.0;
       final khyamdral = (tx['khyamdral'] as num?)?.toDouble() ?? 0.0;
-      uldegdel = uldegdel + tulukhDun - tulsunDun - khyamdral - tulsunAldangi;
+      uldegdel = uldegdel + tulukhDun - tulsunDun - khyamdral;
       if (tx['turul']?.toString() == 'khyamdral' && uldegdel < 0) uldegdel = 0;
       computed[tx] = uldegdel;
+      debugPrint('[Guilgee] ${tx['turul']} ognoo=${tx['ognoo']} +$tulukhDun -$tulsunDun -$khyamdral → $uldegdel');
     }
+    debugPrint('[Guilgee] FINAL uldegdel=$uldegdel (${txs.length} rows)');
 
     if (computed.isEmpty) return txs;
     return txs.map((tx) {
@@ -531,6 +532,9 @@ class _MonthTransactionsSheet extends StatelessWidget {
                 final tulsunDun = (tx['tulsunDun'] as num?)?.toDouble() ?? 0.0;
                 final tulsunAldangi = (tx['tulsunAldangi'] as num?)?.toDouble() ?? 0.0;
                 final khyamdral = (tx['khyamdral'] as num?)?.toDouble() ?? 0.0;
+                final undsenDun = (tx['undsenDun'] as num?)?.toDouble() ?? 0.0;
+                final staffName = tx['guilgeeKhiisenAjiltniiNer']?.toString() ?? '';
+                final tulsunDans = tx['tulsunDans']?.toString() ?? '';
                 // Use pre-computed balance (includes accumulated aldangi from _enrichWithAldangi)
                 final rawUldegdel = (tx['_displayUldegdel'] as num?)?.toDouble()
                     ?? (tx['uldegdel'] as num?)?.toDouble() ?? 0.0;
@@ -539,11 +543,18 @@ class _MonthTransactionsSheet extends StatelessWidget {
                 final ekhniiUldegdel = (tx['ekhniiUldegdel'] as num?)?.toDouble() ?? 0.0;
                 final tailbar = tx['tailbar']?.toString() ?? '';
                 final dateStr = tx['ognoo']?.toString() ?? tx['guilgeeKhiisenOgnoo']?.toString();
+                final registeredDateStr = tx['guilgeeKhiisenOgnoo']?.toString();
                 final turulNer = isEkhniiUldegdel ? 'Эхний үлдэгдэл' : _turulNer(turul);
                 // khuvaari always shows "Түрээсийн төлбөр" matching web; others prefer tailbar
                 final description = turul == 'khuvaari'
                     ? 'Түрээсийн төлбөр'
                     : (tailbar.isNotEmpty ? tailbar : turulNer);
+                // Хэлбэр: matches web Khuulga — bank uses tulsunDans or aldangi label
+                final helber = turul == 'bank'
+                    ? (tulsunAldangi > 0
+                        ? 'Төлсөн алданги'
+                        : (tulsunDans.isNotEmpty && tulsunDans.trim() != '' ? tulsunDans : 'Банк'))
+                    : (isPayment && turul != 'bank' ? turulNer : '');
 
                 double displayAmount;
                 if (isPayment) {
@@ -610,6 +621,29 @@ class _MonthTransactionsSheet extends StatelessWidget {
                                 color: isEkhniiUldegdel ? AppColors.info.withOpacity(0.7) : context.appTextTertiary,
                               ),
                             ),
+                            if (undsenDun > 0 && !isPayment && !isKhyamdral)
+                              Text(
+                                'Түрээс: ${AppFormatters.currency(undsenDun)}',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: context.appTextTertiary, fontSize: 11,
+                                ),
+                              ),
+                            if (helber.isNotEmpty)
+                              Text(
+                                helber,
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: context.appTextSecondary, fontSize: 11, fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            if (staffName.isNotEmpty)
+                              Text(
+                                staffName,
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: context.appTextTertiary, fontSize: 10,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                           ],
                         ),
                       ),
@@ -640,6 +674,13 @@ class _MonthTransactionsSheet extends StatelessWidget {
                                 fontSize: 11,
                               ),
                             ),
+                          if (registeredDateStr != null && registeredDateStr.isNotEmpty)
+                            Text(
+                              AppFormatters.date(registeredDateStr),
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: context.appTextTertiary, fontSize: 10,
+                              ),
+                            ),
                         ],
                       ),
                     ],
@@ -666,7 +707,7 @@ class _InvoiceTab extends ConsumerWidget {
   static String _monthLabel(String? dateStr) {
     if (dateStr == null) return 'Тодорхойгүй';
     try {
-      final d = DateTime.parse(dateStr);
+      final d = DateTime.parse(dateStr).toLocal();
       const months = ['1-р сар', '2-р сар', '3-р сар', '4-р сар', '5-р сар', '6-р сар',
         '7-р сар', '8-р сар', '9-р сар', '10-р сар', '11-р сар', '12-р сар'];
       return '${d.year} / ${months[d.month - 1]}';
@@ -678,7 +719,7 @@ class _InvoiceTab extends ConsumerWidget {
   static String _monthKey(String? dateStr) {
     if (dateStr == null) return '';
     try {
-      final d = DateTime.parse(dateStr);
+      final d = DateTime.parse(dateStr).toLocal();
       return '${d.year}-${d.month.toString().padLeft(2, '0')}';
     } catch (_) {
       return '';
@@ -719,56 +760,50 @@ class _InvoiceTab extends ConsumerWidget {
           return bd.compareTo(ad);
         });
 
-        final List<dynamic> items = [];
-        String? lastKey;
+        // Group by month (newest first)
+        final grouped = <String, List<Map<String, dynamic>>>{};
         for (final inv in sorted) {
           final dateStr = (inv['nekhemjlekhiinOgnoo'] ?? inv['createdAt'])?.toString();
           final key = _monthKey(dateStr);
-          if (key != lastKey) {
-            items.add(_MonthHeader(label: _monthLabel(dateStr)));
-            lastKey = key;
-          }
-          items.add(inv);
+          grouped.putIfAbsent(key, () => []).add(inv);
         }
+        final keys = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
 
         return ListView.builder(
           padding: const EdgeInsets.all(12),
-          itemCount: items.length,
+          itemCount: keys.length,
           itemBuilder: (context, index) {
-            final item = items[index];
-            if (item is _MonthHeader) {
-              return Padding(
-                padding: EdgeInsets.only(top: index == 0 ? 0 : 12, bottom: 8),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(item.label, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700)),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(child: Divider(color: context.appDivider)),
-                  ],
-                ),
-              );
-            }
+            final key = keys[index];
+            final monthInvoices = grouped[key]!;
+            final firstDateStr = monthInvoices.first['nekhemjlekhiinOgnoo']?.toString()
+                ?? monthInvoices.first['createdAt']?.toString();
+            final label = _monthLabel(firstDateStr);
 
-            final inv = item as Map<String, dynamic>;
-            final createdAt = inv['nekhemjlekhiinOgnoo']?.toString() ?? inv['createdAt']?.toString();
-            final invMedeelel = inv['medeelel'] as Map<String, dynamic>?;
-            // niitUldegdel = total invoice amount (matches "Нийт үнэ" in invoice HTML)
-            final amount = (invMedeelel?['niitUldegdel'] as num?)?.toDouble()
-                ?? (invMedeelel?['eneSardTulukhDun'] as num?)?.toDouble()
-                ?? 0.0;
+            final totalAmount = monthInvoices.fold(0.0, (sum, inv) {
+              final m = inv['medeelel'] as Map<String, dynamic>?;
+              return sum + ((m?['niitUldegdel'] as num?)?.toDouble()
+                  ?? (m?['eneSardTulukhDun'] as num?)?.toDouble()
+                  ?? 0.0);
+            });
 
             return GestureDetector(
-              onTap: () => _showDetail(context, inv, agreement),
+              onTap: () => showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.sizeOf(context).width > 600 ? 600 : double.infinity,
+                ),
+                builder: (_) => _MonthInvoicesSheet(
+                  monthLabel: label,
+                  invoices: monthInvoices,
+                  agreement: agreement,
+                  onShowDetail: (inv) => _showDetail(context, inv, agreement),
+                ),
+              ),
               child: Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(14),
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
                   color: context.appCardBg,
                   borderRadius: BorderRadius.circular(14),
@@ -777,33 +812,32 @@ class _InvoiceTab extends ConsumerWidget {
                 child: Row(
                   children: [
                     Container(
-                      width: 40, height: 40,
+                      width: 42, height: 42,
                       decoration: BoxDecoration(
                         color: AppColors.primary.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Icon(Icons.receipt_long_rounded, color: AppColors.primary, size: 18),
+                      child: const Icon(Icons.receipt_long_rounded, color: AppColors.primary, size: 20),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            inv['tailbar']?.toString() ?? 'Нэхэмжлэл',
-                            style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-                          ),
-                          if (createdAt != null)
-                            Text(AppFormatters.date(createdAt), style: Theme.of(context).textTheme.bodySmall),
+                          Text(label, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                          Text('${monthInvoices.length} нэхэмжлэл',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.appTextTertiary)),
                         ],
                       ),
                     ),
-                    Text(
-                      AppFormatters.currency(amount),
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: context.appTextPrimary),
-                    ),
-                    const SizedBox(width: 6),
-                    Icon(Icons.chevron_right_rounded, size: 18, color: context.appTextTertiary),
+                    if (totalAmount > 0) ...[
+                      Text(
+                        AppFormatters.currency(totalAmount),
+                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: context.appTextPrimary),
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    Icon(Icons.chevron_right_rounded, size: 20, color: context.appTextTertiary),
                   ],
                 ),
               ),
@@ -811,6 +845,125 @@ class _InvoiceTab extends ConsumerWidget {
           },
         );
       },
+    );
+  }
+}
+
+// ────────────────────────────────────────────────────
+// Month invoices sheet — shows all invoices for a month
+// ────────────────────────────────────────────────────
+
+class _MonthInvoicesSheet extends StatelessWidget {
+  final String monthLabel;
+  final List<Map<String, dynamic>> invoices;
+  final AgreementModel agreement;
+  final void Function(Map<String, dynamic> inv) onShowDetail;
+
+  const _MonthInvoicesSheet({
+    required this.monthLabel,
+    required this.invoices,
+    required this.agreement,
+    required this.onShowDetail,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: context.appCardBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 36, height: 4,
+            margin: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(color: context.appDivider, borderRadius: BorderRadius.circular(2)),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+            child: Row(
+              children: [
+                const Icon(Icons.receipt_long_rounded, color: AppColors.primary, size: 20),
+                const SizedBox(width: 8),
+                Text(monthLabel,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                const Spacer(),
+                Text('${invoices.length} нэхэмжлэл',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.appTextTertiary)),
+              ],
+            ),
+          ),
+          Divider(height: 16, color: context.appDivider),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.65),
+            child: ListView.separated(
+              shrinkWrap: true,
+              padding: const EdgeInsets.only(bottom: 24),
+              itemCount: invoices.length,
+              separatorBuilder: (_, __) => Divider(height: 1, color: context.appDivider),
+              itemBuilder: (context, i) {
+                final inv = invoices[i];
+                final createdAt = inv['nekhemjlekhiinOgnoo']?.toString() ?? inv['createdAt']?.toString();
+                final invMedeelel = inv['medeelel'] as Map<String, dynamic>?;
+                final amount = (invMedeelel?['niitUldegdel'] as num?)?.toDouble()
+                    ?? (invMedeelel?['eneSardTulukhDun'] as num?)?.toDouble()
+                    ?? 0.0;
+
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    onShowDetail(inv);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 38, height: 38,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.receipt_long_rounded, color: AppColors.primary, size: 18),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                inv['tailbar']?.toString() ?? 'Нэхэмжлэл',
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              if (createdAt != null)
+                                Text(AppFormatters.date(createdAt),
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.appTextTertiary)),
+                            ],
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              AppFormatters.currency(amount),
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                            ),
+                            Icon(Icons.chevron_right_rounded, size: 16, color: context.appTextTertiary),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -927,12 +1080,6 @@ class _InvoiceDetailSheetState extends ConsumerState<_InvoiceDetailSheet> {
                     ),
                   if (eneSardTulukhDun > 0)
                     _InvDetailRow(label: 'Энэ сарын төлбөр', value: AppFormatters.currency(eneSardTulukhDun)),
-                  if (niitUldegdel > 0)
-                    _InvDetailRow(
-                      label: 'Нийт дүн',
-                      value: AppFormatters.currency(niitUldegdel),
-                      valueColor: AppColors.error,
-                    ),
                   if (breakdownItems.isNotEmpty) ...[
                     const SizedBox(height: 16),
                     Text('Задаргаа', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
@@ -980,6 +1127,68 @@ class _InvoiceDetailSheetState extends ConsumerState<_InvoiceDetailSheet> {
                           ],
                         ],
                       ),
+                    ),
+                  ],
+                  // Totals block matching the print invoice layout (Дүн / НӨАТ / Нийт үнэ)
+                  if (niitUldegdel > 0) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: context.appSurface,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: context.appDivider),
+                      ),
+                      child: () {
+                        // НӨАТ = niitUldegdel - preTax (same 10% formula used by print invoice)
+                        final preTax = niitUldegdel / 1.1;
+                        final nuat = niitUldegdel - preTax;
+                        return Column(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('Дүн', style: Theme.of(context).textTheme.bodyMedium),
+                                  Text(AppFormatters.currency(preTax),
+                                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                            ),
+                            Divider(height: 1, color: context.appDivider),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('НӨАТ (10%)', style: Theme.of(context).textTheme.bodyMedium),
+                                  Text(AppFormatters.currency(nuat),
+                                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                            ),
+                            Divider(height: 1, color: context.appDivider),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: AppColors.error.withOpacity(0.06),
+                                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('Нийт үнэ',
+                                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                        fontWeight: FontWeight.w700, color: AppColors.error)),
+                                  Text(AppFormatters.currency(niitUldegdel),
+                                      style: const TextStyle(
+                                        fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.error)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        );
+                      }(),
                     ),
                   ],
                   const SizedBox(height: 32),
@@ -1033,10 +1242,6 @@ class _InvoiceHtmlScreenState extends State<_InvoiceHtmlScreen> {
   }
 }
 
-class _MonthHeader {
-  final String label;
-  const _MonthHeader({required this.label});
-}
 
 class _InvDetailRow extends StatelessWidget {
   final String label;

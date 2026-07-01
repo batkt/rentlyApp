@@ -91,6 +91,27 @@ class AgreementRepository {
     }
   }
 
+  /// Returns the latest invoice's total amount (niitUldegdel = Нийт үнэ including НӨАТ)
+  /// and bank account number in a single fetch — used by PaymentScreen to pre-fill amount.
+  Future<({double? niitUldegdel, String? dansniiDugaar})> getLatestInvoiceInfo(String gereeniiId) async {
+    try {
+      final history = await getInvoiceHistory(gereeniiId);
+      if (history.isEmpty) return (niitUldegdel: null, dansniiDugaar: null);
+      history.sort((a, b) {
+        final ad = (a['nekhemjlekhiinOgnoo'] ?? a['createdAt'] ?? '').toString();
+        final bd = (b['nekhemjlekhiinOgnoo'] ?? b['createdAt'] ?? '').toString();
+        return bd.compareTo(ad);
+      });
+      final latest = history.first;
+      final medeelel = latest['medeelel'] as Map<String, dynamic>?;
+      final niitUldegdel = (medeelel?['niitUldegdel'] as num?)?.toDouble();
+      final dansniiDugaar = latest['nekhemjlekhiinDans']?.toString();
+      return (niitUldegdel: niitUldegdel, dansniiDugaar: dansniiDugaar);
+    } catch (_) {
+      return (niitUldegdel: null, dansniiDugaar: null);
+    }
+  }
+
   Future<double> getNiitUldegdel(String gereeniiDugaar, String barilgiinId) async {
     final res = await getUldegdel(gereeniiDugaar, barilgiinId);
     return double.tryParse(res['uldegdel']?.toString() ?? '0') ?? 0.0;
