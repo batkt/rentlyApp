@@ -14,6 +14,12 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Applied only once google-services.json (from the Firebase console) is
+// dropped in — keeps the build working in the meantime instead of failing.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "mn.zevtabs.turees_app"
     compileSdk = flutter.compileSdkVersion

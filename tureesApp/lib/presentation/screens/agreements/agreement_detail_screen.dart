@@ -320,50 +320,32 @@ class _TransactionsTab extends ConsumerWidget {
     }
   }
 
-  // Recompute the running balance in chronological order, matching the web's
-  // GuilgeeniiTuukh Khuulga formula: uldegdel += tulukhDun - tulsunDun - khyamdral.
-  // ekhniiUldegdelEsekh rows are processed at their date position (NOT moved to front)
-  // because they act as a "balance override" at a specific point in time, exactly
-  // like the web's forEach over the API-ordered (chronological) array.
-  // tulsunAldangi is NOT subtracted (aldangiTuukhKharakhEsekh=false default).
-  static List<Map<String, dynamic>> _enrichWithAldangi(List<Map<String, dynamic>> txs) {
-    final sorted = List<Map<String, dynamic>>.from(txs)
-      ..sort((a, b) {
-        final da = (a['ognoo'] ?? a['guilgeeKhiisenOgnoo'] ?? '').toString();
-        final db = (b['ognoo'] ?? b['guilgeeKhiisenOgnoo'] ?? '').toString();
-        final cmp = da.compareTo(db);
-        if (cmp != 0) return cmp;
-        final aA = (a['aldangiinTuukhEsekh'] as bool?) == true;
-        final bA = (b['aldangiinTuukhEsekh'] as bool?) == true;
-        if (aA != bA) return aA ? 1 : -1;
-        return 0;
-      });
+  // Balance shown per row in the month sheet resets to 0 at the start of
+  // every month instead of carrying the account's overall running balance —
+  // that total (niitUldegdel) already lives on Home/Payment, so this view
+  // should only reflect that month's own charges/payments/discounts.
+  //
+  // monthTxs arrives newest-first (built from the API's chronological-ascending
+  // order via .reversed at the call site), so reversing it back gives true
+  // chronological order. We deliberately don't re-sort by date string instead —
+  // several transactions can share the exact same day, which makes that
+  // comparison ambiguous and scrambles same-day ordering.
+  static List<Map<String, dynamic>> _perMonthUldegdel(List<Map<String, dynamic>> monthTxs) {
+    final chronological = monthTxs.reversed;
 
     double uldegdel = 0;
     final computed = <Map<String, dynamic>, double>{};
-    for (final tx in sorted) {
-      if ((tx['ekhniiUldegdelEsekh'] as bool?) == true) {
-        // Balance override: the server already computed the correct accumulated
-        // balance up to and including this row's own tulukhDun. Use it as-is.
-        uldegdel = (tx['uldegdel'] as num?)?.toDouble() ?? 0.0;
-        computed[tx] = uldegdel;
-        debugPrint('[Guilgee] ekhniiUldegdelEsekh override → uldegdel=$uldegdel (ognoo=${tx['ognoo']})');
-        continue;
-      }
+    for (final tx in chronological) {
       final tulukhDun = (tx['tulukhDun'] as num?)?.toDouble() ?? 0.0;
       final tulsunDun = (tx['tulsunDun'] as num?)?.toDouble() ?? 0.0;
       final khyamdral = (tx['khyamdral'] as num?)?.toDouble() ?? 0.0;
       uldegdel = uldegdel + tulukhDun - tulsunDun - khyamdral;
-      if (tx['turul']?.toString() == 'khyamdral' && uldegdel < 0) uldegdel = 0;
       computed[tx] = uldegdel;
-      debugPrint('[Guilgee] ${tx['turul']} ognoo=${tx['ognoo']} +$tulukhDun -$tulsunDun -$khyamdral → $uldegdel');
     }
-    debugPrint('[Guilgee] FINAL uldegdel=$uldegdel (${txs.length} rows)');
 
-    if (computed.isEmpty) return txs;
-    return txs.map((tx) {
+    return monthTxs.map((tx) {
       final c = computed[tx];
-      return c != null ? {...tx, '_displayUldegdel': c} : tx;
+      return c != null ? {...tx, '_perMonthUldegdel': c} : tx;
     }).toList();
   }
 
@@ -382,12 +364,9 @@ class _TransactionsTab extends ConsumerWidget {
           return const AppEmpty(icon: Icons.receipt_long_outlined, message: 'Гүйлгээ байхгүй байна');
         }
 
-        // Enrich with computed running balance that includes accumulated aldangi
-        final enrichedTxs = _enrichWithAldangi(txs);
-
         // Group by month, newest first
         final grouped = <String, List<Map<String, dynamic>>>{};
-        for (final tx in enrichedTxs.reversed) {
+        for (final tx in txs.reversed) {
           final dateStr = tx['ognoo']?.toString() ?? tx['guilgeeKhiisenOgnoo']?.toString();
           final key = _monthKey(dateStr);
           grouped.putIfAbsent(key, () => []).add(tx);
@@ -404,15 +383,11 @@ class _TransactionsTab extends ConsumerWidget {
                 ?? monthTxs.first['guilgeeKhiisenOgnoo']?.toString();
             final label = _monthLabel(firstDateStr);
 
-            // Total tulukhDun (charges) for the month — matches tureesShine "Төлөх дүн"
-            const paymentTypes = {'bank', 'qpay', 'voucher', 'barter', 'baritsaa', 'zalruulga', 'tulultBurtgekh'};
-            double totalTulukhDun = 0;
-            for (final tx in monthTxs) {
-              final turul = tx['turul']?.toString() ?? '';
-              if (!paymentTypes.contains(turul) && turul != 'khyamdral' && turul != 'khungulult') {
-                totalTulukhDun += (tx['tulukhDun'] as num?)?.toDouble() ?? 0.0;
-              }
-            }
+            // Net balance for the month (charges minus discounts/payments) —
+            // same figure as the detail sheet's final Үлд, so the summary card
+            // and the drill-down agree.
+            final enrichedMonthTxs = _perMonthUldegdel(monthTxs);
+            final monthNetTotal = (enrichedMonthTxs.first['_perMonthUldegdel'] as num?)?.toDouble() ?? 0.0;
 
             return GestureDetector(
               onTap: () => showModalBottomSheet(
@@ -422,7 +397,7 @@ class _TransactionsTab extends ConsumerWidget {
                 constraints: BoxConstraints(
                   maxWidth: MediaQuery.sizeOf(context).width > 600 ? 600 : double.infinity,
                 ),
-                builder: (_) => _MonthTransactionsSheet(monthLabel: label, txs: monthTxs),
+                builder: (_) => _MonthTransactionsSheet(monthLabel: label, txs: enrichedMonthTxs),
               ),
               child: Container(
                 margin: const EdgeInsets.only(bottom: 10),
@@ -453,10 +428,14 @@ class _TransactionsTab extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    if (totalTulukhDun > 0) ...[
+                    if (monthNetTotal != 0) ...[
                       Text(
-                        AppFormatters.currency(totalTulukhDun),
-                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.error),
+                        AppFormatters.currency(monthNetTotal),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: monthNetTotal < 0 ? AppColors.success : AppColors.error,
+                        ),
                       ),
                       const SizedBox(width: 4),
                     ],
@@ -535,11 +514,11 @@ class _MonthTransactionsSheet extends StatelessWidget {
                 final undsenDun = (tx['undsenDun'] as num?)?.toDouble() ?? 0.0;
                 final staffName = tx['guilgeeKhiisenAjiltniiNer']?.toString() ?? '';
                 final tulsunDans = tx['tulsunDans']?.toString() ?? '';
-                // Use pre-computed balance (includes accumulated aldangi from _enrichWithAldangi)
-                final rawUldegdel = (tx['_displayUldegdel'] as num?)?.toDouble()
+                // Per-month balance (resets to 0 each month — see _perMonthUldegdel).
+                // Can go negative (e.g. a discount before any charge offsets it) —
+                // that's shown as-is, not floored to 0.
+                final uldegdel = (tx['_perMonthUldegdel'] as num?)?.toDouble()
                     ?? (tx['uldegdel'] as num?)?.toDouble() ?? 0.0;
-                // Web zeroes negative uldegdel for 'khyamdral' only
-                final uldegdel = (turul == 'khyamdral' && rawUldegdel < 0) ? 0.0 : rawUldegdel;
                 final ekhniiUldegdel = (tx['ekhniiUldegdel'] as num?)?.toDouble() ?? 0.0;
                 final tailbar = tx['tailbar']?.toString() ?? '';
                 final dateStr = tx['ognoo']?.toString() ?? tx['guilgeeKhiisenOgnoo']?.toString();
@@ -560,7 +539,8 @@ class _MonthTransactionsSheet extends StatelessWidget {
                 if (isPayment) {
                   displayAmount = tulsunAldangi > 0 ? tulsunAldangi : (tulsunDun > 0 ? tulsunDun : tulukhDun);
                 } else if (isKhyamdral) {
-                  displayAmount = khyamdral > 0 ? khyamdral : tulukhDun;
+                  // Discounts reduce the month's balance — show as a negative amount.
+                  displayAmount = -(khyamdral > 0 ? khyamdral : tulukhDun);
                 } else {
                   displayAmount = tulukhDun;
                 }
@@ -666,11 +646,11 @@ class _MonthTransactionsSheet extends StatelessWidget {
                                 fontSize: 11,
                               ),
                             ),
-                          if (uldegdel > 0)
+                          if (uldegdel != 0)
                             Text(
                               'Үлд: ${AppFormatters.currency(uldegdel)}',
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppColors.error,
+                                color: uldegdel < 0 ? AppColors.success : AppColors.error,
                                 fontSize: 11,
                               ),
                             ),
@@ -727,6 +707,15 @@ class _InvoiceTab extends ConsumerWidget {
   }
 
   void _showDetail(BuildContext context, Map<String, dynamic> inv, AgreementModel agreement) {
+    // Go straight to the rendered invoice template when available — the
+    // breakdown sheet is only a fallback for invoices without saved HTML.
+    final htmlContent = inv['nekhemjlekh']?.toString() ?? inv['content']?.toString();
+    if (htmlContent != null && htmlContent.isNotEmpty) {
+      Navigator.of(context, rootNavigator: true).push(
+        MaterialPageRoute(builder: (_) => _InvoiceHtmlScreen(html: htmlContent)),
+      );
+      return;
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -779,13 +768,6 @@ class _InvoiceTab extends ConsumerWidget {
                 ?? monthInvoices.first['createdAt']?.toString();
             final label = _monthLabel(firstDateStr);
 
-            final totalAmount = monthInvoices.fold(0.0, (sum, inv) {
-              final m = inv['medeelel'] as Map<String, dynamic>?;
-              return sum + ((m?['niitUldegdel'] as num?)?.toDouble()
-                  ?? (m?['eneSardTulukhDun'] as num?)?.toDouble()
-                  ?? 0.0);
-            });
-
             return GestureDetector(
               onTap: () => showModalBottomSheet(
                 context: context,
@@ -830,13 +812,6 @@ class _InvoiceTab extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    if (totalAmount > 0) ...[
-                      Text(
-                        AppFormatters.currency(totalAmount),
-                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: context.appTextPrimary),
-                      ),
-                      const SizedBox(width: 4),
-                    ],
                     Icon(Icons.chevron_right_rounded, size: 20, color: context.appTextTertiary),
                   ],
                 ),
@@ -906,12 +881,9 @@ class _MonthInvoicesSheet extends StatelessWidget {
               itemBuilder: (context, i) {
                 final inv = invoices[i];
                 final createdAt = inv['nekhemjlekhiinOgnoo']?.toString() ?? inv['createdAt']?.toString();
-                final invMedeelel = inv['medeelel'] as Map<String, dynamic>?;
-                final amount = (invMedeelel?['niitUldegdel'] as num?)?.toDouble()
-                    ?? (invMedeelel?['eneSardTulukhDun'] as num?)?.toDouble()
-                    ?? 0.0;
 
                 return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: () {
                     Navigator.of(context).pop();
                     onShowDetail(inv);
@@ -945,16 +917,7 @@ class _MonthInvoicesSheet extends StatelessWidget {
                             ],
                           ),
                         ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              AppFormatters.currency(amount),
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-                            ),
-                            Icon(Icons.chevron_right_rounded, size: 16, color: context.appTextTertiary),
-                          ],
-                        ),
+                        Icon(Icons.chevron_right_rounded, size: 16, color: context.appTextTertiary),
                       ],
                     ),
                   ),
@@ -1223,8 +1186,16 @@ class _InvoiceHtmlScreenState extends State<_InvoiceHtmlScreen> {
     _controller = webview_flutter.WebViewController()
       ..setJavaScriptMode(webview_flutter.JavaScriptMode.unrestricted)
       ..loadHtmlString(
-        '<html><head><meta name="viewport" content="width=device-width,initial-scale=1">'
-        '<style>body{margin:0;padding:8px;font-family:sans-serif;}</style></head>'
+        '<html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">'
+        '<style>'
+        'html,body{margin:0;padding:8px;font-family:sans-serif;max-width:100%;overflow-x:hidden;}'
+        // The invoice template is authored for print (fixed-width tables/divs) —
+        // force everything to shrink to the device width instead of overflowing.
+        '*{box-sizing:border-box;}'
+        'table{width:100% !important;table-layout:fixed;}'
+        'img,table,div,p{max-width:100% !important;}'
+        'td,th{word-break:break-word;}'
+        '</style></head>'
         '<body>${widget.html}</body></html>',
       );
   }

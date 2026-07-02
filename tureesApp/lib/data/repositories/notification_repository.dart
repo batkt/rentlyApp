@@ -109,8 +109,16 @@ class NotificationRepository {
     int page = 1,
     int pageSize = 20,
   }) async {
+    
+    final query = {
+      'khariltsagchiinId': khariltsagchiinId,
+      'turul': 'duudlaga',
+      'duudlagiinTurul': {
+        r'$nin': ['shaardlaga', 'gomdol', 'sanal', 'sanalKhuselt'],
+      },
+    };
     final res = await _client.get(ApiConstants.notifications, queryParameters: {
-      'query': jsonEncode({'khariltsagchiinId': khariltsagchiinId, 'turul': 'duudlaga'}),
+      'query': jsonEncode(query),
       'order': jsonEncode({'createdAt': -1}),
       'khuudasniiDugaar': page,
       'khuudasniiKhemjee': pageSize,

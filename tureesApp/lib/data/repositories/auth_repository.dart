@@ -33,6 +33,13 @@ class AuthRepository {
     return res.data as Map<String, dynamic>;
   }
 
+  Future<void> saveFcmToken(String khariltsagchId, String fcmToken) async {
+    await _client.post(ApiConstants.khariltsagchidTokenOnooyo, data: {
+      'id': khariltsagchId,
+      'token': fcmToken,
+    });
+  }
+
   Future<Map<String, dynamic>> login({
     required String phone,
     required String password,

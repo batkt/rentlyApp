@@ -22,7 +22,7 @@ class PaymentScreen extends ConsumerStatefulWidget {
   ConsumerState<PaymentScreen> createState() => _PaymentScreenState();
 }
 
-final _numFmt = NumberFormat('#,##0.##', 'mn');
+final _numFmt = NumberFormat('#,##0.00', 'mn');
 
 class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   final _amountController = TextEditingController();
@@ -68,7 +68,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         _loadingUldegdel = false;
       });
       if ((uldegdel ?? 0) > 0 && _amountController.text.isEmpty) {
-        _amountController.text = _numFmt.format(uldegdel!.toInt());
+        _amountController.text = _numFmt.format(uldegdel!);
       }
     } catch (_) {
       if (!mounted) return;
@@ -266,7 +266,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         // Нийт үлдэгдэл button — shown prominently when there's a balance
         if (uldegdel > 0 && !_loadingUldegdel) ...[
           GestureDetector(
-            onTap: () => _amountController.text = _numFmt.format(uldegdel.toInt()),
+            onTap: () => setState(() => _amountController.text = _numFmt.format(uldegdel)),
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

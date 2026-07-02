@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/services/biometric_service.dart';
+import '../../core/services/push_notification_service.dart';
 import '../../core/storage/secure_storage.dart';
 import '../../core/socket/socket_service.dart';
 import '../../data/models/user_model.dart';
@@ -97,6 +98,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           await _socket.connect();
           _socket.joinOrgRoom(user.baiguullagiinId);
           _socket.joinUserRoom(user.id);
+          PushNotificationService.instance.registerToken((token) => _repo.saveFcmToken(user.id, token));
           _refreshBarilguud(user.baiguullagiinId);
           return;
         }
@@ -201,6 +203,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await _socket.connect();
     _socket.joinOrgRoom(user.baiguullagiinId);
     _socket.joinUserRoom(user.id);
+    PushNotificationService.instance.registerToken((token) => _repo.saveFcmToken(user.id, token));
     return LoginResult.success;
   }
 

@@ -67,13 +67,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
               decoration: BoxDecoration(color: context.appInputFill, borderRadius: BorderRadius.circular(10)),
               child: Icon(Icons.add_rounded, size: 20, color: context.appTextSecondary),
             ),
-            onPressed: () {
-              if (_tabController.index == 2) {
-                _showNewDuudlagaDialog(context);
-              } else {
-                _showNewRequestSheet(context);
-              }
-            },
+            onPressed: () => _showNewRequestSheet(
+              context,
+              initialTurul: _tabController.index == 2 ? 'duudlaga' : 'sanal',
+            ),
           ),
           const SizedBox(width: 8),
         ],
@@ -86,8 +83,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
             controller: _tabController,
             children: [
               _NotificationsTab(),
-              _RequestsTab(onAddRequest: () => _showNewRequestSheet(context)),
-              _DuudlagaTab(onAddDuudlaga: () => _showNewDuudlagaDialog(context)),
+              _RequestsTab(onAddRequest: () => _showNewRequestSheet(context, initialTurul: 'sanal')),
+              _DuudlagaTab(onAddDuudlaga: () => _showNewRequestSheet(context, initialTurul: 'duudlaga')),
             ],
           ),
         ),
@@ -95,7 +92,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
     );
   }
 
-  void _showNewRequestSheet(BuildContext context) {
+  void _showNewRequestSheet(BuildContext context, {required String initialTurul}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -104,307 +101,18 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
         maxWidth: MediaQuery.sizeOf(context).width > 600 ? 560 : double.infinity,
       ),
       builder: (ctx) => _RequestFormSheet(
-        onSubmitted: () {
+        initialTurul: initialTurul,
+        onSubmitted: (turul) {
+          if (turul == 'duudlaga') {
+            ref.read(duudlagaProvider.notifier).load();
+          }
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Хүсэлт амжилттай илгээгдлээ')),
+              SnackBar(content: Text(turul == 'duudlaga' ? 'Дуудлага амжилттай илгээгдлээ' : 'Хүсэлт амжилттай илгээгдлээ')),
             );
           }
         },
       ),
-    );
-  }
-
-  void _showNewDuudlagaDialog(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      constraints: BoxConstraints(
-        maxWidth: MediaQuery.sizeOf(context).width > 600 ? 560 : double.infinity,
-      ),
-      builder: (ctx) => _DuudlagaFormSheet(
-        onSubmitted: () {
-          ref.read(duudlagaProvider.notifier).load();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Дуудлага амжилттай илгээгдлээ')),
-            );
-          }
-        },
-      ),
-    );
-  }
-}
-
-// ─── Дуудлага form sheet ────────────────────────────────────────────────────
-
-class _DuudlagaFormSheet extends ConsumerStatefulWidget {
-  final VoidCallback? onSubmitted;
-
-  const _DuudlagaFormSheet({this.onSubmitted});
-
-  @override
-  ConsumerState<_DuudlagaFormSheet> createState() => _DuudlagaFormSheetState();
-}
-
-class _DuudlagaFormSheetState extends ConsumerState<_DuudlagaFormSheet> {
-  final _titleCtrl = TextEditingController();
-  final _msgCtrl = TextEditingController();
-  String _selectedTurul = '';
-  bool _isDropdownOpen = false;
-  bool _submitted = false;
-  bool _loading = false;
-
-  static const _turulOptions = [
-    'Сантехник', 'Цахилгаан', 'Халаалтын систем', 'Агааржуулалт', 'Лифт засвар',
-    'Ус', 'Усны даралт', 'Усны чанар', 'Усны хоолой', 'Бохир ус',
-    'Ханын засвар', 'Шалны засвар', 'Тааз засвар', 'Цонх засвар', 'Хаалганы засвар',
-    'Галын аюулгүй байдал', 'Аюулгүй байдлын систем', 'Дуу чимээ', 'Гэрэлтүүлэг',
-    'Цэвэрлэгээ', 'Хогийн менежмент', 'Халдвар хамгаалалт', 'Интернет', 'Кабелийн ТВ',
-    'Утасны холбоо', 'Лифт', 'Паркинг', 'Хамгаалалт', 'Удирдлагын асуудал',
-    'Санхүүгийн асуудал', 'Бусад',
-  ];
-
-  @override
-  void dispose() {
-    _titleCtrl.dispose();
-    _msgCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    if (_selectedTurul.isEmpty || _titleCtrl.text.trim().isEmpty || _msgCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Бүх талбарыг бөглөнө үү')),
-      );
-      return;
-    }
-    final user = ref.read(currentUserProvider);
-    setState(() => _loading = true);
-    try {
-      await ref.read(duudlagaProvider.notifier).submit(
-        title: _titleCtrl.text.trim(),
-        message: _msgCtrl.text.trim(),
-        duudlagiinTurul: _selectedTurul,
-        khariltsagchiinUtas: user?.primaryPhone ?? '',
-        khariltsagchiinRegister: user?.register ?? '',
-      );
-      setState(() => _submitted = true);
-      widget.onSubmitted?.call();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Алдаа: $e'), backgroundColor: AppColors.error),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final user = ref.watch(currentUserProvider);
-
-    return Container(
-      decoration: BoxDecoration(
-        color: context.appSurface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: EdgeInsets.fromLTRB(24, 0, 24, MediaQuery.of(context).viewInsets.bottom + 24),
-      child: _submitted ? _buildSuccess() : _buildForm(context, user),
-    );
-  }
-
-  Widget _buildSuccess() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const SizedBox(height: 32),
-        Container(
-          width: 64,
-          height: 64,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: AppColors.success, width: 2),
-          ),
-          child: const Icon(Icons.check_rounded, size: 32, color: AppColors.success),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Дуудлага амжилттай бүртгэгдлээ.',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Хариуцсан менежер болон ажилтнууд\nтантай эргэн холбогдох болно.',
-          style: Theme.of(context).textTheme.bodyMedium,
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 24),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: () => Navigator.pop(context),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.success,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('Хаах'),
-          ),
-        ),
-        const SizedBox(height: 8),
-      ],
-    );
-  }
-
-  Widget _buildForm(BuildContext context, dynamic user) {
-    return SingleChildScrollView(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 48,
-              height: 5,
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(color: context.appDivider, borderRadius: BorderRadius.circular(4)),
-            ),
-          ),
-          Row(
-            children: [
-              Text('Дуудлага үүсгэх', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-              const Spacer(),
-              IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _buildTypeDropdown(context),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _titleCtrl,
-            maxLength: 40,
-            textCapitalization: TextCapitalization.sentences,
-            onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(
-              labelText: 'Гарчиг',
-              hintText: 'Дуудлагын гарчиг...',
-              counterText: '${_titleCtrl.text.length}/40',
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _msgCtrl,
-            maxLines: 3,
-            maxLength: 150,
-            textCapitalization: TextCapitalization.sentences,
-            onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(
-              labelText: 'Тайлбар',
-              hintText: 'Дэлгэрэнгүй тайлбар...',
-              counterText: '${_msgCtrl.text.length}/150',
-            ),
-          ),
-          const SizedBox(height: 12),
-          _ReadOnlyField(icon: Icons.person_rounded, value: user?.fullName ?? ''),
-          const SizedBox(height: 8),
-          _ReadOnlyField(icon: Icons.phone_rounded, value: user?.primaryPhone ?? ''),
-          if ((user?.register?.isNotEmpty ?? false)) ...[
-            const SizedBox(height: 8),
-            _ReadOnlyField(icon: Icons.badge_rounded, value: user?.register ?? ''),
-          ],
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: _loading ? null : _submit,
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: _loading
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Text('Илгээх', style: TextStyle(fontWeight: FontWeight.w600)),
-            ),
-          ),
-          const SizedBox(height: 8),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTypeDropdown(BuildContext context) {
-    return Column(
-      children: [
-        GestureDetector(
-          onTap: () => setState(() => _isDropdownOpen = !_isDropdownOpen),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              border: Border.all(color: _isDropdownOpen ? AppColors.primary : context.appDivider, width: _isDropdownOpen ? 1.5 : 1),
-              borderRadius: BorderRadius.circular(12),
-              color: context.appInputFill,
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _selectedTurul.isEmpty ? 'Төрөл сонгох' : _selectedTurul,
-                    style: TextStyle(color: _selectedTurul.isEmpty ? context.appTextTertiary : context.appTextPrimary),
-                  ),
-                ),
-                Icon(
-                  _isDropdownOpen ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                  color: context.appTextTertiary,
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (_isDropdownOpen)
-          Container(
-            constraints: const BoxConstraints(maxHeight: 200),
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.primary.withOpacity(0.4)),
-              borderRadius: BorderRadius.circular(12),
-              color: context.appSurface,
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8)],
-            ),
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: _turulOptions.length,
-              itemBuilder: (_, i) => InkWell(
-                onTap: () => setState(() {
-                  _selectedTurul = _turulOptions[i];
-                  _isDropdownOpen = false;
-                }),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: _selectedTurul == _turulOptions[i] ? context.appPrimaryContainer : Colors.transparent,
-                    border: i < _turulOptions.length - 1
-                        ? Border(bottom: BorderSide(color: context.appDivider))
-                        : null,
-                  ),
-                  child: Text(
-                    _turulOptions[i],
-                    style: TextStyle(
-                      color: _selectedTurul == _turulOptions[i] ? AppColors.primary : context.appTextPrimary,
-                      fontWeight: _selectedTurul == _turulOptions[i] ? FontWeight.w600 : FontWeight.normal,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-      ],
     );
   }
 }
@@ -493,48 +201,30 @@ class _NotificationsTab extends ConsumerWidget {
   }
 }
 
-class _RequestsTab extends ConsumerWidget {
+class _RequestsTab extends ConsumerStatefulWidget {
   final VoidCallback? onAddRequest;
 
   const _RequestsTab({this.onAddRequest});
 
-  void _showApproveDialog(BuildContext context, WidgetRef ref, NotificationModel notif) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Зөвшөөрөх үү?', style: TextStyle(fontWeight: FontWeight.w700)),
-        content: Text(
-          notif.message.isNotEmpty ? notif.message : 'Энэхүү хүсэлтийг зөвшөөрөх үү?',
-          style: const TextStyle(fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Үгүй'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              ref.read(notificationsProvider.notifier).markRead(notif.id);
-            },
-            child: const Text('Зөвшөөрөх'),
-          ),
-        ],
-      ),
-    );
-  }
+  @override
+  ConsumerState<_RequestsTab> createState() => _RequestsTabState();
+}
+
+class _RequestsTabState extends ConsumerState<_RequestsTab> {
+  // null = Бүгд (all)
+  String? _turulFilter;
+
+  static const _turulOptions = ['Санал хүсэлт', 'Шаардлага', 'Гомдол'];
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final state = ref.watch(notificationsProvider);
-    final items = state.notifications
+    final allItems = state.notifications
         .where((n) => n.category == NotifCategory.request)
         .toList();
+    final items = _turulFilter == null
+        ? allItems
+        : allItems.where((n) => n.requestTypeLabel == _turulFilter).toList();
 
     if (state.isLoading && state.notifications.isEmpty) {
       return const ShimmerList(itemCount: 4, itemHeight: 80);
@@ -545,7 +235,7 @@ class _RequestsTab extends ConsumerWidget {
         onRetry: () => ref.read(notificationsProvider.notifier).load(),
       );
     }
-    if (items.isEmpty) {
+    if (allItems.isEmpty) {
       return RefreshIndicator(
         color: AppColors.primary,
         onRefresh: () async => ref.read(notificationsProvider.notifier).load(),
@@ -556,7 +246,7 @@ class _RequestsTab extends ConsumerWidget {
               icon: Icons.forum_outlined,
               message: 'Хүсэлт байхгүй байна',
               subMessage: 'Санал хүсэлт, гомдол илгээхийн тулд + товчийг дарна уу',
-              onAction: onAddRequest,
+              onAction: widget.onAddRequest,
               actionLabel: 'Хүсэлт илгээх',
             ),
           ],
@@ -564,17 +254,86 @@ class _RequestsTab extends ConsumerWidget {
       );
     }
 
-    return RefreshIndicator(
-      color: AppColors.primary,
-      onRefresh: () async => ref.read(notificationsProvider.notifier).load(),
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: items.length,
-        itemBuilder: (context, index) => _RequestCard(
-          notification: items[index],
-          onTap: items[index].tuluv == 0
-              ? () => _showApproveDialog(context, ref, items[index])
-              : null,
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _TurulFilterChip(
+                  label: 'Бүгд',
+                  selected: _turulFilter == null,
+                  onTap: () => setState(() => _turulFilter = null),
+                ),
+                for (final t in _turulOptions) ...[
+                  const SizedBox(width: 8),
+                  _TurulFilterChip(
+                    label: t,
+                    selected: _turulFilter == t,
+                    onTap: () => setState(() => _turulFilter = t),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        Expanded(
+          child: items.isEmpty
+              ? RefreshIndicator(
+                  color: AppColors.primary,
+                  onRefresh: () async => ref.read(notificationsProvider.notifier).load(),
+                  child: ListView(
+                    children: [
+                      const SizedBox(height: 80),
+                      AppEmpty(icon: Icons.forum_outlined, message: 'Хүсэлт байхгүй байна'),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  color: AppColors.primary,
+                  onRefresh: () async => ref.read(notificationsProvider.notifier).load(),
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemCount: items.length,
+                    itemBuilder: (context, index) => _RequestCard(
+                      notification: items[index],
+                    ),
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TurulFilterChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _TurulFilterChip({required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : context.appInputFill,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: selected ? AppColors.primary : context.appDivider),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: selected ? Colors.white : context.appTextSecondary,
+          ),
         ),
       ),
     );
@@ -598,9 +357,8 @@ class _RequestsTab extends ConsumerWidget {
 
 class _RequestCard extends StatelessWidget {
   final NotificationModel notification;
-  final VoidCallback? onTap;
 
-  const _RequestCard({required this.notification, this.onTap});
+  const _RequestCard({required this.notification});
 
   @override
   Widget build(BuildContext context) {
@@ -611,9 +369,7 @@ class _RequestCard extends StatelessWidget {
         : AppColors.info;
     final status = notifStatus(notification.tuluv);
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
+    return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -651,7 +407,6 @@ class _RequestCard extends StatelessWidget {
           _StatusPill(status: status),
         ],
       ),
-      ),
     );
   }
 }
@@ -688,9 +443,10 @@ class _StatusPill extends StatelessWidget {
 
 /// Bottom sheet to submit a Санал хүсэлт / Гомдол, mirroring the web opinion page.
 class _RequestFormSheet extends ConsumerStatefulWidget {
-  final VoidCallback? onSubmitted;
+  final String initialTurul;
+  final void Function(String turul)? onSubmitted;
 
-  const _RequestFormSheet({this.onSubmitted});
+  const _RequestFormSheet({this.initialTurul = 'sanal', this.onSubmitted});
 
   @override
   ConsumerState<_RequestFormSheet> createState() => _RequestFormSheetState();
@@ -698,14 +454,30 @@ class _RequestFormSheet extends ConsumerStatefulWidget {
 
 class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
   final _msgCtrl = TextEditingController();
-  String _turul = 'sanal';
+  final _duudlagaTitleCtrl = TextEditingController();
+  late String _turul = widget.initialTurul;
+  String _duudlagaSubTurul = '';
+  bool _isDropdownOpen = false;
   bool _loading = false;
+
+  static const _duudlagaTurulOptions = [
+    'Сантехник', 'Цахилгаан', 'Халаалтын систем', 'Агааржуулалт', 'Лифт засвар',
+    'Ус', 'Усны даралт', 'Усны чанар', 'Усны хоолой', 'Бохир ус',
+    'Ханын засвар', 'Шалны засвар', 'Тааз засвар', 'Цонх засвар', 'Хаалганы засвар',
+    'Галын аюулгүй байдал', 'Аюулгүй байдлын систем', 'Дуу чимээ', 'Гэрэлтүүлэг',
+    'Цэвэрлэгээ', 'Хогийн менежмент', 'Халдвар хамгаалалт', 'Интернет', 'Кабелийн ТВ',
+    'Утасны холбоо', 'Лифт', 'Паркинг', 'Хамгаалалт', 'Удирдлагын асуудал',
+    'Санхүүгийн асуудал', 'Бусад',
+  ];
 
   @override
   void dispose() {
     _msgCtrl.dispose();
+    _duudlagaTitleCtrl.dispose();
     super.dispose();
   }
+
+  bool get _isDuudlaga => _turul == 'duudlaga';
 
   Future<void> _submit() async {
     if (_msgCtrl.text.trim().isEmpty) {
@@ -714,15 +486,32 @@ class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
       );
       return;
     }
+    if (_isDuudlaga && (_duudlagaSubTurul.isEmpty || _duudlagaTitleCtrl.text.trim().isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Бүх талбарыг бөглөнө үү')),
+      );
+      return;
+    }
     setState(() => _loading = true);
     try {
-      await ref.read(notificationsProvider.notifier).submitRequest(
-            message: _msgCtrl.text.trim(),
-            turul: _turul,
-          );
+      if (_isDuudlaga) {
+        final user = ref.read(currentUserProvider);
+        await ref.read(duudlagaProvider.notifier).submit(
+              title: _duudlagaTitleCtrl.text.trim(),
+              message: _msgCtrl.text.trim(),
+              duudlagiinTurul: _duudlagaSubTurul,
+              khariltsagchiinUtas: user?.primaryPhone ?? '',
+              khariltsagchiinRegister: user?.register ?? '',
+            );
+      } else {
+        await ref.read(notificationsProvider.notifier).submitRequest(
+              message: _msgCtrl.text.trim(),
+              turul: _turul,
+            );
+      }
       if (!mounted) return;
       Navigator.pop(context);
-      widget.onSubmitted?.call();
+      widget.onSubmitted?.call(_turul);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -736,70 +525,178 @@ class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final user = ref.watch(currentUserProvider);
     return Container(
       decoration: BoxDecoration(
         color: context.appSurface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.fromLTRB(24, 20, 24, MediaQuery.of(context).viewInsets.bottom + 24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text('Шинэ хүсэлт', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-              const Spacer(),
-              IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              _TurulChoice(
-                label: 'Санал хүсэлт',
-                selected: _turul == 'sanal',
-                color: AppColors.info,
-                onTap: () => setState(() => _turul = 'sanal'),
-              ),
-              const SizedBox(width: 10),
-              _TurulChoice(
-                label: 'Гомдол',
-                selected: _turul == 'gomdol',
-                color: AppColors.warning,
-                onTap: () => setState(() => _turul = 'gomdol'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _msgCtrl,
-            maxLines: 4,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(
-              labelText: 'Тайлбар',
-              hintText: _turul == 'gomdol' ? 'Гомдлын тайлбар...' : 'Санал хүсэлт...',
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text('Шинэ хүсэлт', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                const Spacer(),
+                IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded)),
+              ],
             ),
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: _loading ? null : _submit,
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: _loading
-                  ? const SizedBox(
-                      width: 20, height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Text('Илгээх', style: TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                _TurulChoice(
+                  label: 'Санал хүсэлт',
+                  selected: _turul == 'sanal',
+                  color: AppColors.info,
+                  onTap: () => setState(() => _turul = 'sanal'),
+                ),
+                const SizedBox(width: 8),
+                _TurulChoice(
+                  label: 'Гомдол',
+                  selected: _turul == 'gomdol',
+                  color: AppColors.warning,
+                  onTap: () => setState(() => _turul = 'gomdol'),
+                ),
+                const SizedBox(width: 8),
+                _TurulChoice(
+                  label: 'Дуудлага',
+                  selected: _isDuudlaga,
+                  color: AppColors.primary,
+                  onTap: () => setState(() => _turul = 'duudlaga'),
+                ),
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            if (_isDuudlaga) ...[
+              _buildDuudlagaTypeDropdown(context),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _duudlagaTitleCtrl,
+                maxLength: 40,
+                textCapitalization: TextCapitalization.sentences,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  labelText: 'Гарчиг',
+                  hintText: 'Дуудлагын гарчиг...',
+                  counterText: '${_duudlagaTitleCtrl.text.length}/40',
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            TextField(
+              controller: _msgCtrl,
+              maxLines: _isDuudlaga ? 3 : 4,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(
+                labelText: 'Тайлбар',
+                hintText: _turul == 'gomdol'
+                    ? 'Гомдлын тайлбар...'
+                    : _isDuudlaga
+                        ? 'Дэлгэрэнгүй тайлбар...'
+                        : 'Санал хүсэлт...',
+              ),
+            ),
+            if (_isDuudlaga) ...[
+              const SizedBox(height: 12),
+              _ReadOnlyField(icon: Icons.person_rounded, value: user?.fullName ?? ''),
+              const SizedBox(height: 8),
+              _ReadOnlyField(icon: Icons.phone_rounded, value: user?.primaryPhone ?? ''),
+              if ((user?.register?.isNotEmpty ?? false)) ...[
+                const SizedBox(height: 8),
+                _ReadOnlyField(icon: Icons.badge_rounded, value: user?.register ?? ''),
+              ],
+            ],
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _loading ? null : _submit,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: _loading
+                    ? const SizedBox(
+                        width: 20, height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Илгээх', style: TextStyle(fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildDuudlagaTypeDropdown(BuildContext context) {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: () => setState(() => _isDropdownOpen = !_isDropdownOpen),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              border: Border.all(color: _isDropdownOpen ? AppColors.primary : context.appDivider, width: _isDropdownOpen ? 1.5 : 1),
+              borderRadius: BorderRadius.circular(12),
+              color: context.appInputFill,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _duudlagaSubTurul.isEmpty ? 'Төрөл сонгох' : _duudlagaSubTurul,
+                    style: TextStyle(color: _duudlagaSubTurul.isEmpty ? context.appTextTertiary : context.appTextPrimary),
+                  ),
+                ),
+                Icon(
+                  _isDropdownOpen ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                  color: context.appTextTertiary,
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_isDropdownOpen)
+          Container(
+            constraints: const BoxConstraints(maxHeight: 200),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.primary.withOpacity(0.4)),
+              borderRadius: BorderRadius.circular(12),
+              color: context.appSurface,
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8)],
+            ),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _duudlagaTurulOptions.length,
+              itemBuilder: (_, i) => InkWell(
+                onTap: () => setState(() {
+                  _duudlagaSubTurul = _duudlagaTurulOptions[i];
+                  _isDropdownOpen = false;
+                }),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: _duudlagaSubTurul == _duudlagaTurulOptions[i] ? context.appPrimaryContainer : Colors.transparent,
+                    border: i < _duudlagaTurulOptions.length - 1
+                        ? Border(bottom: BorderSide(color: context.appDivider))
+                        : null,
+                  ),
+                  child: Text(
+                    _duudlagaTurulOptions[i],
+                    style: TextStyle(
+                      color: _duudlagaSubTurul == _duudlagaTurulOptions[i] ? AppColors.primary : context.appTextPrimary,
+                      fontWeight: _duudlagaSubTurul == _duudlagaTurulOptions[i] ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

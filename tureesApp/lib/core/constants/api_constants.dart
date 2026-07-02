@@ -12,6 +12,7 @@ class ApiConstants {
   static const String sergeekhKodAvya = '/sergeekhKodAvya';
   static const String nuutsUgSergeeye = '/nuutsUgSergeeye';
   static const String khariltsagch = '/khariltsagch';
+  static const String khariltsagchidTokenOnooyo = '/khariltsagchidTokenOnooyo';
 
   // Organization
   static const String organization = '/baiguullaga';
