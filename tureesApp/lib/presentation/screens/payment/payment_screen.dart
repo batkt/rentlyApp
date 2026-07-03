@@ -8,6 +8,7 @@ import '../../../core/utils/formatters.dart';
 import '../../../data/models/agreement_model.dart';
 import '../../../data/repositories/agreement_repository.dart';
 import '../../providers/agreement_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/payment_provider.dart';
 import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_loading.dart';
@@ -120,6 +121,21 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // This screen lives inside HomeScreen's IndexedStack, so its State is
+    // never disposed when the tenant switches buildings from the Dashboard —
+    // without this listener a contract picked in one building would stay
+    // selected (and payable) after switching to another building/salbar.
+    ref.listen<String>(selectedBarilgiinIdProvider, (previous, next) {
+      if (previous != null && previous != next && _selectedAgreement != null) {
+        setState(() {
+          _selectedAgreement = null;
+          _realUldegdel = null;
+          _dansniiDugaar = null;
+          _autoSelectDone = false;
+          _amountController.clear();
+        });
+      }
+    });
     final paymentState = ref.watch(paymentNotifierProvider);
     final agreementsAsync = ref.watch(agreementsProvider);
 

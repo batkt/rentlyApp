@@ -13,6 +13,7 @@ final conversationsProvider = StateNotifierProvider<ConversationsNotifier, Conve
     ref.read(chatRepositoryProvider),
     user,
     ref.read(socketServiceProvider),
+    ref,
   );
 });
 
@@ -54,9 +55,10 @@ class ConversationsNotifier extends StateNotifier<ConversationsState> {
   final ChatRepository _repo;
   final UserModel? _user;
   final SocketService _socket;
+  final Ref _ref;
   String? _event;
 
-  ConversationsNotifier(this._repo, this._user, this._socket) : super(const ConversationsState()) {
+  ConversationsNotifier(this._repo, this._user, this._socket, this._ref) : super(const ConversationsState()) {
     final user = _user;
     if (user != null) {
       _event = 'shineChatKhariult${user.id}';
@@ -71,6 +73,10 @@ class ConversationsNotifier extends StateNotifier<ConversationsState> {
     final isFromUser = msg is Map && msg['role'] == 'user';
     if (isFromUser) return; // ignore our own echoed messages
     final convId = data['conversationId']?.toString();
+    // Don't bump unread (and re-trigger the home-screen toast) for a
+    // conversation the tenant already has open — MessagesNotifier already
+    // renders it live there.
+    if (convId != null && convId == _ref.read(activeConversationProvider)) return;
     final updated = state.conversations
         .map((c) => (convId == null || c.id == convId) ? c.withUnread(c.unreadCount + 1) : c)
         .toList();

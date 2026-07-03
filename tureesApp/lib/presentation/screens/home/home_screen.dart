@@ -88,6 +88,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
           backgroundColor: AppColors.primary,
           behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 1),
           action: SnackBarAction(
             label: 'Харах',
             textColor: Colors.white,
@@ -114,6 +115,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           content: const Text('Таньд шинэ  мессеж ирлээ'),
           backgroundColor: AppColors.primary,
           behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 1),
           action: SnackBarAction(
             label: 'Нээх',
             textColor: Colors.white,

@@ -38,7 +38,18 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   String? _recordPath;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(activeConversationProvider.notifier).state = widget.conversationId;
+    });
+  }
+
+  @override
   void dispose() {
+    if (ref.read(activeConversationProvider) == widget.conversationId) {
+      ref.read(activeConversationProvider.notifier).state = null;
+    }
     _messageController.dispose();
     _scrollController.dispose();
     _recorder.dispose();
