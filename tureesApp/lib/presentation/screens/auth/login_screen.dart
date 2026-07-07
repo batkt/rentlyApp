@@ -67,9 +67,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       _canUseBiometric = available && hasToken;
       _isFaceAuth = faceAuth;
     });
-    // Auto-trigger biometric if previously enabled and token exists
-    if (available && enabled && hasToken) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _doBiometricLogin());
+    // Don't auto-trigger the scan — an unprompted native Face ID/fingerprint
+    // dialog every time the screen opens is jarring. Instead pre-fill and
+    // auto-verify the saved phone so the password section (and its icon
+    // next to the login button) appears immediately, and the user taps it
+    // to scan on their own terms.
+    if (available && enabled && hasToken && _savedPhone.isNotEmpty) {
+      _phoneController.text = _savedPhone;
+      await _checkPhone(_savedPhone);
     }
   }
 
@@ -166,7 +171,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     final alreadyEnabled = await storage.isBiometricEnabled();
     if (!available || alreadyEnabled || !mounted) return;
 
-    final face = await ref.read(biometricServiceProvider).isFaceAuth;
+    final face = await bio.isFaceAuth;
     final icon = face ? Icons.face_rounded : Icons.fingerprint_rounded;
     final label = face ? 'Face ID' : 'Хурууны хээ';
     final confirmed = await showDialog<bool>(
@@ -195,7 +200,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     // Confirm with an actual face/fingerprint scan before enabling.
     final ok = await bio.authenticate();
     if (!ok) return;
-    await ref.read(authStateProvider.notifier).enableBiometric();
+    // Use the already-captured `storage` (a plain object, not tied to this
+    // widget's lifecycle) instead of ref.read(authStateProvider.notifier) —
+    // GoRouter redirects to /home the instant login succeeds, which can
+    // dispose this screen while the face scan is still in progress. Reading
+    // through `ref` after that throws "Cannot use ref after disposed" and
+    // aborts before the flag is saved, so biometric never actually persists
+    // and the enrollment prompt keeps reappearing every login.
+    await storage.saveBiometricEnabled(true);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -962,7 +974,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         ),
         const SizedBox(height: 4),
         Text(
-          'v3.0.2',
+          'v3.0.3',
           style: TextStyle(
             fontSize: 11,
             color: isDark ? const Color(0xFF334155) : AppColors.textTertiary,

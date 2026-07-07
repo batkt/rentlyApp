@@ -107,6 +107,7 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
           tuluv: n.tuluv, turul: n.turul,
           duudlagiinTurul: n.duudlagiinTurul,
           createdAt: n.createdAt,
+          gereeniiId: n.gereeniiId,
         );
       }).toList();
       state = state.copyWith(isLoading: false, notifications: processed);
@@ -139,6 +140,7 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
             khariltsagchiinId: n.khariltsagchiinId, baiguullagiinId: n.baiguullagiinId,
             tuluv: 1, turul: n.turul, duudlagiinTurul: n.duudlagiinTurul,
             createdAt: n.createdAt,
+            gereeniiId: n.gereeniiId,
           );
         }
         return n;
@@ -159,6 +161,7 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
               khariltsagchiinId: n.khariltsagchiinId, baiguullagiinId: n.baiguullagiinId,
               tuluv: 1, turul: n.turul, duudlagiinTurul: n.duudlagiinTurul,
               createdAt: n.createdAt,
+              gereeniiId: n.gereeniiId,
             )
           : n).toList(),
     );

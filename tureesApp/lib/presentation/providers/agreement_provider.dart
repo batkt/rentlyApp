@@ -19,23 +19,21 @@ final agreementsProvider = FutureProvider<List<AgreementModel>>((ref) async {
   );
   if (agreements.isEmpty) return agreements;
 
-  // Single bulk call instead of N individual /uldegdelBodyo requests.
-  try {
-    final ids = agreements.map((a) => a.id).toList();
-    final bulkMap = await repo.getBulkUldegdel(
-      ids,
-      barilgiinId: selectedBarilgiinId.isNotEmpty ? selectedBarilgiinId : null,
-      baiguullagiinId: user.baiguullagiinId,
-    );
-    return agreements.map((a) {
-      final entry = bulkMap[a.id];
-      if (entry == null) return a;
-      final uldegdel = (entry['uldegdel'] as num?)?.toDouble() ?? a.uldegdel;
-      return a.copyWith(uldegdel: uldegdel > 0 ? uldegdel : 0);
-    }).toList();
-  } catch (_) {
-    return agreements;
-  }
+  // Show the same balance PaymentScreen shows (the latest invoice's
+  // niitUldegdel) instead of a separately-computed ledger aggregate — the
+  // two were disagreeing (e.g. pre-billed future charges, late fees handled
+  // differently) since they came from different backend computations.
+  final results = await Future.wait(agreements.map((a) async {
+    try {
+      final info = await repo.getLatestInvoiceInfo(a.id);
+      final niitUldegdel = info.niitUldegdel;
+      if (niitUldegdel == null) return a;
+      return a.copyWith(uldegdel: niitUldegdel > 0 ? niitUldegdel : 0);
+    } catch (_) {
+      return a;
+    }
+  }));
+  return results;
 });
 
 final selectedAgreementProvider = StateProvider<AgreementModel?>((ref) => null);

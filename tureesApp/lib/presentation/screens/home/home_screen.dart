@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/notification_model.dart';
+import '../../providers/agreement_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/notification_provider.dart';
@@ -71,6 +72,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // Real-time notification banner
     ref.listen<NotificationModel?>(incomingNotificationProvider, (_, next) {
       if (next == null || !mounted) return;
+      // Dashboard/agreement balances and the нэхэмжлэх history list are plain
+      // (non-autoDispose) FutureProviders kept alive by the IndexedStack
+      // tabs, so they never refetch on their own — without this the tenant
+      // sees a notification toast but stale Нийт үлдэгдэл / гэрээнүүд
+      // үлдэгдэл until a manual pull-to-refresh. Not gated on `turul` since
+      // any server-side event that pushes a notification (new invoice,
+      // payment reconciled, discount applied, etc.) can also change balances
+      // — refetching is cheap, so just always do it.
+      ref.invalidate(agreementsProvider);
+      ref.invalidate(invoiceHistoryProvider);
       final title = next.title.isNotEmpty ? next.title : 'Шинэ мэдэгдэл';
       final body = next.message;
       ScaffoldMessenger.of(context).showSnackBar(

@@ -12,6 +12,7 @@ class NotificationModel {
   final String? turul;
   final String? duudlagiinTurul;
   final String? createdAt;
+  final String? gereeniiId;
 
   const NotificationModel({
     required this.id,
@@ -23,6 +24,7 @@ class NotificationModel {
     this.turul,
     this.duudlagiinTurul,
     this.createdAt,
+    this.gereeniiId,
   });
 
   bool get isUnread => tuluv == 0;
@@ -73,6 +75,7 @@ class NotificationModel {
       turul: json['turul']?.toString(),
       duudlagiinTurul: json['duudlagiinTurul']?.toString(),
       createdAt: (json['createdAt'] ?? json['ognoo'])?.toString(),
+      gereeniiId: json['gereeniiId']?.toString(),
     );
   }
 }

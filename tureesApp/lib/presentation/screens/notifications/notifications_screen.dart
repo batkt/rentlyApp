@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../data/models/notification_model.dart';
@@ -193,6 +194,10 @@ class _NotificationsTab extends ConsumerWidget {
           onTap: () {
             if (items[index].isUnread) {
               ref.read(notificationsProvider.notifier).markRead(items[index].id);
+            }
+            final gereeniiId = items[index].gereeniiId;
+            if (items[index].turul == 'nekhemjlekh' && gereeniiId != null && gereeniiId.isNotEmpty) {
+              context.push('/agreements/$gereeniiId');
             }
           },
         ),

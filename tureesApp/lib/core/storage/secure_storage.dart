@@ -89,12 +89,23 @@ class SecureStorageService {
   }
 
   Future<void> saveBiometricEnabled(bool enabled) async {
-    await _storage.write(key: 'biometric_enabled', value: enabled ? 'true' : 'false');
+    try {
+      await _storage.write(key: 'biometric_enabled', value: enabled ? 'true' : 'false');
+    } catch (_) {}
   }
 
   Future<bool> isBiometricEnabled() async {
-    final val = await _storage.read(key: 'biometric_enabled');
-    return val == 'true';
+    try {
+      final val = await _storage.read(key: 'biometric_enabled');
+      return val == 'true';
+    } catch (_) {
+      // A decrypt failure here (e.g. Android keystore invalidated after an
+      // OS update/reinstall) must not propagate — an uncaught exception here
+      // aborts LoginScreen._initBiometric()/_offerBiometricSetup() before
+      // their setState/dialog runs, which is exactly what makes the app look
+      // like it "forgot" biometric was enabled and re-asks every time.
+      return false;
+    }
   }
 
   Future<void> saveBuildings(String json) async {

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/chat_model.dart';
 import '../../data/models/user_model.dart';
@@ -103,7 +104,18 @@ class ConversationsNotifier extends StateNotifier<ConversationsState> {
         baiguullagiinId: user.baiguullagiinId,
         barilgiinId: user.barilgiinId,
       );
-      state = state.copyWith(isLoading: false, conversations: [conv]);
+      // conv.unreadCount is the MANAGER-facing counter (backend increments it
+      // whenever the tenant sends a message, so managers see it as unread —
+      // see tureesBack/controller/chat.js sendMessage). It is meaningless as
+      // "unread for the tenant" and would otherwise show a false "new
+      // message" banner reflecting the tenant's own just-sent messages.
+      // Preserve any locally-tracked unread count from a genuine incoming
+      // manager reply instead of overwriting it with the server value.
+      final existing = state.conversations.firstWhereOrNull((c) => c.id == conv.id);
+      state = state.copyWith(
+        isLoading: false,
+        conversations: [conv.withUnread(existing?.unreadCount ?? 0)],
+      );
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }

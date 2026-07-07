@@ -57,9 +57,14 @@ class AgreementRepository {
   }
 
   Future<Map<String, dynamic>> getUldegdel(String gereeniiDugaar, String barilgiinId) async {
+    // Without an ognoo range, the backend caps this to "as of right now",
+    // excluding pre-billed future-dated charges a just-generated invoice
+    // already includes (tureesBack controller/tulbur.js uldegdelBodyo).
+    final farFuture = DateTime.now().add(const Duration(days: 730)).toIso8601String();
     final res = await _client.post(ApiConstants.uldegdelBodyo, data: {
       'gereeniiDugaar': gereeniiDugaar,
       'barilgiinId': barilgiinId,
+      'ognoo': [null, farFuture],
     });
     return res.data as Map<String, dynamic>;
   }
@@ -114,24 +119,12 @@ class AgreementRepository {
 
   Future<double> getNiitUldegdel(String gereeniiDugaar, String barilgiinId) async {
     final res = await getUldegdel(gereeniiDugaar, barilgiinId);
-    return double.tryParse(res['uldegdel']?.toString() ?? '0') ?? 0.0;
-  }
-
-  /// Fetches outstanding balances for multiple agreements in one request.
-  /// Returns map of { gereeniiId → {uldegdel, aldangiinUldegdel, ...} }.
-  Future<Map<String, Map<String, dynamic>>> getBulkUldegdel(
-    List<String> gereeniiIds, {
-    String? barilgiinId,
-    String? baiguullagiinId,
-  }) async {
-    if (gereeniiIds.isEmpty) return {};
-    final res = await _client.post(ApiConstants.bulkUldegdelBodyo, data: {
-      'gereeniiIds': gereeniiIds,
-      if (barilgiinId != null && barilgiinId.isNotEmpty) 'barilgiinId': barilgiinId,
-      if (baiguullagiinId != null && baiguullagiinId.isNotEmpty) 'baiguullagiinId': baiguullagiinId,
-    });
-    final data = res.data as Map<String, dynamic>? ?? {};
-    return data.map((k, v) => MapEntry(k, (v as Map<String, dynamic>? ?? {})));
+    // uldegdelBodyo never folds aldangi (late fee) into `uldegdel` — it's
+    // always returned as a separate field, so add it here to match the
+    // invoice/QPay total the tenant actually owes.
+    final uldegdel = double.tryParse(res['uldegdel']?.toString() ?? '0') ?? 0.0;
+    final aldangi = double.tryParse(res['aldangiinUldegdel']?.toString() ?? '0') ?? 0.0;
+    return uldegdel + aldangi;
   }
 
   /// Fetches the payment breakdown for the month of [ognoo] for agreement [gereeniiId].
