@@ -32,6 +32,7 @@ class NotificationRepository {
           'duudlaga',
           'gomdol',
           'sanalKhuselt',
+          'nekhemjlekh',
         ],
       },
     };

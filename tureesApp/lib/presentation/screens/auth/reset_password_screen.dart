@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -155,6 +156,14 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   }
 
   String _parseError(Object e) {
+    // Prefer the backend's actual message (e.g. "Мессеж илгээхэд алдаа
+    // гарлаа...") over the generic fallback — the raw string-matching below
+    // was matching against DioException's own toString(), which doesn't
+    // include the server's response body at all.
+    if (e is DioException) {
+      final serverMsg = e.response?.data is Map ? e.response?.data['aldaa'] : null;
+      if (serverMsg is String && serverMsg.isNotEmpty) return serverMsg;
+    }
     final msg = e.toString();
     if (msg.contains('Тохиргоо')) return 'SMS тохиргоо хийгдээгүй байна';
     if (msg.contains('олдсонгүй') || msg.contains('404')) return 'Бүртгэлтэй харилцагч олдсонгүй';
