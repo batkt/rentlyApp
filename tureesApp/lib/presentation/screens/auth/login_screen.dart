@@ -67,15 +67,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       _canUseBiometric = available && hasToken;
       _isFaceAuth = faceAuth;
     });
-    // Don't auto-trigger the scan — an unprompted native Face ID/fingerprint
-    // dialog every time the screen opens is jarring. Instead pre-fill and
-    // auto-verify the saved phone so the password section (and its icon
-    // next to the login button) appears immediately, and the user taps it
-    // to scan on their own terms.
-    if (available && enabled && hasToken && _savedPhone.isNotEmpty) {
-      _phoneController.text = _savedPhone;
-      await _checkPhone(_savedPhone);
-    }
+    // Don't auto-trigger the scan (an unprompted native Face ID/fingerprint
+    // dialog every time the screen opens is jarring) and don't auto-verify
+    // the phone via a network call either — a slow/failed request there
+    // left _isCheckingPhone stuck true, permanently disabling the phone
+    // field with no way to type a different number. _canUseBiometric alone
+    // (no phone entry required) already surfaces the standalone "Face
+    // ID-ээр нэвтрэх" tap-to-scan button below the card.
   }
 
   Future<void> _doBiometricLogin() async {
@@ -222,14 +220,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   void _resetPhone() {
     setState(() {
-      _phoneController.clear();
-      _passwordController.clear();
+      // Reset _phoneVerified etc. BEFORE clearing the controller — clearing
+      // it fires the field's onChanged synchronously (controller listeners
+      // run inline, not just on user keystrokes), and that handler branches
+      // on _phoneVerified/_lastCheckedPhone still holding their pre-reset
+      // values otherwise.
       _phoneVerified = false;
       _phoneError = null;
       _orgs = [];
       _selectedOrgId = null;
       _lastCheckedPhone = '';
       _showBiometricLoginButton = false;
+      _phoneController.clear();
+      _passwordController.clear();
     });
   }
 
@@ -504,14 +507,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     ),
                   )
                 : _phoneVerified
-                    ? GestureDetector(
-                        onTap: _resetPhone,
-                        child: Container(
-                          margin: const EdgeInsets.all(10),
+                    ? IconButton(
+                        onPressed: _resetPhone,
+                        icon: Container(
                           decoration: BoxDecoration(
                             color: AppColors.primary.withOpacity(0.12),
                             shape: BoxShape.circle,
                           ),
+                          padding: const EdgeInsets.all(6),
                           child: const Icon(Icons.close_rounded, color: AppColors.primary, size: 16),
                         ),
                       )
