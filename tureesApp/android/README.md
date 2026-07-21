@@ -1,4 +1,4 @@
-# turees_app
+# Rently
 
 A new Flutter project.
 

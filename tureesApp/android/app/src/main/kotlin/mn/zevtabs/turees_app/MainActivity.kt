@@ -1,4 +1,4 @@
-package mn.zevtabs.turees_app
+package mn.zevtabs.Rently
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 
