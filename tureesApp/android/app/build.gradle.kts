@@ -21,7 +21,7 @@ if (file("google-services.json").exists()) {
 }
 
 android {
-    namespace = "mn.zevtabs.Rently"
+    namespace = "mn.zevtabs.turees_app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -47,7 +47,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "mn.zevtabs.Rently"
+        applicationId = "mn.zevtabs.turees_app"
         minSdk = maxOf(flutter.minSdkVersion, 21)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
