@@ -29,7 +29,8 @@
       "Bash(cp /Users/macbookairm4/Downloads/hi-car-c6ef0-firebase-adminsdk-kbcvc-122a8b4b8b.json /Users/macbookairm4/tureesBack/middlewares/serviceAccountKey.json && echo \"Replaced successfully\")",
       "Bash(gh repo *)",
       "Bash(curl -s https://api.github.com/repos/batkt/tureesBack)",
-      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('private:', d.get\\('private'\\), '| message:', d.get\\('message'\\)\\)\")"
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('private:', d.get\\('private'\\), '| message:', d.get\\('message'\\)\\)\")",
+      "Bash(open -a Xcode /Users/macbookairm4/rentlyApp/tureesApp/ios/Runner.xcworkspace)"
     ],
     "additionalDirectories": [
       "/Users/macbookairm4/Downloads",
