@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "290154807490",
+    "project_id": "hi-car-c6ef0",
+    "storage_bucket": "hi-car-c6ef0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:290154807490:android:9f536af3522efc9edafb5b",
+        "android_client_info": {
+          "package_name": "mn.zevtabs.turees_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCNXOfsMy_nJgarH0veDB9aVHntuG6YTWA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

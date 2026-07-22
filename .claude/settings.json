@@ -3,7 +3,37 @@
     "allow": [
       "Bash(cd /c/Users/buynini/tureesShine && find . -type f -name \"*.json\" -o -name \"*.js\" -o -name \"*.jsx\" -o -name \"*.ts\" -o -name \"*.tsx\" | head -100)",
       "Read(//c/c/Users/buynini/**)",
-      "Bash(xargs grep -l \"Bearer\\\\|Authorization\\\\|token\")"
+      "Bash(xargs grep -l \"Bearer\\\\|Authorization\\\\|token\")",
+      "Read(//Users/macbookairm4/**)",
+      "Bash(echo 'export PATH=\"$PATH\":\"$HOME/.pub-cache/bin\"')",
+      "Bash(git checkout *)",
+      "Bash(gem install *)",
+      "Bash(flutter pub *)",
+      "Bash(dart analyze *)",
+      "Bash(plutil -lint ios/Runner.xcodeproj/project.pbxproj)",
+      "Bash(plutil -lint ios/Runner/Runner.entitlements)",
+      "Bash(plutil -lint android/app/src/main/AndroidManifest.xml)",
+      "Bash(xmllint --noout android/app/src/main/AndroidManifest.xml)",
+      "Bash(find / -maxdepth 4 -iname \"*tureesback*\")",
+      "Bash(cd /Users/macbookairm4/tureesBack && ls -la; echo \"---package.json scripts/deps---\"; cat package.json 2>/dev/null | head -50)",
+      "Read(//Users/macbookairm4/tureesBack/**)",
+      "Bash(cd /Users/macbookairm4/tureesBack && grep -rli \"fcm\\\\|firebase\\\\|push.*notif\\\\|notification\" --include=\"*.js\" . 2>/dev/null | grep -v node_modules)",
+      "Read(//Users/macbookairm4/tureesBack/middlewares/**)",
+      "Read(//Users/macbookairm4/tureesBack/service/**)",
+      "Bash(cd /Users/macbookairm4/tureesBack && grep -m1 \"project_id\" middlewares/serviceAccountKey.json 2>/dev/null; echo \"---\"; ls -la middlewares/serviceAccountKey.json 2>/dev/null)",
+      "Read(//Users/macbookairm4/tureesBack/controller/**)",
+      "Bash(gcloud auth *)",
+      "Bash(ls -la ~/Downloads/ | grep -i -E \"google|firebase|service|json|plist\" 2>/dev/null)",
+      "Read(//Users/macbookairm4/Downloads/**)",
+      "Bash(python3 -c ' *)",
+      "Bash(cp /Users/macbookairm4/Downloads/hi-car-c6ef0-firebase-adminsdk-kbcvc-122a8b4b8b.json /Users/macbookairm4/tureesBack/middlewares/serviceAccountKey.json && echo \"Replaced successfully\")",
+      "Bash(gh repo *)",
+      "Bash(curl -s https://api.github.com/repos/batkt/tureesBack)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('private:', d.get\\('private'\\), '| message:', d.get\\('message'\\)\\)\")"
+    ],
+    "additionalDirectories": [
+      "/Users/macbookairm4/Downloads",
+      "/Users/macbookairm4/tureesBack"
     ]
   }
 }

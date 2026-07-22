@@ -3,6 +3,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import '../../firebase_options.dart';
+
 /// Handles background (locked-phone / terminated-app) push notifications.
 ///
 /// Requires `android/app/google-services.json` and
@@ -32,7 +34,7 @@ class PushNotificationService {
   Future<void> init() async {
     if (_initialized) return;
     try {
-      await Firebase.initializeApp();
+      await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
       await FirebaseMessaging.instance.requestPermission(alert: true, badge: true, sound: true);
