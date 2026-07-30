@@ -125,6 +125,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       });
     } catch (_) {
       if (!mounted) return;
+      _lastCheckedPhone = '';
       setState(() {
         _isCheckingPhone = false;
         _phoneError = 'Шалгах үед алдаа гарлаа';
