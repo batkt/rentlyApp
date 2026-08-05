@@ -54,19 +54,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   Future<void> _initBiometric() async {
     final bio = ref.read(biometricServiceProvider);
     final storage = ref.read(secureStorageProvider);
-    final available = await bio.isAvailable;
-    final enabled = await storage.isBiometricEnabled();
-    final hasToken = await storage.isLoggedIn();
-    final savedPhone = await storage.read('utas');
-    final faceAuth = available ? await bio.isFaceAuth : false;
-    if (!mounted) return;
-    setState(() {
-      _savedPhone = savedPhone ?? '';
-      _biometricEnabled = enabled && available;
-      _hasSavedToken = hasToken;
-      _canUseBiometric = available && hasToken;
-      _isFaceAuth = faceAuth;
-    });
+    try {
+      final available = await bio.isAvailable;
+      final enabled = await storage.isBiometricEnabled();
+      final hasToken = await storage.isLoggedIn();
+      final savedPhone = await storage.read('utas');
+      final faceAuth = available ? await bio.isFaceAuth : false;
+      if (!mounted) return;
+      setState(() {
+        _savedPhone = savedPhone ?? '';
+        _biometricEnabled = enabled && available;
+        _hasSavedToken = hasToken;
+        _canUseBiometric = available && hasToken;
+        _isFaceAuth = faceAuth;
+      });
+    } catch (_) {
+      // A Keystore/secure-storage read can throw (e.g. invalidated key after
+      // an OS update or reinstall). This runs unawaited from initState, so an
+      // uncaught exception here would crash the whole screen on launch —
+      // fail safe by just leaving biometric login unavailable.
+    }
     // Don't auto-trigger the scan (an unprompted native Face ID/fingerprint
     // dialog every time the screen opens is jarring) and don't auto-verify
     // the phone via a network call either — a slow/failed request there
