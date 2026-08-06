@@ -30,7 +30,9 @@
       "Bash(gh repo *)",
       "Bash(curl -s https://api.github.com/repos/batkt/tureesBack)",
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('private:', d.get\\('private'\\), '| message:', d.get\\('message'\\)\\)\")",
-      "Bash(open -a Xcode /Users/macbookairm4/rentlyApp/tureesApp/ios/Runner.xcworkspace)"
+      "Bash(open -a Xcode /Users/macbookairm4/rentlyApp/tureesApp/ios/Runner.xcworkspace)",
+      "Bash(pod install *)",
+      "Bash(cd /Users/macbookairm4/tureesBack && cat .gitignore)"
     ],
     "additionalDirectories": [
       "/Users/macbookairm4/Downloads",

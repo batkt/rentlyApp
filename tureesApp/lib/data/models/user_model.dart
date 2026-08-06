@@ -12,6 +12,11 @@ class UserModel {
   final String? token;
   final List<String> appErkhuud;
 
+  /// Contracts explicitly linked to this user from the dashboard. When set,
+  /// these are the only agreements shown; otherwise we fall back to matching
+  /// on register/customerTin.
+  final List<String> gereeniiIdnuud;
+
   const UserModel({
     required this.id,
     required this.ner,
@@ -25,6 +30,7 @@ class UserModel {
     required this.zochinTurul,
     this.token,
     this.appErkhuud = const [],
+    this.gereeniiIdnuud = const [],
   });
 
   String get fullName => '$ovog $ner'.trim();
@@ -45,6 +51,8 @@ class UserModel {
       zochinTurul: json['zochinTurul']?.toString() ?? '',
       token: json['token']?.toString(),
       appErkhuud: (json['appErkhuud'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      gereeniiIdnuud:
+          (json['gereeniiIdnuud'] as List?)?.map((e) => e.toString()).toList() ?? [],
     );
   }
 

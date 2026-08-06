@@ -354,7 +354,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         ),
         const SizedBox(height: 4),
         Text(
-          'Түрээсийн удирдлагын систем',
+          'Түрээс удирдлагын систем',
           style: TextStyle(
             fontSize: 13,
             color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
@@ -985,7 +985,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         ),
         const SizedBox(height: 4),
         Text(
-          'v3.0.4',
+          'v3.0.5',
           style: TextStyle(
             fontSize: 11,
             color: isDark ? const Color(0xFF334155) : AppColors.textTertiary,

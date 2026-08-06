@@ -17,13 +17,30 @@ class AgreementRepository {
 
   Future<List<AgreementModel>> getAgreements({
     required String register,
+    String? customerTin,
+    List<String> gereeniiIdnuud = const [],
     String? barilgiinId,
     int? tuluv,
     int page = 1,
     int pageSize = 20,
   }) async {
+    // Contracts the dashboard explicitly linked to this user win. Otherwise
+    // they're keyed to a tenant by `register`, falling back to `customerTin`
+    // for entities without one. With none of the three we must NOT send an
+    // empty `register` — that matches every contract whose register is ""
+    // and would leak other tenants' agreements.
+    final identifier = register.trim().isNotEmpty
+        ? register.trim()
+        : (customerTin?.trim() ?? '');
+    if (gereeniiIdnuud.isEmpty && identifier.isEmpty) return [];
+
     final query = {
-      'register': register,
+      if (gereeniiIdnuud.isNotEmpty)
+        '_id': {'\$in': gereeniiIdnuud}
+      else if (register.trim().isNotEmpty)
+        'register': identifier
+      else
+        'customerTin': identifier,
       if (barilgiinId != null && barilgiinId.isNotEmpty) 'barilgiinId': barilgiinId,
       if (tuluv != null) 'tuluv': tuluv,
     };

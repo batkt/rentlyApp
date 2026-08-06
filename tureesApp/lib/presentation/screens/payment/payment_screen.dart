@@ -235,12 +235,45 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                     child: Text('Гэрээ сонгох...', style: TextStyle(color: context.appTextTertiary)),
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  itemHeight: 60,
+                  // Бүх гэрээ ихэвчлэн нэг түрээслэгчийнх байдаг тул нэрний
+                  // оронд гэрээ/талбайн дугаар, үлдэгдлийг харуулна.
                   items: active.map((a) => DropdownMenuItem(
                     value: a,
-                    child: Text(
-                      '${a.tenantName} – ${a.gereeniiDugaar}',
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: context.appTextPrimary),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                a.gereeniiDugaar,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: context.appTextPrimary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              if ((a.talbainDugaar ?? '').isNotEmpty)
+                                Text(
+                                  'Талбай: ${a.talbainDugaar}',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(fontSize: 12, color: context.appTextTertiary),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          AppFormatters.balance(a.uldegdel),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: a.uldegdel.balanceColor,
+                          ),
+                        ),
+                      ],
                     ),
                   )).toList(),
                   onChanged: (v) {
@@ -431,7 +464,8 @@ class _SelectedAgreementTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  agreement.tenantName,
+                  agreement.gereeniiDugaar,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w700,
@@ -439,7 +473,10 @@ class _SelectedAgreementTile extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  agreement.gereeniiDugaar,
+                  (agreement.talbainDugaar ?? '').isNotEmpty
+                      ? 'Талбай: ${agreement.talbainDugaar}'
+                      : agreement.tenantName,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],

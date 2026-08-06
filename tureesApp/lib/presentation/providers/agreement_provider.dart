@@ -14,6 +14,8 @@ final agreementsProvider = FutureProvider<List<AgreementModel>>((ref) async {
   final repo = ref.read(agreementRepositoryProvider);
   final agreements = await repo.getAgreements(
     register: user.register ?? '',
+    customerTin: user.customerTin,
+    gereeniiIdnuud: user.gereeniiIdnuud,
     barilgiinId: selectedBarilgiinId.isNotEmpty ? selectedBarilgiinId : null,
     pageSize: 999999,
   );
@@ -79,13 +81,27 @@ final barilguudWithAgreementsProvider = FutureProvider<Set<String>>((ref) async 
   final user = ref.watch(currentUserProvider);
   if (user == null) return {};
   final repo = ref.read(agreementRepositoryProvider);
+
+  // Contracts linked from the dashboard are authoritative — the buildings
+  // they live in are exactly the ones this user should be able to switch to.
+  if (user.gereeniiIdnuud.isNotEmpty) {
+    final linked = await repo.getAgreements(
+      register: '',
+      gereeniiIdnuud: user.gereeniiIdnuud,
+      pageSize: 999999,
+    );
+    return linked.map((a) => a.barilgiinId).where((id) => id.isNotEmpty).toSet();
+  }
+
   // Fetch agreements by phone number (primaryPhone) as requested: "check by utasniiDugaar"
   final all = await repo.getAgreements(
     register: user.primaryPhone.isNotEmpty ? user.primaryPhone : (user.register ?? ''),
+    customerTin: user.customerTin,
     pageSize: 999999,
   );
   final allByReg = await repo.getAgreements(
     register: user.register ?? '',
+    customerTin: user.customerTin,
     pageSize: 999999,
   );
   final combined = {...all, ...allByReg};

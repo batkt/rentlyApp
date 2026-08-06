@@ -204,7 +204,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final total = agreements?.length ?? 0;
     final active = agreements?.where((a) => a.isActive).length ?? 0;
-    final totalDebt = agreements?.fold<double>(0, (s, a) => s + (a.uldegdel > 0 ? a.uldegdel : 0)) ?? 0;
+
+    // The balance tile follows the Идэвхтэй / Бүгд chip below, so it always
+    // matches the contracts actually listed. The two count tiles deliberately
+    // stay unfiltered — they are what the chip is choosing between.
+    final filter = ref.watch(agreementFilterProvider);
+    final debtEndsen = filter == null
+        ? agreements
+        : agreements?.where((a) => a.tuluv == filter).toList();
+    final totalDebt =
+        debtEndsen?.fold<double>(0, (s, a) => s + (a.uldegdel > 0 ? a.uldegdel : 0)) ?? 0;
     final hasDebt = totalDebt > 0;
 
     return SliverAppBar(

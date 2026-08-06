@@ -1178,6 +1178,9 @@ class _InvoiceHtmlScreen extends StatefulWidget {
 }
 
 class _InvoiceHtmlScreenState extends State<_InvoiceHtmlScreen> {
+  /// Width the invoice templates are authored against (print/A4-ish).
+  static const int _printWidth = 800;
+
   late final webview_flutter.WebViewController _controller;
 
   @override
@@ -1185,15 +1188,23 @@ class _InvoiceHtmlScreenState extends State<_InvoiceHtmlScreen> {
     super.initState();
     _controller = webview_flutter.WebViewController()
       ..setJavaScriptMode(webview_flutter.JavaScriptMode.unrestricted)
+      ..enableZoom(true)
       ..loadHtmlString(
-        '<html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">'
+        // The invoice template is authored for print at roughly A4 width. Laying
+        // it out at the phone's width squeezed the two-column header until the
+        // "Хариуцагч" values were clipped, and pushed the absolutely-positioned
+        // stamp/signature images outside the visible area. Instead lay it out at
+        // its native width and let the viewport scale the whole page down —
+        // the same way a PDF viewer would. Pinch-zoom stays available.
+        '<html><head>'
+        '<meta name="viewport" content="width=$_printWidth,user-scalable=yes">'
         '<style>'
-        'html,body{margin:0;padding:8px;font-family:sans-serif;max-width:100%;overflow-x:hidden;}'
-        // The invoice template is authored for print (fixed-width tables/divs) —
-        // force everything to shrink to the device width instead of overflowing.
+        'html{background:#fff;}'
+        'body{margin:0;padding:8px;width:${_printWidth}px;font-family:sans-serif;}'
         '*{box-sizing:border-box;}'
-        'table{width:100% !important;table-layout:fixed;}'
-        'img,table,div,p{max-width:100% !important;}'
+        // Keep the stamp/signature at their authored size; only clamp anything
+        // genuinely wider than the page.
+        'img{max-width:${_printWidth}px;height:auto;}'
         'td,th{word-break:break-word;}'
         '</style></head>'
         '<body>${widget.html}</body></html>',
