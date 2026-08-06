@@ -1183,12 +1183,96 @@ class _InvoiceHtmlScreenState extends State<_InvoiceHtmlScreen> {
 
   late final webview_flutter.WebViewController _controller;
 
+  /// Applied once the template is in the DOM. The templates carry inline styles
+  /// on every cell, so the tweaks below have to be set from script (or with
+  /// `!important`) to win: money columns were wrapping mid-number ("192,128." /
+  /// "00") because the description column ate the width.
+  static const String _tuukhZasakhJs = r'''
+(function () {
+  var tables = document.getElementsByTagName('table');
+  for (var i = 0; i < tables.length; i++) {
+    var table = tables[i];
+    var headCells = table.querySelectorAll('thead th');
+    var utgaIndex = -1;
+    for (var j = 0; j < headCells.length; j++) {
+      if ((headCells[j].textContent || '').indexOf('Гүйлгээний утга') !== -1) {
+        utgaIndex = j;
+        break;
+      }
+    }
+    // Зөвхөн үндсэн нэхэмжлэлийн (6 баганат) хүснэгт — тоолуурын хүснэгтийг орхино
+    if (utgaIndex === -1 || headCells.length !== 6) continue;
+
+    table.style.tableLayout = 'fixed';
+    table.style.width = '100%';
+
+    // №, Гүйлгээний утга, Тоо хэмжээ, Нэгж үнэ, Хөнгөлөлт, Нийт үнэ
+    var urgun = ['5%', '28%', '12%', '18%', '16%', '21%'];
+    var colgroup = document.createElement('colgroup');
+    for (var k = 0; k < urgun.length; k++) {
+      var col = document.createElement('col');
+      col.style.width = urgun[k];
+      colgroup.appendChild(col);
+    }
+    table.insertBefore(colgroup, table.firstChild);
+
+    // Мөнгөн дүнгүүд нэг мөрөнд, арай томоор
+    var rows = table.querySelectorAll('tbody tr');
+    for (var r = 0; r < rows.length; r++) {
+      var cells = rows[r].children;
+      for (var c = 0; c < cells.length; c++) {
+        if (c >= 2) {
+          cells[c].style.whiteSpace = 'nowrap';
+          cells[c].style.fontSize = '13px';
+        } else if (c === 1) {
+          cells[c].style.fontSize = '11px';
+          cells[c].style.wordBreak = 'break-word';
+        }
+      }
+    }
+
+    // Дүн / НӨАТ / Нийт үнэ мөрүүд
+    var footCells = table.querySelectorAll('tfoot td');
+    for (var f = 0; f < footCells.length; f++) {
+      var cell = footCells[f];
+      if (cell.getAttribute('rowspan') === '3') {
+        // "... төгрөг ... болно" — үсгээр бичсэн дүн
+        cell.style.fontSize = '10px';
+        cell.style.lineHeight = '1.3';
+        cell.style.padding = '2px 4px';
+      } else if ((cell.textContent || '').indexOf('Жич') === -1) {
+        cell.style.whiteSpace = 'nowrap';
+        cell.style.fontSize = '13px';
+      }
+    }
+  }
+
+  // "Жич:" тайлбарууд — жижигхэн, бага зэрэг тод
+  var bugd = document.querySelectorAll('p, td, div, span');
+  for (var n = 0; n < bugd.length; n++) {
+    var el = bugd[n];
+    var text = (el.textContent || '').trim();
+    if (text.indexOf('Жич') !== 0) continue;
+    if (el.children.length > 0) continue;
+    el.style.fontSize = '10px';
+    el.style.fontWeight = '600';
+    el.style.lineHeight = '1.3';
+    el.style.margin = '4px 0';
+  }
+})();
+''';
+
   @override
   void initState() {
     super.initState();
     _controller = webview_flutter.WebViewController()
       ..setJavaScriptMode(webview_flutter.JavaScriptMode.unrestricted)
       ..enableZoom(true)
+      ..setNavigationDelegate(
+        webview_flutter.NavigationDelegate(
+          onPageFinished: (_) => _controller.runJavaScript(_tuukhZasakhJs),
+        ),
+      )
       ..loadHtmlString(
         // The invoice template is authored for print at roughly A4 width. Laying
         // it out at the phone's width squeezed the two-column header until the
@@ -1205,7 +1289,8 @@ class _InvoiceHtmlScreenState extends State<_InvoiceHtmlScreen> {
         // Keep the stamp/signature at their authored size; only clamp anything
         // genuinely wider than the page.
         'img{max-width:${_printWidth}px;height:auto;}'
-        'td,th{word-break:break-word;}'
+        // Тоон утга дундуураа тасрахгүй — зөвхөн урт үг шилжинэ.
+        'td,th{word-break:normal;overflow-wrap:break-word;}'
         '</style></head>'
         '<body>${widget.html}</body></html>',
       );
