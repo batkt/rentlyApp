@@ -143,25 +143,42 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       constraints: BoxConstraints(
         maxWidth: MediaQuery.sizeOf(context).width > 600 ? 560 : double.infinity,
       ),
-      builder: (_) => Padding(
+      builder: (sheetContext) => Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Барилга сонгох', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            Text(
+              'Барилга сонгох',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: sheetContext.appTextPrimary,
+              ),
+            ),
             const SizedBox(height: 12),
             ...barilguud.map((b) {
               final isSelected = b.id == currentId;
               final count = countPerBuilding[b.id] ?? 0;
+              // The fixed AppColors.* variants are the light-theme ones: on the
+              // dark sheet the selected row turned into a near-white block with
+              // its label invisible. Use the theme-aware getters instead.
+              final containerBg = sheetContext.appPrimaryContainer;
               return ListTile(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                tileColor: isSelected ? AppColors.primaryContainer : null,
+                tileColor: isSelected ? containerBg : null,
                 leading: Icon(
                   Icons.business_rounded,
-                  color: isSelected ? AppColors.primary : AppColors.textTertiary,
+                  color: isSelected ? AppColors.primary : sheetContext.appTextTertiary,
                 ),
-                title: Text(b.ner, style: TextStyle(fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal)),
+                title: Text(
+                  b.ner,
+                  style: TextStyle(
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
+                    color: sheetContext.appTextPrimary,
+                  ),
+                ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -169,7 +186,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: isSelected ? AppColors.primary : AppColors.primaryContainer,
+                          color: isSelected ? AppColors.primary : containerBg,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
@@ -183,7 +200,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       ),
                     if (isSelected) ...[
                       const SizedBox(width: 6),
-                      Icon(Icons.check_rounded, color: AppColors.primary),
+                      const Icon(Icons.check_rounded, color: AppColors.primary),
                     ],
                   ],
                 ),
@@ -318,6 +335,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           Text(
             'Гэрээнүүд',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          // Every contract's нэхэмжлэх in one list — with a dozen contracts,
+          // opening each one to find this month's bill is a chore.
+          IconButton(
+            tooltip: 'Бүх нэхэмжлэх',
+            icon: const Icon(Icons.receipt_long_rounded, size: 20, color: AppColors.primary),
+            visualDensity: VisualDensity.compact,
+            onPressed: () => context.push('/invoices'),
           ),
           const Spacer(),
           _FilterChip(label: 'Идэвхтэй', value: 1, current: currentFilter),

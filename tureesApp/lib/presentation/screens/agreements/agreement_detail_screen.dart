@@ -15,15 +15,23 @@ import '../../../data/repositories/agreement_repository.dart';
 import '../../providers/agreement_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/common/app_loading.dart';
+import '../../widgets/common/sar_songolt.dart';
+
+/// Tab order of [AgreementDetailScreen]: Мэдээлэл, Гүйлгээ, Нэхэмжлэх, Файл.
+const int kAgreementInvoiceTab = 2;
 
 class AgreementDetailScreen extends ConsumerStatefulWidget {
   final String agreementId;
   final AgreementModel? initialData;
 
+  /// Which tab to open on. Invoice notifications land on [kAgreementInvoiceTab].
+  final int initialTab;
+
   const AgreementDetailScreen({
     super.key,
     required this.agreementId,
     this.initialData,
+    this.initialTab = 0,
   });
 
   @override
@@ -38,7 +46,11 @@ class _AgreementDetailScreenState extends ConsumerState<AgreementDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(
+      length: 4,
+      vsync: this,
+      initialIndex: widget.initialTab.clamp(0, 3),
+    );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = ref.read(currentUserProvider);
@@ -679,40 +691,35 @@ class _MonthTransactionsSheet extends StatelessWidget {
 // Invoice Tab (Нэхэмжлэх) — grouped by month
 // ────────────────────────────────────────────────────
 
-class _InvoiceTab extends ConsumerWidget {
+class _InvoiceTab extends ConsumerStatefulWidget {
   final AgreementModel agreement;
 
   const _InvoiceTab({required this.agreement});
 
-  static String _monthLabel(String? dateStr) {
-    if (dateStr == null) return 'Тодорхойгүй';
-    try {
-      final d = DateTime.parse(dateStr).toLocal();
-      const months = ['1-р сар', '2-р сар', '3-р сар', '4-р сар', '5-р сар', '6-р сар',
-        '7-р сар', '8-р сар', '9-р сар', '10-р сар', '11-р сар', '12-р сар'];
-      return '${d.year} / ${months[d.month - 1]}';
-    } catch (_) {
-      return 'Тодорхойгүй';
-    }
+  @override
+  ConsumerState<_InvoiceTab> createState() => _InvoiceTabState();
+}
+
+class _InvoiceTabState extends ConsumerState<_InvoiceTab> {
+  /// `2026-08` of the month being shown. Null until the list is first loaded.
+  String? _songosonSar;
+
+  /// Day within [_songosonSar]; null = бүх өдөр.
+  int? _songosonUdur;
+
+  static DateTime? _ognoo(Map<String, dynamic> inv) {
+    final raw = (inv['nekhemjlekhiinOgnoo'] ?? inv['createdAt'])?.toString();
+    if (raw == null) return null;
+    return DateTime.tryParse(raw)?.toLocal();
   }
 
-  static String _monthKey(String? dateStr) {
-    if (dateStr == null) return '';
-    try {
-      final d = DateTime.parse(dateStr).toLocal();
-      return '${d.year}-${d.month.toString().padLeft(2, '0')}';
-    } catch (_) {
-      return '';
-    }
-  }
-
-  void _showDetail(BuildContext context, Map<String, dynamic> inv, AgreementModel agreement) {
+  void _showDetail(BuildContext context, Map<String, dynamic> inv) {
     // Go straight to the rendered invoice template when available — the
     // breakdown sheet is only a fallback for invoices without saved HTML.
     final htmlContent = inv['nekhemjlekh']?.toString() ?? inv['content']?.toString();
     if (htmlContent != null && htmlContent.isNotEmpty) {
       Navigator.of(context, rootNavigator: true).push(
-        MaterialPageRoute(builder: (_) => _InvoiceHtmlScreen(html: htmlContent)),
+        MaterialPageRoute(builder: (_) => InvoiceHtmlScreen(html: htmlContent)),
       );
       return;
     }
@@ -724,100 +731,90 @@ class _InvoiceTab extends ConsumerWidget {
       constraints: BoxConstraints(
         maxWidth: MediaQuery.sizeOf(context).width > 600 ? 600 : double.infinity,
       ),
-      builder: (ctx) => _InvoiceDetailSheet(inv: inv, agreement: agreement),
+      builder: (ctx) => _InvoiceDetailSheet(inv: inv, agreement: widget.agreement),
     );
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final invoicesAsync = ref.watch(invoiceHistoryProvider(agreement.id));
+  Widget build(BuildContext context) {
+    final invoicesAsync = ref.watch(invoiceHistoryProvider(widget.agreement.id));
 
     return invoicesAsync.when(
       loading: () => const ShimmerList(itemCount: 5, itemHeight: 72),
       error: (_, __) => AppErrorWidget(
         message: 'Нэхэмжлэх ачаалахад алдаа гарлаа',
-        onRetry: () => ref.refresh(invoiceHistoryProvider(agreement.id)),
+        onRetry: () => ref.invalidate(invoiceHistoryProvider(widget.agreement.id)),
       ),
       data: (invoices) {
         if (invoices.isEmpty) {
           return const AppEmpty(icon: Icons.receipt_outlined, message: 'Нэхэмжлэх байхгүй байна');
         }
 
-        final sorted = [...invoices]..sort((a, b) {
-          final ad = (a['nekhemjlekhiinOgnoo'] ?? a['createdAt'] ?? '').toString();
-          final bd = (b['nekhemjlekhiinOgnoo'] ?? b['createdAt'] ?? '').toString();
-          return bd.compareTo(ad);
-        });
+        final sorted = [...invoices]
+          ..sort((a, b) {
+            final ad = _ognoo(a), bd = _ognoo(b);
+            if (ad == null && bd == null) return 0;
+            if (ad == null) return 1;
+            if (bd == null) return -1;
+            return bd.compareTo(ad);
+          });
 
-        // Group by month (newest first)
-        final grouped = <String, List<Map<String, dynamic>>>{};
+        // Group by month, newest month first.
+        final saruud = <String, List<Map<String, dynamic>>>{};
         for (final inv in sorted) {
-          final dateStr = (inv['nekhemjlekhiinOgnoo'] ?? inv['createdAt'])?.toString();
-          final key = _monthKey(dateStr);
-          grouped.putIfAbsent(key, () => []).add(inv);
+          saruud.putIfAbsent(sariinTulkhuur(_ognoo(inv)), () => []).add(inv);
         }
-        final keys = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
+        final turluud = saruud.keys.toList();
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(12),
-          itemCount: keys.length,
-          itemBuilder: (context, index) {
-            final key = keys[index];
-            final monthInvoices = grouped[key]!;
-            final firstDateStr = monthInvoices.first['nekhemjlekhiinOgnoo']?.toString()
-                ?? monthInvoices.first['createdAt']?.toString();
-            final label = _monthLabel(firstDateStr);
+        final songoson = turluud.contains(_songosonSar) ? _songosonSar! : turluud.first;
+        final sariinKhuudas = saruud[songoson]!;
 
-            return GestureDetector(
-              onTap: () => showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.sizeOf(context).width > 600 ? 600 : double.infinity,
-                ),
-                builder: (_) => _MonthInvoicesSheet(
-                  monthLabel: label,
-                  invoices: monthInvoices,
-                  agreement: agreement,
-                  onShowDetail: (inv) => _showDetail(context, inv, agreement),
-                ),
-              ),
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  color: context.appCardBg,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: context.appDivider),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 42, height: 42,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.receipt_long_rounded, color: AppColors.primary, size: 20),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(label, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-                          Text('${monthInvoices.length} нэхэмжлэл',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.appTextTertiary)),
-                        ],
+        // Days that actually have an invoice this month — only those are
+        // tappable in the calendar.
+        final udruud = <int, int>{};
+        for (final inv in sariinKhuudas) {
+          final day = _ognoo(inv)?.day;
+          if (day != null) udruud[day] = (udruud[day] ?? 0) + 1;
+        }
+        final udur = udruud.containsKey(_songosonUdur) ? _songosonUdur : null;
+        final muruud = udur == null
+            ? sariinKhuudas
+            : sariinKhuudas.where((inv) => _ognoo(inv)?.day == udur).toList();
+
+        return Column(
+          children: [
+            SarSongolt(
+              saruud: turluud,
+              songoson: songoson,
+              toolol: {for (final e in saruud.entries) e.key: e.value.length},
+              onSelect: (key) => setState(() {
+                _songosonSar = key;
+                _songosonUdur = null; // a day only means something inside a month
+              }),
+            ),
+            UdriinKhuanli(
+              sar: songoson,
+              udruud: udruud,
+              songoson: udur,
+              onSelect: (u) => setState(() => _songosonUdur = u),
+            ),
+            Expanded(
+              child: muruud.isEmpty
+                  ? const AppEmpty(
+                      icon: Icons.receipt_outlined,
+                      message: 'Энэ өдөр нэхэмжлэх байхгүй байна',
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+                      itemCount: muruud.length,
+                      itemBuilder: (context, index) => _NekhemjlekhMur(
+                        inv: muruud[index],
+                        ognoo: _ognoo(muruud[index]),
+                        onTap: () => _showDetail(context, muruud[index]),
                       ),
                     ),
-                    Icon(Icons.chevron_right_rounded, size: 20, color: context.appTextTertiary),
-                  ],
-                ),
-              ),
-            );
-          },
+            ),
+          ],
         );
       },
     );
@@ -825,107 +822,77 @@ class _InvoiceTab extends ConsumerWidget {
 }
 
 // ────────────────────────────────────────────────────
-// Month invoices sheet — shows all invoices for a month
+// One invoice row
 // ────────────────────────────────────────────────────
 
-class _MonthInvoicesSheet extends StatelessWidget {
-  final String monthLabel;
-  final List<Map<String, dynamic>> invoices;
-  final AgreementModel agreement;
-  final void Function(Map<String, dynamic> inv) onShowDetail;
+class _NekhemjlekhMur extends StatelessWidget {
+  final Map<String, dynamic> inv;
+  final DateTime? ognoo;
+  final VoidCallback onTap;
 
-  const _MonthInvoicesSheet({
-    required this.monthLabel,
-    required this.invoices,
-    required this.agreement,
-    required this.onShowDetail,
-  });
+  const _NekhemjlekhMur({required this.inv, required this.ognoo, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: context.appCardBg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 36, height: 4,
-            margin: const EdgeInsets.symmetric(vertical: 12),
-            decoration: BoxDecoration(color: context.appDivider, borderRadius: BorderRadius.circular(2)),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-            child: Row(
-              children: [
-                const Icon(Icons.receipt_long_rounded, color: AppColors.primary, size: 20),
-                const SizedBox(width: 8),
-                Text(monthLabel,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                const Spacer(),
-                Text('${invoices.length} нэхэмжлэл',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.appTextTertiary)),
-              ],
-            ),
-          ),
-          Divider(height: 16, color: context.appDivider),
-          ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.65),
-            child: ListView.separated(
-              shrinkWrap: true,
-              padding: const EdgeInsets.only(bottom: 24),
-              itemCount: invoices.length,
-              separatorBuilder: (_, __) => Divider(height: 1, color: context.appDivider),
-              itemBuilder: (context, i) {
-                final inv = invoices[i];
-                final createdAt = inv['nekhemjlekhiinOgnoo']?.toString() ?? inv['createdAt']?.toString();
+    final medeelel = inv['medeelel'] as Map<String, dynamic>?;
+    final dun = (medeelel?['niitUldegdel'] as num?)?.toDouble();
 
-                return GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    onShowDetail(inv);
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 38, height: 38,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.receipt_long_rounded, color: AppColors.primary, size: 18),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                inv['tailbar']?.toString() ?? 'Нэхэмжлэл',
-                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              if (createdAt != null)
-                                Text(AppFormatters.date(createdAt),
-                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.appTextTertiary)),
-                            ],
-                          ),
-                        ),
-                        Icon(Icons.chevron_right_rounded, size: 16, color: context.appTextTertiary),
-                      ],
-                    ),
-                  ),
-                );
-              },
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: context.appCardBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: context.appDivider),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: context.appPrimaryContainer,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.receipt_long_rounded, color: AppColors.primary, size: 20),
             ),
-          ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    AppFormatters.date(ognoo),
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: context.appTextPrimary,
+                        ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    inv['tailbar']?.toString() ?? 'Нэхэмжлэх',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: context.appTextTertiary,
+                        ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            if (dun != null && dun > 0) ...[
+              const SizedBox(width: 8),
+              Text(
+                AppFormatters.currency(dun),
+                style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.error),
+              ),
+            ],
+            Icon(Icons.chevron_right_rounded, size: 18, color: context.appTextTertiary),
+          ],
+        ),
       ),
     );
   }
@@ -1016,7 +983,7 @@ class _InvoiceDetailSheetState extends ConsumerState<_InvoiceDetailSheet> {
                     TextButton.icon(
                       onPressed: () => Navigator.of(context, rootNavigator: true).push(
                         MaterialPageRoute(
-                          builder: (_) => _InvoiceHtmlScreen(html: htmlContent),
+                          builder: (_) => InvoiceHtmlScreen(html: htmlContent),
                         ),
                       ),
                       icon: const Icon(Icons.open_in_new_rounded, size: 15),
@@ -1169,15 +1136,16 @@ class _InvoiceDetailSheetState extends ConsumerState<_InvoiceDetailSheet> {
 // Full-screen HTML invoice viewer
 // ────────────────────────────────────────────────────
 
-class _InvoiceHtmlScreen extends StatefulWidget {
+/// Full-screen viewer for a saved нэхэмжлэх template.
+class InvoiceHtmlScreen extends StatefulWidget {
   final String html;
-  const _InvoiceHtmlScreen({required this.html});
+  const InvoiceHtmlScreen({super.key, required this.html});
 
   @override
-  State<_InvoiceHtmlScreen> createState() => _InvoiceHtmlScreenState();
+  State<InvoiceHtmlScreen> createState() => _InvoiceHtmlScreenState();
 }
 
-class _InvoiceHtmlScreenState extends State<_InvoiceHtmlScreen> {
+class _InvoiceHtmlScreenState extends State<InvoiceHtmlScreen> {
   /// Width the invoice templates are authored against (print/A4-ish).
   static const int _printWidth = 800;
 
@@ -1236,9 +1204,11 @@ class _InvoiceHtmlScreenState extends State<_InvoiceHtmlScreen> {
     for (var f = 0; f < footCells.length; f++) {
       var cell = footCells[f];
       if (cell.getAttribute('rowspan') === '3') {
-        // "... төгрөг ... болно" — үсгээр бичсэн дүн
-        cell.style.fontSize = '10px';
-        cell.style.lineHeight = '1.3';
+        // "... төгрөг ... болно" — үсгээр бичсэн дүн. Загварын inline фонтыг
+        // дарж бичихийн тулд !important-оор тавина.
+        cell.style.setProperty('font-size', '8px', 'important');
+        cell.style.setProperty('line-height', '1.2', 'important');
+        cell.style.setProperty('font-weight', 'normal', 'important');
         cell.style.padding = '2px 4px';
       } else if ((cell.textContent || '').indexOf('Жич') === -1) {
         cell.style.whiteSpace = 'nowrap';
@@ -1247,17 +1217,33 @@ class _InvoiceHtmlScreenState extends State<_InvoiceHtmlScreen> {
     }
   }
 
-  // "Жич:" тайлбарууд — жижигхэн, бага зэрэг тод
+  // "Жич:" тайлбарууд. Хүснэгтийн доторх нь (Гүйлгээний утга дээр талбайн
+  // тоот...) багана шахдаг тул жижиг, харин хүснэгтээс гадуурх төгсгөлийн
+  // тайлбар нь уншигдахуйц байх ёстой — хуудас багасгаж харуулдаг тул 8px
+  // дээр бараг уншигдахгүй болдог.
   var bugd = document.querySelectorAll('p, td, div, span');
   for (var n = 0; n < bugd.length; n++) {
     var el = bugd[n];
     var text = (el.textContent || '').trim();
     if (text.indexOf('Жич') !== 0) continue;
     if (el.children.length > 0) continue;
-    el.style.fontSize = '10px';
+    var khusnegtDotor = el.closest ? !!el.closest('table') : false;
+    // Загвар дээр inline `font-size: 12px` явдаг тул !important шаардлагатай.
+    el.style.setProperty('font-size', khusnegtDotor ? '8px' : '15px', 'important');
+    el.style.setProperty('line-height', khusnegtDotor ? '1.2' : '1.35', 'important');
     el.style.fontWeight = '600';
-    el.style.lineHeight = '1.3';
-    el.style.margin = '4px 0';
+    el.style.margin = khusnegtDotor ? '3px 0' : '10px 0 0';
+  }
+
+  // Загвар нь A4 хуудсанд тохируулж хоосон мөрүүдээр (<td colspan="6"><br></td>)
+  // зай авдаг. Утсан дээр эдгээр нь зүгээр л том цагаан зай болж харагдана —
+  // тамга/гарын үсэгтэй мөрөөс бусдыг нь хасна.
+  var khooson = document.querySelectorAll('tfoot tr');
+  for (var q = 0; q < khooson.length; q++) {
+    var mur = khooson[q];
+    if (mur.querySelector('img')) continue;
+    if ((mur.textContent || '').replace(/[\s\u00a0]+/g, '') !== '') continue;
+    if (mur.parentNode) mur.parentNode.removeChild(mur);
   }
 })();
 ''';
@@ -1283,8 +1269,16 @@ class _InvoiceHtmlScreenState extends State<_InvoiceHtmlScreen> {
         '<html><head>'
         '<meta name="viewport" content="width=$_printWidth,user-scalable=yes">'
         '<style>'
-        'html{background:#fff;}'
-        'body{margin:0;padding:8px;width:${_printWidth}px;font-family:sans-serif;}'
+        // The invoice never fills the phone's height once it is scaled down.
+        // Painting the leftover area in the same white as the document made it
+        // look like the page was cut off mid-way; a grey backdrop behind a
+        // white sheet reads as a document instead of empty space.
+        'html{background:#EDF0F2;}'
+        // The template starts right at the top edge, which reads as cramped
+        // under the app bar once the page is scaled down — give it breathing
+        // room above and below the sheet.
+        'body{margin:0;padding:36px 14px 40px;width:${_printWidth}px;'
+        'background:#fff;box-shadow:0 2px 10px rgba(0,0,0,0.18);font-family:sans-serif;}'
         '*{box-sizing:border-box;}'
         // Keep the stamp/signature at their authored size; only clamp anything
         // genuinely wider than the page.
@@ -1303,6 +1297,14 @@ class _InvoiceHtmlScreenState extends State<_InvoiceHtmlScreen> {
         title: const Text('Нэхэмжлэх'),
         backgroundColor: AppColors.primaryDark,
         foregroundColor: Colors.white,
+        // AppBarTheme.titleTextStyle carries the theme's own text colour, which
+        // beats `foregroundColor` — on the dark green bar that left the title
+        // nearly unreadable in both themes.
+        titleTextStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+        ),
       ),
       body: webview_flutter.WebViewWidget(controller: _controller),
     );

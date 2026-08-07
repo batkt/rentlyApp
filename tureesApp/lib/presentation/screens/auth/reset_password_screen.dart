@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_text_field.dart';
+import '../../../core/utils/app_snackbar.dart';
 
 enum _Step { phone, otp, password }
 
@@ -55,9 +56,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   Future<void> _sendCode() async {
     final phone = _phoneController.text.trim();
     if (phone.length < 8) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('8 оронтой утасны дугаар оруулна уу'), backgroundColor: AppColors.error),
-      );
+      showAppSnackBar(context, '8 оронтой утасны дугаар оруулна уу', turul: SnackTurul.aldaa);
       return;
     }
     setState(() => _isLoading = true);
@@ -69,21 +68,11 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
         _step = _Step.otp;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Сэргээх код утсанд илгээлээ'),
-            backgroundColor: AppColors.success,
-          ),
-        );
+        showAppSnackBar(context, 'Сэргээх код утсанд илгээлээ', turul: SnackTurul.amjilt);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_parseError(e)),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        showAppSnackBar(context, _parseError(e), turul: SnackTurul.aldaa);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -93,9 +82,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   Future<void> _verifyCode() async {
     final code = _otpController.text.trim();
     if (code.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('6 оронтой код оруулна уу'), backgroundColor: AppColors.error),
-      );
+      showAppSnackBar(context, '6 оронтой код оруулна уу', turul: SnackTurul.aldaa);
       return;
     }
     setState(() => _isLoading = true);
@@ -108,12 +95,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_parseError(e)),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        showAppSnackBar(context, _parseError(e), turul: SnackTurul.aldaa);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -124,31 +106,23 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
     final newPass = _newPasswordController.text;
     final confirm = _confirmController.text;
     if (newPass.isEmpty || newPass.length < 4) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Хамгийн багадаа 4 тэмдэгт оруулна уу'), backgroundColor: AppColors.error),
-      );
+      showAppSnackBar(context, 'Хамгийн багадаа 4 тэмдэгт оруулна уу', turul: SnackTurul.aldaa);
       return;
     }
     if (newPass != confirm) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Нууц үг таарахгүй байна'), backgroundColor: AppColors.error),
-      );
+      showAppSnackBar(context, 'Нууц үг таарахгүй байна', turul: SnackTurul.aldaa);
       return;
     }
     setState(() => _isLoading = true);
     try {
       await ref.read(authRepositoryProvider).updatePassword(_khariltsagchId, newPass, _recoveryToken);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Нууц үг амжилттай солигдлоо'), backgroundColor: AppColors.success),
-        );
+        showAppSnackBar(context, 'Нууц үг амжилттай солигдлоо', turul: SnackTurul.amjilt);
         context.pop();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_parseError(e)), backgroundColor: AppColors.error),
-        );
+        showAppSnackBar(context, _parseError(e), turul: SnackTurul.aldaa);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);

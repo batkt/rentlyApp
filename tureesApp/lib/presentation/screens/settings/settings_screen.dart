@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/mashin_provider.dart';
+import '../../providers/notification_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/common/app_button.dart';
 import '../home/home_screen.dart' show chatVisibleProvider;
@@ -28,6 +30,7 @@ class SettingsScreen extends ConsumerWidget {
                 const SizedBox(height: 16),
                 _buildUserInfoCard(context, user),
                 const SizedBox(height: 16),
+                _buildNemeltKhereglegchid(context, ref),
                 _buildSettingsSection(context, ref, isDark),
                 const SizedBox(height: 16),
                 _buildLogoutSection(context, ref),
@@ -130,8 +133,92 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
+  /// Users the tenant added from the web portal (appKhariltsagch). Hidden when
+  /// there are none, so a tenant who never added anyone sees no extra clutter.
+  Widget _buildNemeltKhereglegchid(BuildContext context, WidgetRef ref) {
+    final khereglegchid = ref.watch(nemeltKhereglegchidProvider);
+
+    return khereglegchid.maybeWhen(
+      orElse: () => const SizedBox.shrink(),
+      data: (jagsaalt) {
+        if (jagsaalt.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Container(
+            decoration: BoxDecoration(
+              color: context.appCardBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: context.appDivider),
+            ),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.group_rounded, size: 20, color: AppColors.primary),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Нэмэлт хэрэглэгч',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: context.appTextPrimary,
+                            ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${jagsaalt.length}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: context.appTextTertiary,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                for (final khereglegch in jagsaalt) ...[
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: CircleAvatar(
+                      radius: 18,
+                      backgroundColor: context.appPrimaryContainer,
+                      child: Text(
+                        khereglegch.ner.isNotEmpty ? khereglegch.ner[0] : '?',
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    title: Text(
+                      khereglegch.fullName.isNotEmpty ? khereglegch.fullName : 'Нэргүй',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: context.appTextPrimary,
+                      ),
+                    ),
+                    subtitle: Text(
+                      [
+                        if (khereglegch.primaryPhone.isNotEmpty) khereglegch.primaryPhone,
+                        if (khereglegch.gereeniiIdnuud.isNotEmpty)
+                          '${khereglegch.gereeniiIdnuud.length} гэрээ',
+                        if (khereglegch.appErkhuud.isNotEmpty)
+                          '${khereglegch.appErkhuud.length} эрх',
+                      ].join(' · '),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildSettingsSection(BuildContext context, WidgetRef ref, bool isDark) {
     final chatVisible = ref.watch(chatVisibleProvider);
+    final notifEnabled = ref.watch(notificationsEnabledProvider);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
@@ -148,10 +235,23 @@ class SettingsScreen extends ConsumerWidget {
               onTap: () => context.push('/reset-password'),
             ),
             const Divider(height: 1),
-            _SettingsItem(
-              icon: Icons.notifications_rounded,
-              label: 'Мэдэгдлийн тохиргоо',
-              onTap: () {},
+            if (ref.watch(mashinBurtgelKharuulakhProvider)) ...[
+              _SettingsItem(
+                icon: Icons.directions_car_rounded,
+                label: 'Машин бүртгэл',
+                onTap: () => context.push('/mashin'),
+              ),
+              const Divider(height: 1),
+            ],
+            ListTile(
+              leading: const Icon(Icons.notifications_rounded, size: 20, color: AppColors.primary),
+              title: const Text('Мэдэгдэл харах'),
+              trailing: Switch.adaptive(
+                value: notifEnabled,
+                activeThumbColor: AppColors.primary,
+                activeTrackColor: AppColors.primaryContainer,
+                onChanged: (v) => ref.read(notificationsEnabledProvider.notifier).set(v),
+              ),
             ),
             const Divider(height: 1),
             ListTile(

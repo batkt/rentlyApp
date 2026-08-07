@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/network/dio_client.dart';
@@ -7,6 +9,9 @@ import '../models/user_model.dart';
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository(ref.read(dioClientProvider));
 });
+
+/// Account state as the server sees it.
+enum KhereglegchiinTuluv { baina, ustsan, todorkhoigui }
 
 class AuthRepository {
   final DioClient _client;
@@ -71,6 +76,55 @@ class AuthRepository {
       return null;
     } catch (_) {
       return null;
+    }
+  }
+
+  /// App users this tenant added from the web portal (`appKhariltsagch`).
+  /// Same query the portal itself lists them with.
+  Future<List<UserModel>> nemeltKhereglegchid({
+    required String baiguullagiinId,
+    required String nemegchiiId,
+  }) async {
+    final res = await _client.get(ApiConstants.khariltsagch, queryParameters: {
+      'query': jsonEncode({
+        'baiguullagiinId': baiguullagiinId,
+        'nemegchiiId': nemegchiiId,
+      }),
+      'khuudasniiDugaar': 1,
+      'khuudasniiKhemjee': 999,
+    });
+    final list = (res.data is Map ? res.data['jagsaalt'] as List? : null) ?? [];
+    return list
+        .map((e) => UserModel.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  /// Re-checks that the logged-in account still exists.
+  ///
+  /// A tenant can delete an additional app user from the web portal
+  /// (`appKhariltsagch`), and that user's phone stayed logged in — the app only
+  /// ever read the token locally. This separates "the account is gone" from
+  /// "the network is down", because only the former may sign the user out.
+  Future<KhereglegchiinTuluv> khereglegchShalgaya() async {
+    try {
+      final res = await _client.post(ApiConstants.getUserByToken);
+      final data = res.data;
+      if (data == null || (data is Map && data.isEmpty)) {
+        return KhereglegchiinTuluv.ustsan;
+      }
+      if (data is Map && data['idevkhiteiEsekh'] == false) {
+        return KhereglegchiinTuluv.ustsan;
+      }
+      return KhereglegchiinTuluv.baina;
+    } on DioException catch (e) {
+      final code = e.response?.statusCode;
+      if (code == 401 || code == 403 || code == 404) {
+        return KhereglegchiinTuluv.ustsan;
+      }
+      // Сүлжээ/сервер асуудал — хэрэглэгчийг гаргах шалтгаан биш.
+      return KhereglegchiinTuluv.todorkhoigui;
+    } catch (_) {
+      return KhereglegchiinTuluv.todorkhoigui;
     }
   }
 

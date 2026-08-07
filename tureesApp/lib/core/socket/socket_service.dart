@@ -37,6 +37,21 @@ class SocketService {
     _socket!.onConnectError((data) {});
   }
 
+  /// Reopens a connection that dropped while the app was backgrounded (iOS
+  /// suspends the socket, and reconnection attempts are capped) *without*
+  /// throwing away the socket instance — every listener registered through
+  /// [on] lives on that instance, so recreating it would silently stop
+  /// notifications until the app was killed and relaunched.
+  Future<void> ensureConnected() async {
+    if (isConnected) return;
+    final socket = _socket;
+    if (socket != null) {
+      socket.connect();
+      return;
+    }
+    await connect();
+  }
+
   void joinRoom(String room) {
     _socket?.emit('join', room);
   }

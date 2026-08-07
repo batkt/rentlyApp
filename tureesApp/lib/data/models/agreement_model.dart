@@ -21,6 +21,11 @@ class AgreementModel {
   final String? duusakhOgnoo;
   final List<dynamic> zurguud; // String = image ID, Map = {id, ner, turul:'pdf'}
 
+  /// Bank account the contract is billed to. QPay needs it to route the
+  /// payment to the right account — without it the backend cannot tie the
+  /// callback back to this contract.
+  final String? dans;
+
   const AgreementModel({
     required this.id,
     required this.gereeniiDugaar,
@@ -43,7 +48,19 @@ class AgreementModel {
     required this.zardluud,
     this.duusakhOgnoo,
     this.zurguud = const [],
+    this.dans,
   });
+
+  /// End of the rental period. Contracts that only carry a duration (сар) get
+  /// it derived from the start date, which is how the detail screen's
+  /// "Хугацаа" row and the printed contract read it.
+  DateTime? get duusakhDate {
+    final explicit = DateTime.tryParse(duusakhOgnoo ?? '');
+    if (explicit != null) return explicit;
+    final start = DateTime.tryParse(gereeniiOgnoo ?? '');
+    if (start == null || khugatsaa == null) return null;
+    return DateTime(start.year, start.month + khugatsaa!, start.day);
+  }
 
   String get tenantName => '${ovog ?? ''} $ner'.trim();
   String get shortName => ovog != null && ovog!.isNotEmpty ? '${ovog![0]}.$ner' : ner;
@@ -73,6 +90,7 @@ class AgreementModel {
       zardluud: zardluud,
       duusakhOgnoo: duusakhOgnoo,
       zurguud: zurguud ?? this.zurguud,
+      dans: dans,
     );
   }
 
@@ -99,6 +117,7 @@ class AgreementModel {
       zardluud: (json['zardluud'] as List?)?.map((e) => ZardalModel.fromJson(e)).toList() ?? [],
       duusakhOgnoo: json['duusakhOgnoo']?.toString(),
       zurguud: (json['zurguud'] as List?) ?? [],
+      dans: json['dans']?.toString(),
     );
   }
 }

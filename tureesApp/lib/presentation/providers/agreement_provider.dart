@@ -57,6 +57,48 @@ final invoiceHistoryProvider = FutureProvider.family<List<Map<String, dynamic>>,
   return repo.getInvoiceHistory(gereeniiId);
 });
 
+/// One нэхэмжлэх together with the contract it belongs to.
+typedef NekhemjlekhBichlegT = ({
+  AgreementModel agreement,
+  Map<String, dynamic> invoice,
+  DateTime? ognoo,
+});
+
+/// Every contract's invoices in one list, newest first. A tenant with a dozen
+/// contracts had to open each one separately to see what was billed.
+final bukhNekhemjlekhProvider = FutureProvider<List<NekhemjlekhBichlegT>>((ref) async {
+  final agreements = await ref.watch(agreementsProvider.future);
+  if (agreements.isEmpty) return [];
+  final repo = ref.read(agreementRepositoryProvider);
+
+  final perAgreement = await Future.wait(agreements.map((agreement) async {
+    try {
+      final list = await repo.getInvoiceHistory(agreement.id);
+      return list.map((inv) {
+        final raw = (inv['nekhemjlekhiinOgnoo'] ?? inv['createdAt'])?.toString();
+        return (
+          agreement: agreement,
+          invoice: inv,
+          ognoo: raw == null ? null : DateTime.tryParse(raw),
+        );
+      }).toList();
+    } catch (_) {
+      // One unreachable contract must not blank out the whole list.
+      return <NekhemjlekhBichlegT>[];
+    }
+  }));
+
+  final bukh = perAgreement.expand((e) => e).toList();
+  bukh.sort((a, b) {
+    final ad = a.ognoo, bd = b.ognoo;
+    if (ad == null && bd == null) return 0;
+    if (ad == null) return 1;
+    if (bd == null) return -1;
+    return bd.compareTo(ad);
+  });
+  return bukh;
+});
+
 final uldegdelProvider = FutureProvider.family<Map<String, dynamic>, ({String gereeniiDugaar, String barilgiinId})>((ref, args) async {
   final repo = ref.read(agreementRepositoryProvider);
   return repo.getUldegdel(args.gereeniiDugaar, args.barilgiinId);

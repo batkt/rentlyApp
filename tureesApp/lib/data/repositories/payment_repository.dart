@@ -30,6 +30,7 @@ class PaymentRepository {
     final data = res.data as Map<String, dynamic>;
     return QpayInvoiceModel(
       invoiceId: data['id']?.toString() ?? data['invoice_id']?.toString() ?? data['invoiceId']?.toString(),
+      zakhialgiinDugaar: data['zakhialgiinDugaar']?.toString(),
       qrText: data['qr_code']?.toString() ?? data['qr_text']?.toString() ?? data['qrText']?.toString(),
       qrImage: data['qr_image']?.toString() ?? data['qrImage']?.toString(),
       urls: (data['urls'] as List?)?.map((e) => QpayUrlModel.fromJson(e)).toList() ?? [],

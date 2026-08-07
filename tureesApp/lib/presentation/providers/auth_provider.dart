@@ -18,6 +18,17 @@ final authStateProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   );
 });
 
+/// Additional app users the tenant created in the web portal. Shown in
+/// Профайл so they can see who else has access to their contracts.
+final nemeltKhereglegchidProvider = FutureProvider<List<UserModel>>((ref) async {
+  final user = ref.watch(currentUserProvider);
+  if (user == null || user.id.isEmpty) return [];
+  return ref.read(authRepositoryProvider).nemeltKhereglegchid(
+        baiguullagiinId: user.baiguullagiinId,
+        nemegchiiId: user.id,
+      );
+});
+
 final currentUserProvider = Provider<UserModel?>((ref) {
   return ref.watch(authStateProvider).user;
 });
@@ -207,6 +218,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
     return LoginResult.success;
   }
 
+  /// Ask the server whether this account still exists. Returns true when it
+  /// was deleted (or deactivated) — the caller shows the warning and signs out.
+  Future<bool> erkhUstsanEsekhShalgaya() async {
+    if (!state.isAuthenticated) return false;
+    final tuluv = await _repo.khereglegchShalgaya();
+    if (tuluv != KhereglegchiinTuluv.ustsan) return false;
+    await logout();
+    return true;
+  }
+
   Future<void> logout() async {
     _socket.disconnect();
     await _storage.clearAll();
@@ -258,15 +279,36 @@ class AuthNotifier extends StateNotifier<AuthState> {
     return 'Алдаа гарлаа. Дахин оролдоно уу';
   }
 
+  /// Every failure path used to return `false` silently, so a tap on
+  /// "Face ID-ээр нэвтрэх" that could not work looked like a dead button.
+  /// Each one now leaves a message in [AuthState.error], which LoginScreen
+  /// already surfaces as a snackbar.
   Future<bool> loginWithBiometric() async {
     final hasToken = await _storage.isLoggedIn();
-    if (!hasToken) return false;
+    if (!hasToken) {
+      state = state.copyWith(
+        error: 'Хадгалсан нэвтрэлт олдсонгүй. Утасны дугаар, нууц үгээрээ нэвтэрнэ үү',
+      );
+      return false;
+    }
 
-    final available = await _biometric.isAvailable;
-    if (!available) return false;
+    if (!await _biometric.isEnrolled) {
+      state = state.copyWith(
+        error: 'Face ID / хурууны хээ тохируулаагүй байна. Утасныхаа тохиргооноос идэвхжүүлнэ үү',
+      );
+      return false;
+    }
 
     final authenticated = await _biometric.authenticate();
-    if (!authenticated) return false;
+    if (!authenticated) {
+      final kod = _biometric.lastError;
+      state = state.copyWith(
+        error: kod == 'LockedOut' || kod == 'PermanentlyLockedOut'
+            ? 'Олон удаа буруу оролдсон тул түр хаагдсан байна. Нууц үгээрээ нэвтэрнэ үү'
+            : 'Баталгаажуулалт амжилтгүй боллоо',
+      );
+      return false;
+    }
 
     state = state.copyWith(isLoading: true, error: null);
     try {
@@ -278,9 +320,21 @@ class AuthNotifier extends StateNotifier<AuthState> {
         _socket.joinUserRoom(user.id);
         return true;
       }
-    } catch (_) {}
-    state = state.copyWith(isLoading: false);
-    return false;
+      // The token is no longer good — drop it so the button stops promising
+      // a login that cannot happen.
+      await _storage.clearAll();
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Нэвтрэх хугацаа дууссан байна. Дахин нэвтэрнэ үү',
+      );
+      return false;
+    } catch (_) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Сервертэй холбогдож чадсангүй. Интернэтээ шалгана уу',
+      );
+      return false;
+    }
   }
 
   Future<void> enableBiometric() async {

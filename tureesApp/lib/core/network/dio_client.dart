@@ -3,14 +3,39 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../constants/api_constants.dart';
 import '../storage/secure_storage.dart';
 
+/// Flipped when the server rejects our token — the account was deleted or
+/// deactivated. HomeScreen watches it to warn the user and sign them out.
+final erkhTsutslagdsanProvider = StateProvider<bool>((ref) => false);
+
 final dioClientProvider = Provider<DioClient>((ref) {
   final storage = ref.read(secureStorageProvider);
-  return DioClient(storage);
+  final client = DioClient(storage);
+  client.onErkhTsutslagdsan =
+      () => ref.read(erkhTsutslagdsanProvider.notifier).state = true;
+  return client;
 });
 
 class DioClient {
   late final Dio _dio;
   final SecureStorageService _storage;
+
+  /// Called when the server rejects the stored token — the account was
+  /// deleted or deactivated while the app was still holding a session.
+  void Function()? onErkhTsutslagdsan;
+
+  /// Endpoints where a 401 means "wrong credentials", not "account gone".
+  static bool _nevtrekhZam(String path) {
+    const zamuud = [
+      ApiConstants.login,
+      ApiConstants.loginWithOrg,
+      ApiConstants.verifyPhone,
+      ApiConstants.resetPasswordCheck,
+      ApiConstants.sergeekhKodAvya,
+      ApiConstants.nuutsUgSergeeye,
+      ApiConstants.getUserByToken,
+    ];
+    return zamuud.any(path.contains);
+  }
 
   DioClient(this._storage) {
     _dio = Dio(
@@ -34,6 +59,13 @@ class DioClient {
           handler.next(options);
         },
         onError: (error, handler) {
+          // A deleted/revoked account answers 401 on every token-backed call.
+          // Logging in with a wrong password is a 401 too, so the auth
+          // endpoints are excluded — those are handled by LoginScreen.
+          if (error.response?.statusCode == 401 &&
+              !_nevtrekhZam(error.requestOptions.path)) {
+            onErkhTsutslagdsan?.call();
+          }
           handler.next(error);
         },
       ),

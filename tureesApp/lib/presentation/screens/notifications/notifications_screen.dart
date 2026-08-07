@@ -6,8 +6,10 @@ import '../../../core/utils/formatters.dart';
 import '../../../data/models/notification_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/notification_provider.dart';
+import '../agreements/agreement_detail_screen.dart' show kAgreementInvoiceTab;
 import '../../widgets/cards/notification_card.dart';
 import '../../widgets/common/app_loading.dart';
+import '../../../core/utils/app_snackbar.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
@@ -108,8 +110,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
             ref.read(duudlagaProvider.notifier).load();
           }
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(turul == 'duudlaga' ? 'Дуудлага амжилттай илгээгдлээ' : 'Хүсэлт амжилттай илгээгдлээ')),
+            showAppSnackBar(
+              context,
+              turul == 'duudlaga' ? 'Дуудлага амжилттай илгээгдлээ' : 'Хүсэлт амжилттай илгээгдлээ',
+              turul: SnackTurul.amjilt,
             );
           }
         },
@@ -197,7 +201,9 @@ class _NotificationsTab extends ConsumerWidget {
             }
             final gereeniiId = items[index].gereeniiId;
             if (items[index].turul == 'nekhemjlekh' && gereeniiId != null && gereeniiId.isNotEmpty) {
-              context.push('/agreements/$gereeniiId');
+              // Open the Нэхэмжлэх tab directly — the notification is about an
+              // invoice, so landing on Мэдээлэл made the tenant hunt for it.
+              context.push('/agreements/$gereeniiId?tab=$kAgreementInvoiceTab');
             }
           },
         ),
@@ -360,13 +366,35 @@ class _TurulFilterChip extends StatelessWidget {
   }
 }
 
-class _RequestCard extends StatelessWidget {
+class _RequestCard extends ConsumerStatefulWidget {
   final NotificationModel notification;
 
   const _RequestCard({required this.notification});
 
   @override
+  ConsumerState<_RequestCard> createState() => _RequestCardState();
+}
+
+class _RequestCardState extends ConsumerState<_RequestCard> {
+  bool _khuleejBaina = false;
+
+  Future<void> _khuleenAvya() async {
+    setState(() => _khuleejBaina = true);
+    try {
+      await ref.read(notificationsProvider.notifier).khuleenAvya(widget.notification.id);
+      if (!mounted) return;
+      showAppSnackBar(context, 'Шаардлагыг хүлээн авлаа', turul: SnackTurul.amjilt);
+    } catch (_) {
+      if (!mounted) return;
+      showAppSnackBar(context, 'Хүлээн авахад алдаа гарлаа', turul: SnackTurul.aldaa);
+    } finally {
+      if (mounted) setState(() => _khuleejBaina = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final notification = widget.notification;
     // Шаардлага and Гомдол are flagged red; Санал хүсэлт stays blue.
     final label = notification.requestTypeLabel;
     final accent = (label == 'Гомдол' || label == 'Шаардлага')
@@ -409,7 +437,40 @@ class _RequestCard extends StatelessWidget {
             Text(notification.message, style: Theme.of(context).textTheme.bodyMedium),
           ],
           const SizedBox(height: 8),
-          _StatusPill(status: status),
+          Row(
+            children: [
+              _StatusPill(status: status),
+              const Spacer(),
+              // Шаардлага бол менежерээс ирдэг — түрээслэгч хүлээн авах ёстой.
+              if (label == 'Шаардлага' && notification.tuluv != 1)
+                SizedBox(
+                  height: 32,
+                  child: FilledButton(
+                    onPressed: _khuleejBaina ? null : _khuleenAvya,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: _khuleejBaina
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'Хүлээн авах',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
     );
@@ -486,15 +547,11 @@ class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
 
   Future<void> _submit() async {
     if (_msgCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Тайлбар оруулна уу')),
-      );
+      showAppSnackBar(context, 'Тайлбар оруулна уу', turul: SnackTurul.sanuulga);
       return;
     }
     if (_isDuudlaga && (_duudlagaSubTurul.isEmpty || _duudlagaTitleCtrl.text.trim().isEmpty)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Бүх талбарыг бөглөнө үү')),
-      );
+      showAppSnackBar(context, 'Бүх талбарыг бөглөнө үү', turul: SnackTurul.sanuulga);
       return;
     }
     setState(() => _loading = true);
@@ -519,9 +576,7 @@ class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
       widget.onSubmitted?.call(_turul);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Алдаа: $e'), backgroundColor: AppColors.error),
-        );
+        showAppSnackBar(context, 'Алдаа: $e', turul: SnackTurul.aldaa);
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -550,7 +605,10 @@ class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
               ],
             ),
             const SizedBox(height: 8),
-            Row(
+            // Шаардлага-г жагсаалт дээр шүүдэг байсан ч илгээх боломж байгаагүй.
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 _TurulChoice(
                   label: 'Санал хүсэлт',
@@ -558,14 +616,18 @@ class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
                   color: AppColors.info,
                   onTap: () => setState(() => _turul = 'sanal'),
                 ),
-                const SizedBox(width: 8),
+                _TurulChoice(
+                  label: 'Шаардлага',
+                  selected: _turul == 'shaardlaga',
+                  color: AppColors.error,
+                  onTap: () => setState(() => _turul = 'shaardlaga'),
+                ),
                 _TurulChoice(
                   label: 'Гомдол',
                   selected: _turul == 'gomdol',
                   color: AppColors.warning,
                   onTap: () => setState(() => _turul = 'gomdol'),
                 ),
-                const SizedBox(width: 8),
                 _TurulChoice(
                   label: 'Дуудлага',
                   selected: _isDuudlaga,
@@ -595,13 +657,10 @@ class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
               controller: _msgCtrl,
               maxLines: _isDuudlaga ? 3 : 4,
               textCapitalization: TextCapitalization.sentences,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Тайлбар',
-                hintText: _turul == 'gomdol'
-                    ? 'Гомдлын тайлбар...'
-                    : _isDuudlaga
-                        ? 'Дэлгэрэнгүй тайлбар...'
-                        : 'Санал хүсэлт...',
+                // Төрөл бүрт өөр өөр байсныг нэг болгов.
+                hintText: 'Дэлгэрэнгүй тайлбараа бичнэ үү...',
               ),
             ),
             if (_isDuudlaga) ...[

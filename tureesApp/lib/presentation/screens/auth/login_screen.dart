@@ -9,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../providers/auth_provider.dart';
+import '../../../core/utils/app_snackbar.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -55,7 +56,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     final bio = ref.read(biometricServiceProvider);
     final storage = ref.read(secureStorageProvider);
     try {
-      final available = await bio.isAvailable;
+      // Face ID/хурууны хээ ҮНЭХЭЭР бүртгэлтэй эсэх. `isAvailable` нь зөвхөн
+      // нууц кодтой утсан дээр ч true болдог тул товч гарч ирээд, дарахад
+      // нууц кодын цонх нээгддэг байсан.
+      final available = await bio.isEnrolled;
       final enabled = await storage.isBiometricEnabled();
       final hasToken = await storage.isLoggedIn();
       final savedPhone = await storage.read('utas');
@@ -173,7 +177,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   Future<void> _offerBiometricSetup() async {
     final bio = ref.read(biometricServiceProvider);
     final storage = ref.read(secureStorageProvider);
-    final available = await bio.isAvailable;
+    final available = await bio.isEnrolled;
     final alreadyEnabled = await storage.isBiometricEnabled();
     if (!available || alreadyEnabled || !mounted) return;
 
@@ -215,15 +219,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     // and the enrollment prompt keeps reappearing every login.
     await storage.saveBiometricEnabled(true);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$label амжилттай идэвхжлээ'),
-        backgroundColor: AppColors.success,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
+    showAppSnackBar(context, '$label амжилттай идэвхжлээ', turul: SnackTurul.amjilt);
   }
 
   void _resetPhone() {
@@ -244,6 +240,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     });
   }
 
+  /// Clears just the phone entry (and whatever state it produced) so the
+  /// tenant can type another number after a "Бүртгэлтэй хэрэглэгч олдсонгүй".
+  void _clearPhone() => _resetPhone();
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -251,15 +251,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
     ref.listen(authStateProvider, (_, next) {
       if (next.error != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(next.error!),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
+        showAppSnackBar(context, next.error!, turul: SnackTurul.aldaa);
         ref.read(authStateProvider.notifier).clearError();
       }
     });
@@ -468,7 +460,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             FilteringTextInputFormatter.digitsOnly,
             LengthLimitingTextInputFormatter(8),
           ],
-          enabled: !_phoneVerified && !_isCheckingPhone,
+          // NOT `enabled: false` when verified: TextField wraps its whole
+          // subtree — suffix icon included — in IgnorePointer while disabled
+          // (text_field.dart: `IgnorePointer(ignoring: !_isEnabled)`), so the
+          // X button silently swallowed every tap. readOnly blocks editing
+          // without blocking the button.
+          // Never `enabled: false`: TextField wraps its whole subtree — suffix
+          // icon included — in IgnorePointer while disabled (text_field.dart:
+          // `IgnorePointer(ignoring: !_isEnabled)`), so the X button silently
+          // swallowed every tap once the number was verified. readOnly blocks
+          // editing without blocking the button.
+          readOnly: _phoneVerified || _isCheckingPhone,
           style: TextStyle(
             fontSize: 16,
             letterSpacing: 2,
@@ -526,10 +528,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           child: const Icon(Icons.close_rounded, color: AppColors.primary, size: 16),
                         ),
                       )
-                    : _phoneError != null
-                        ? const Padding(
-                            padding: EdgeInsets.all(14),
-                            child: Icon(Icons.cancel_rounded, color: AppColors.error, size: 20),
+                    // Алдааны улаан тэмдэг зүгээр л зураг байсан — хүмүүс
+                    // дарж дугаараа цэвэрлэхийг оролддог. Одоо цэвэрлэнэ.
+                    : _phoneController.text.isNotEmpty
+                        ? IconButton(
+                            tooltip: 'Дугаарыг арилгах',
+                            onPressed: _clearPhone,
+                            icon: Icon(
+                              Icons.cancel_rounded,
+                              color: _phoneError != null
+                                  ? AppColors.error
+                                  : (isDark ? const Color(0xFF64748B) : AppColors.textTertiary),
+                              size: 20,
+                            ),
                           )
                         : null,
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -545,6 +556,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 _selectedOrgId = null;
                 _lastCheckedPhone = '';
               });
+            } else {
+              // Арилгах товч гарч ирэх/алга болохын тулд дахин зурна.
+              setState(() {});
             }
           },
           validator: (v) {
@@ -827,16 +841,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     if (success) {
       context.go('/home');
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_isFaceAuth
-              ? 'Face ID амжилтгүй. Нууц үгийг оруулна уу.'
-              : 'Хурууны хээ амжилтгүй. Нууц үгийг оруулна уу.'),
-          backgroundColor: AppColors.warning,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: const EdgeInsets.all(16),
-        ),
+      showAppSnackBar(
+        context,
+        _isFaceAuth
+            ? 'Face ID амжилтгүй. Нууц үгийг оруулна уу.'
+            : 'Хурууны хээ амжилтгүй. Нууц үгийг оруулна уу.',
+        turul: SnackTurul.sanuulga,
       );
     }
   }
@@ -937,12 +947,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         onPressed: () {
           final phone = _phoneController.text.trim();
           if (phone.isEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Утасны дугаараа оруулна уу'),
-                backgroundColor: AppColors.warning,
-              ),
-            );
+            showAppSnackBar(context, 'Утасны дугаараа оруулна уу', turul: SnackTurul.sanuulga);
             return;
           }
           context.push('/reset-password', extra: phone);

@@ -21,6 +21,11 @@ class AgreementCard extends StatelessWidget {
     final theme = Theme.of(context);
     final isActive = agreement.isActive;
     final hasDebt = agreement.uldegdel > 0;
+    final duusakh = agreement.duusakhDate;
+    // Within a month of the end date (or already past it) the period is worth
+    // calling out — that is when a tenant needs to renew.
+    final duusakhUdirlaa = duusakh != null &&
+        duusakh.difference(DateTime.now()).inDays <= 30;
 
     return GestureDetector(
       onTap: onTap,
@@ -28,9 +33,15 @@ class AgreementCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: context.appCardBg,
           borderRadius: BorderRadius.circular(16),
+          // A cancelled contract is called out first — it outranks the debt
+          // highlight, since paying into it is not what the tenant wants.
           border: Border.all(
-            color: hasDebt ? AppColors.overdueChipBg : context.appDivider,
-            width: hasDebt ? 1.5 : 1,
+            color: !isActive
+                ? AppColors.error
+                : hasDebt
+                    ? AppColors.overdueChipBg
+                    : context.appDivider,
+            width: !isActive || hasDebt ? 1.5 : 1,
           ),
           boxShadow: [
             BoxShadow(
@@ -95,6 +106,27 @@ class AgreementCard extends StatelessWidget {
                               Text(
                                 AppFormatters.phone(agreement.utas.first),
                                 style: theme.textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ],
+                        if (isActive && (agreement.gereeniiOgnoo != null || duusakh != null)) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(Icons.event_available_rounded,
+                                  size: 13,
+                                  color: duusakhUdirlaa ? AppColors.error : context.appTextTertiary),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  '${AppFormatters.date(agreement.gereeniiOgnoo)} — ${AppFormatters.date(duusakh)}',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: duusakhUdirlaa ? AppColors.error : null,
+                                    fontWeight: duusakhUdirlaa ? FontWeight.w600 : null,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ],
                           ),

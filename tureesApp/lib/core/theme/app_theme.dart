@@ -22,13 +22,25 @@ class AppTheme {
       dividerColor: const Color(0xFF2D3B39),
     );
 
+    // Every slot the light theme overrides has to be overridden here too.
+    // Anything left at Material's default keeps `inherit: false`, and toggling
+    // Dark Mode then throws "Failed to interpolate TextStyles with different
+    // inherit values" while the two themes cross-fade (it was labelLarge, the
+    // slot every button's text comes from).
     final textTheme = GoogleFonts.notoSansTextTheme(base.textTheme).copyWith(
+      displayLarge: GoogleFonts.notoSans(fontSize: 32, fontWeight: FontWeight.w700, color: const Color(0xFFE2E8F0)),
+      displayMedium: GoogleFonts.notoSans(fontSize: 28, fontWeight: FontWeight.w700, color: const Color(0xFFE2E8F0)),
+      headlineLarge: GoogleFonts.notoSans(fontSize: 24, fontWeight: FontWeight.w700, color: const Color(0xFFE2E8F0)),
+      headlineMedium: GoogleFonts.notoSans(fontSize: 20, fontWeight: FontWeight.w600, color: const Color(0xFFE2E8F0)),
+      headlineSmall: GoogleFonts.notoSans(fontSize: 18, fontWeight: FontWeight.w600, color: const Color(0xFFE2E8F0)),
       titleLarge: GoogleFonts.notoSans(fontSize: 16, fontWeight: FontWeight.w600, color: const Color(0xFFE2E8F0)),
       titleMedium: GoogleFonts.notoSans(fontSize: 15, fontWeight: FontWeight.w500, color: const Color(0xFFE2E8F0)),
       titleSmall: GoogleFonts.notoSans(fontSize: 14, fontWeight: FontWeight.w500, color: const Color(0xFF94A3B8)),
       bodyLarge: GoogleFonts.notoSans(fontSize: 15, fontWeight: FontWeight.w400, color: const Color(0xFFE2E8F0)),
       bodyMedium: GoogleFonts.notoSans(fontSize: 14, fontWeight: FontWeight.w400, color: const Color(0xFF94A3B8)),
       bodySmall: GoogleFonts.notoSans(fontSize: 12, fontWeight: FontWeight.w400, color: const Color(0xFF64748B)),
+      labelLarge: GoogleFonts.notoSans(fontSize: 14, fontWeight: FontWeight.w600, color: const Color(0xFFE2E8F0)),
+      labelMedium: GoogleFonts.notoSans(fontSize: 12, fontWeight: FontWeight.w500, color: const Color(0xFF94A3B8)),
       labelSmall: GoogleFonts.notoSans(fontSize: 11, fontWeight: FontWeight.w500, color: const Color(0xFF64748B)),
     );
 
@@ -65,6 +77,10 @@ class AppTheme {
         hintStyle: textTheme.bodyMedium,
         labelStyle: textTheme.bodyMedium,
       ),
+      // The button themes must mirror the light theme's, textStyle included:
+      // leaving it unset here made a button's text style animate between the
+      // light theme's (inherit: true) and Material's default (inherit: false)
+      // when Dark Mode is toggled, which throws in TextStyle.lerp.
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
@@ -72,15 +88,39 @@ class AppTheme {
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          textStyle: textTheme.labelLarge?.copyWith(color: Colors.white),
           minimumSize: const Size(double.infinity, 50),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          side: const BorderSide(color: AppColors.primary),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          textStyle: textTheme.labelLarge,
+          minimumSize: const Size(double.infinity, 50),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          textStyle: textTheme.labelLarge,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         ),
       ),
       dividerTheme: const DividerThemeData(color: Color(0xFF2D3B39), thickness: 1, space: 1),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: const Color(0xFF1E2A28),
-        contentTextStyle: textTheme.bodyMedium?.copyWith(color: const Color(0xFFE2E8F0)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        backgroundColor: const Color(0xFF243330),
+        contentTextStyle: textTheme.bodyMedium?.copyWith(
+          color: const Color(0xFFE2E8F0),
+          fontWeight: FontWeight.w600,
+        ),
+        actionTextColor: AppColors.primary,
+        elevation: 8,
+        insetPadding: const EdgeInsets.fromLTRB(16, 5, 16, 20),
       ),
       listTileTheme: const ListTileThemeData(contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4)),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
@@ -225,11 +265,19 @@ class AppTheme {
         thickness: 1,
         space: 1,
       ),
+      // A near-black snackbar on a light page reads as a stray dark-mode
+      // element, so light mode gets a raised white card with dark text.
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: AppColors.textPrimary,
-        contentTextStyle: textTheme.bodyMedium?.copyWith(color: Colors.white),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        backgroundColor: AppColors.cardBg,
+        contentTextStyle: textTheme.bodyMedium?.copyWith(
+          color: AppColors.textPrimary,
+          fontWeight: FontWeight.w600,
+        ),
+        actionTextColor: AppColors.primary,
+        elevation: 8,
+        insetPadding: const EdgeInsets.fromLTRB(16, 5, 16, 20),
       ),
       listTileTheme: const ListTileThemeData(
         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),

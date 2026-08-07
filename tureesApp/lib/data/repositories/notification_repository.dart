@@ -71,6 +71,21 @@ class NotificationRepository {
     await _client.post(ApiConstants.sonorduulgaKharlaa, data: {'id': notificationId});
   }
 
+  /// Tenant accepts a Шаардлага the manager sent them. Same endpoint the web
+  /// uses to accept a request; the backend flips both the сонордуулга and the
+  /// linked санал/гомдол record to tuluv 1.
+  Future<void> khuleenAvya({
+    required String id,
+    required String baiguullagiinId,
+    required String barilgiinId,
+  }) async {
+    await _client.post(ApiConstants.sanalKhuleenAvlaa, data: {
+      'id': id,
+      'baiguullagiinId': baiguullagiinId,
+      'barilgiinId': barilgiinId,
+    });
+  }
+
   Future<List<TaskModel>> getTasks({
     required String khariltsagchiinId,
     int page = 1,

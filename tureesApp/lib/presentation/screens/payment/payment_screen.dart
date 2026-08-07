@@ -13,6 +13,7 @@ import '../../providers/payment_provider.dart';
 import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_loading.dart';
 import '../../widgets/common/app_text_field.dart';
+import '../../../core/utils/app_snackbar.dart';
 
 class PaymentScreen extends ConsumerStatefulWidget {
   final AgreementModel? selectedAgreement;
@@ -65,7 +66,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       final uldegdel = info.niitUldegdel;
       setState(() {
         _realUldegdel = uldegdel;
-        _dansniiDugaar = info.dansniiDugaar;
+        // Fall back to the contract's own account when the latest invoice
+        // carries none — the web app does the same. Without an account number
+        // the backend cannot link the QPay callback back to this contract, so
+        // the payment never reaches the manager's гүйлгээний түүх.
+        final invoiceDans = info.dansniiDugaar;
+        _dansniiDugaar = (invoiceDans != null && invoiceDans.isNotEmpty)
+            ? invoiceDans
+            : agreement.dans;
         _loadingUldegdel = false;
       });
       if ((uldegdel ?? 0) > 0 && _amountController.text.isEmpty) {
@@ -93,12 +101,25 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       _showError('Мөнгөн дүн оруулна уу');
       return;
     }
+    // The backend only wires up the contract-specific QPay callback when both
+    // gereeniiId and dansniiDugaar are present (see /qpayGargaya). Generating
+    // a QR without the account number produces an invoice whose payment is
+    // never booked against the contract, so refuse instead — same as the web,
+    // which does not fire the request at all without an account.
+    final dans = _dansniiDugaar;
+    if (dans == null || dans.isEmpty) {
+      _showError('Гэрээний төлбөрийн данс олдсонгүй. Менежертэй холбогдоно уу.');
+      return;
+    }
+
     FocusScope.of(context).unfocus();
 
     await ref.read(paymentNotifierProvider.notifier).generateQpay(
       gereeniiId: _selectedAgreement!.id,
+      barilgiinId: _selectedAgreement!.barilgiinId,
+      register: _selectedAgreement!.register ?? '',
       amount: amount,
-      dansniiDugaar: _dansniiDugaar,
+      dansniiDugaar: dans,
     );
 
     final state = ref.read(paymentNotifierProvider);
@@ -108,15 +129,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   }
 
   void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: AppColors.error,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
+    showAppSnackBar(context, msg, turul: SnackTurul.aldaa);
   }
 
   @override
@@ -135,6 +148,18 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           _amountController.clear();
         });
       }
+    });
+    // A payment was confirmed on the QPay screen: this State survives in the
+    // home IndexedStack, so wipe the amount that was just paid and pull the
+    // new balance instead of leaving the old one on screen.
+    ref.listen<int>(paymentClearSignalProvider, (previous, next) {
+      if (previous == null || previous == next || !mounted) return;
+      setState(() {
+        _amountController.clear();
+        _realUldegdel = null;
+      });
+      final agreement = _selectedAgreement;
+      if (agreement != null) _fetchRealUldegdel(agreement);
     });
     final paymentState = ref.watch(paymentNotifierProvider);
     final agreementsAsync = ref.watch(agreementsProvider);
@@ -295,13 +320,26 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   }
 
   Widget _buildAmountInput() {
-    return AppTextField(
-      label: 'Төлөх дүн (₮)',
-      hint: '0',
-      controller: _amountController,
-      keyboardType: const TextInputType.numberWithOptions(decimal: false),
-      inputFormatters: [_ThousandsSeparatorFormatter()],
-      prefixIcon: Icon(Icons.monetization_on_rounded, size: 18, color: context.appTextTertiary),
+    // The field is normally pre-filled with the whole balance, so changing the
+    // amount meant deleting a dozen digits one at a time — clear it in one tap.
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: _amountController,
+      builder: (context, value, __) => AppTextField(
+        label: 'Төлөх дүн (₮)',
+        hint: '0',
+        controller: _amountController,
+        keyboardType: const TextInputType.numberWithOptions(decimal: false),
+        inputFormatters: [_ThousandsSeparatorFormatter()],
+        prefixIcon: Icon(Icons.monetization_on_rounded, size: 18, color: context.appTextTertiary),
+        suffixIcon: value.text.isEmpty
+            ? null
+            : IconButton(
+                icon: Icon(Icons.cancel_rounded, size: 18, color: context.appTextTertiary),
+                splashRadius: 18,
+                tooltip: 'Дүнг арилгах',
+                onPressed: () => _amountController.clear(),
+              ),
+      ),
     );
   }
 

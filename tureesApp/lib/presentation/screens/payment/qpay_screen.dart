@@ -13,6 +13,7 @@ import '../../providers/payment_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/agreement_provider.dart';
 import '../../widgets/common/app_button.dart';
+import '../../../core/utils/app_snackbar.dart';
 
 class QpayScreen extends ConsumerStatefulWidget {
   final QpayInvoiceModel invoice;
@@ -27,6 +28,7 @@ class _QpayScreenState extends ConsumerState<QpayScreen> with SingleTickerProvid
   Timer? _pollTimer;
   late AnimationController _pulseController;
   bool _isCheckingPayment = false;
+  bool _paymentDone = false;
 
   @override
   void initState() {
@@ -35,11 +37,19 @@ class _QpayScreenState extends ConsumerState<QpayScreen> with SingleTickerProvid
     _startPolling();
 
     final user = ref.read(currentUserProvider);
-    if (user != null && widget.invoice.invoiceId != null) {
-      ref.read(socketServiceProvider).joinQpayRoom(user.baiguullagiinId, widget.invoice.invoiceId!);
+    final room = _qpayRoomId;
+    if (user != null && room != null) {
+      ref.read(socketServiceProvider).joinQpayRoom(user.baiguullagiinId, room);
       ref.read(socketServiceProvider).on('qpaySuccess', (_) => _onPaymentConfirmed());
     }
   }
+
+  /// The backend emits `qpay/<baiguullagiinId>/<zakhialgiinDugaar>` from its
+  /// payment callback, so the room has to be keyed on the order number. It was
+  /// joining on the QPay invoice id, which never matches — leaving the 5s poll
+  /// as the only way a payment was noticed.
+  String? get _qpayRoomId =>
+      widget.invoice.zakhialgiinDugaar ?? widget.invoice.invoiceId;
 
   void _startPolling() {
     _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
@@ -53,9 +63,16 @@ class _QpayScreenState extends ConsumerState<QpayScreen> with SingleTickerProvid
   }
 
   void _onPaymentConfirmed() {
+    if (_paymentDone) return; // socket and poll can both fire
+    _paymentDone = true;
     _pollTimer?.cancel();
     ref.read(paymentNotifierProvider.notifier).markPaid();
+    // Everything that quotes a balance is now stale.
     ref.invalidate(agreementsProvider);
+    ref.invalidate(invoiceHistoryProvider);
+    ref.invalidate(transactionHistoryProvider);
+    ref.invalidate(niitUldegdelProvider);
+    ref.invalidate(uldegdelProvider);
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -63,10 +80,18 @@ class _QpayScreenState extends ConsumerState<QpayScreen> with SingleTickerProvid
         amount: widget.invoice.amount,
         onClose: () {
           Navigator.pop(context);
-          context.go('/home');
+          _clearAndLeave();
         },
       ),
     );
+  }
+
+  /// Drops the finished QPay invoice so neither this screen nor the payment
+  /// form comes back carrying the amount that was just paid.
+  void _clearAndLeave() {
+    ref.read(paymentNotifierProvider.notifier).reset();
+    ref.read(paymentClearSignalProvider.notifier).state++;
+    context.go('/home');
   }
 
   @override
@@ -74,8 +99,9 @@ class _QpayScreenState extends ConsumerState<QpayScreen> with SingleTickerProvid
     _pollTimer?.cancel();
     _pulseController.dispose();
     final user = ref.read(currentUserProvider);
-    if (user != null && widget.invoice.invoiceId != null) {
-      ref.read(socketServiceProvider).leaveQpayRoom(user.baiguullagiinId, widget.invoice.invoiceId!);
+    final room = _qpayRoomId;
+    if (user != null && room != null) {
+      ref.read(socketServiceProvider).leaveQpayRoom(user.baiguullagiinId, room);
       ref.read(socketServiceProvider).off('qpaySuccess');
     }
     super.dispose();
@@ -124,13 +150,16 @@ class _QpayScreenState extends ConsumerState<QpayScreen> with SingleTickerProvid
                   const SizedBox(height: 24),
                   _buildBankApps(),
                 ],
-                const SizedBox(height: 24),
-                _buildActions(paymentState),
+                const SizedBox(height: 12),
               ],
             ),
           ),
         ),
       ),
+      // Pinned to the bottom: after paying in the bank app the tenant comes
+      // back here to confirm, and the button used to sit below a QR, the
+      // instructions and the bank list — off screen until they scrolled.
+      bottomNavigationBar: _buildActions(paymentState),
     );
   }
 
@@ -240,9 +269,8 @@ class _QpayScreenState extends ConsumerState<QpayScreen> with SingleTickerProvid
                     TextButton.icon(
                       onPressed: () {
                         Clipboard.setData(ClipboardData(text: safeQrText));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Хуулагдлаа'), duration: Duration(seconds: 2)),
-                        );
+                        showAppSnackBar(context, 'Хуулагдлаа',
+                            duration: const Duration(seconds: 2));
                       },
                       icon: const Icon(Icons.copy_rounded, size: 16),
                       label: const Text('Хуулах', style: TextStyle(fontSize: 13)),
@@ -353,25 +381,33 @@ class _QpayScreenState extends ConsumerState<QpayScreen> with SingleTickerProvid
   }
 
   Widget _buildActions(PaymentState paymentState) {
-    return Column(
-      children: [
-        AppButton(
+    return SafeArea(
+      minimum: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 560),
+        padding: const EdgeInsets.only(top: 8),
+        child: AppButton(
           label: 'Төлөлт шалгах',
-          variant: ButtonVariant.outline,
-          onPressed: paymentState.isVerifying ? null : () async {
-            if (widget.invoice.invoiceId == null) return;
-            final paid = await ref.read(paymentNotifierProvider.notifier).verifyPayment(widget.invoice.invoiceId!);
-            if (!paid && mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Төлбөр хийгдээгүй байна'), backgroundColor: AppColors.warning),
-              );
-            }
-          },
+          loadingLabel: 'Шалгаж байна...',
+          onPressed: paymentState.isVerifying ? null : _checkPayment,
           isLoading: paymentState.isVerifying,
-          icon: Icons.refresh_rounded,
+          icon: Icons.verified_rounded,
         ),
-      ],
+      ),
     );
+  }
+
+  Future<void> _checkPayment() async {
+    final invoiceId = widget.invoice.invoiceId;
+    if (invoiceId == null) return;
+    final paid = await ref.read(paymentNotifierProvider.notifier).verifyPayment(invoiceId);
+    if (!mounted) return;
+    if (paid) {
+      _onPaymentConfirmed();
+      return;
+    }
+    showAppSnackBar(context, 'Төлбөр хараахан хийгдээгүй байна',
+        turul: SnackTurul.sanuulga);
   }
 }
 

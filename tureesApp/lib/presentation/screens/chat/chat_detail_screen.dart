@@ -12,6 +12,7 @@ import '../../../core/utils/formatters.dart';
 import '../../../data/models/chat_model.dart';
 import '../../providers/chat_provider.dart';
 import '../../widgets/common/app_loading.dart';
+import '../../../core/utils/app_snackbar.dart';
 
 class ChatDetailScreen extends ConsumerStatefulWidget {
   final String conversationId;
@@ -93,11 +94,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       _scrollToBottom();
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Зураг сонгоход алдаа гарлаа'),
-            backgroundColor: AppColors.error),
-      );
+      showAppSnackBar(context, 'Зураг сонгоход алдаа гарлаа', turul: SnackTurul.aldaa);
     }
   }
 
@@ -106,12 +103,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       final hasPermission = await _recorder.hasPermission();
       if (!hasPermission) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Микрофоны эрх олгоно уу'),
-              backgroundColor: AppColors.error,
-            ),
-          );
+          showAppSnackBar(context, 'Микрофоны эрх олгоно уу', turul: SnackTurul.aldaa);
         }
         return;
       }
@@ -129,12 +121,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       _tickDuration();
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Дуу бичихэд алдаа гарлаа'),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        showAppSnackBar(context, 'Дуу бичихэд алдаа гарлаа', turul: SnackTurul.aldaa);
       }
     }
   }

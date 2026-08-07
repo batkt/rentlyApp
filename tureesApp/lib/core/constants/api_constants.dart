@@ -43,6 +43,7 @@ class ApiConstants {
   // Notifications & Duudlaga (shared /sonorduulga endpoint)
   static const String notifications = '/sonorduulga';
   static const String sonorduulgaKharlaa = '/sonorduulgaKharlaa';
+  static const String sanalKhuleenAvlaa = '/sanalKhuleenAvlaa';
   static const String duudlaga = '/sonorduulga';
   static String duudlagaUpdate(String id) => '/sonorduulga/$id';
 
@@ -72,6 +73,10 @@ class ApiConstants {
 
   // Feedback
   static const String feedback = '/sanalKhadgalya';
+
+  // Машин бүртгэл (tenant's own vehicles)
+  static const String mashin = '/mashin';
+  static String mashinById(String id) => '/mashin/$id';
 }
 
 class StorageKeys {

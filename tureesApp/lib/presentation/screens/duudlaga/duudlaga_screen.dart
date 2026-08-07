@@ -5,6 +5,7 @@ import '../../../core/utils/formatters.dart';
 import '../../../data/models/duudlaga_model.dart';
 import '../../providers/duudlaga_provider.dart';
 import '../../widgets/common/app_loading.dart';
+import '../../../core/utils/app_snackbar.dart';
 
 class DuudlagaScreen extends ConsumerStatefulWidget {
   const DuudlagaScreen({super.key});
@@ -311,9 +312,7 @@ class _CreateDuudlagaSheetState extends ConsumerState<_CreateDuudlagaSheet> {
 
   Future<void> _submit() async {
     if (_titleController.text.isEmpty || _messageController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Гарчиг болон мессеж оруулна уу'), backgroundColor: AppColors.error),
-      );
+      showAppSnackBar(context, 'Гарчиг болон мессеж оруулна уу', turul: SnackTurul.aldaa);
       return;
     }
     FocusScope.of(context).unfocus();
@@ -325,15 +324,7 @@ class _CreateDuudlagaSheetState extends ConsumerState<_CreateDuudlagaSheet> {
     if (success) {
       widget.onCreated();
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Дуудлага амжилттай илгээгдлээ!'),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: const EdgeInsets.all(16),
-        ),
-      );
+      showAppSnackBar(context, 'Дуудлага амжилттай илгээгдлээ!', turul: SnackTurul.amjilt);
     }
   }
 

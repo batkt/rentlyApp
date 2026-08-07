@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/services/push_notification_service.dart';
 import '../../core/socket/socket_service.dart';
+import '../../core/storage/secure_storage.dart';
 import '../../data/models/notification_model.dart';
 import '../../data/models/task_model.dart';
 import '../../data/repositories/notification_repository.dart';
@@ -7,6 +9,39 @@ import 'auth_provider.dart';
 
 /// Latest notification received via socket — home screen listens to show a banner.
 final incomingNotificationProvider = StateProvider<NotificationModel?>((ref) => null);
+
+/// "Мэдэгдэл харах" switch in Settings. Off silences both the in-app banner
+/// and the notification the app raises for a foreground push; the list itself
+/// keeps filling so nothing is lost while it is off.
+class NotificationsEnabledNotifier extends StateNotifier<bool> {
+  static const _key = 'app_notifications_enabled';
+
+  final SecureStorageService _storage;
+
+  NotificationsEnabledNotifier(this._storage) : super(true) {
+    PushNotificationService.instance.showForegroundNotifications = true;
+    _load();
+  }
+
+  Future<void> _load() async {
+    final saved = await _storage.read(_key);
+    if (saved == null) return;
+    final enabled = saved == 'true';
+    state = enabled;
+    PushNotificationService.instance.showForegroundNotifications = enabled;
+  }
+
+  Future<void> set(bool enabled) async {
+    state = enabled;
+    PushNotificationService.instance.showForegroundNotifications = enabled;
+    await _storage.write(_key, enabled.toString());
+  }
+}
+
+final notificationsEnabledProvider =
+    StateNotifierProvider<NotificationsEnabledNotifier, bool>((ref) {
+  return NotificationsEnabledNotifier(ref.read(secureStorageProvider));
+});
 
 final notificationsProvider = StateNotifierProvider<NotificationsNotifier, NotificationsState>((ref) {
   final user = ref.watch(currentUserProvider);
@@ -126,6 +161,19 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
       khariltsagchiinNer: user.fullName,
       message: message,
       turul: turul,
+    );
+    await load();
+  }
+
+  /// Tenant accepts a Шаардлага the manager sent. Reloads so the status pill
+  /// reflects what the server stored rather than a guess.
+  Future<void> khuleenAvya(String id) async {
+    final user = _ref.read(currentUserProvider);
+    if (user == null) return;
+    await _repo.khuleenAvya(
+      id: id,
+      baiguullagiinId: user.baiguullagiinId,
+      barilgiinId: user.barilgiinId,
     );
     await load();
   }

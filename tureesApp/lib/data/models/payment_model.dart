@@ -1,5 +1,10 @@
 class QpayInvoiceModel {
   final String? invoiceId;
+
+  /// The order number the backend assigns to this QPay invoice. It — not the
+  /// QPay invoice id — is what the payment callback and the `qpay/<org>/<id>`
+  /// socket event are keyed on.
+  final String? zakhialgiinDugaar;
   final String? qrText;
   final String? qrImage;
   final List<QpayUrlModel> urls;
@@ -8,6 +13,7 @@ class QpayInvoiceModel {
 
   const QpayInvoiceModel({
     this.invoiceId,
+    this.zakhialgiinDugaar,
     this.qrText,
     this.qrImage,
     required this.urls,
@@ -18,6 +24,7 @@ class QpayInvoiceModel {
   factory QpayInvoiceModel.fromJson(Map<String, dynamic> json) {
     return QpayInvoiceModel(
       invoiceId: json['invoice_id']?.toString() ?? json['invoiceId']?.toString(),
+      zakhialgiinDugaar: json['zakhialgiinDugaar']?.toString(),
       qrText: json['qr_text']?.toString() ?? json['qrText']?.toString(),
       qrImage: json['qr_image']?.toString() ?? json['qrImage']?.toString(),
       urls: (json['urls'] as List?)?.map((e) => QpayUrlModel.fromJson(e)).toList() ?? [],

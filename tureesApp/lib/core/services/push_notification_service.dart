@@ -24,6 +24,12 @@ class PushNotificationService {
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
   bool _initialized = false;
 
+  /// Mirrors the "Мэдэгдэл харах" switch in Settings. Only governs what this
+  /// app raises for a foreground message — a backgrounded/terminated app's
+  /// notifications are drawn by the OS from the FCM payload, so those are
+  /// turned off in the phone's own notification settings.
+  bool showForegroundNotifications = true;
+
   static const _channel = AndroidNotificationChannel(
     'turees_default_channel',
     'Мэдэгдэл',
@@ -54,7 +60,7 @@ class PushNotificationService {
       // show one ourselves so the behaviour matches a locked/backgrounded phone.
       FirebaseMessaging.onMessage.listen((message) {
         final notif = message.notification;
-        if (notif == null) return;
+        if (notif == null || !showForegroundNotifications) return;
         _localNotifications.show(
           notif.hashCode,
           notif.title,

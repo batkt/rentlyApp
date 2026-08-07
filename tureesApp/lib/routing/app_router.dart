@@ -10,8 +10,10 @@ import '../presentation/screens/auth/org_select_screen.dart';
 import '../presentation/screens/auth/reset_password_screen.dart';
 import '../presentation/screens/home/home_screen.dart';
 import '../presentation/screens/agreements/agreement_detail_screen.dart';
+import '../presentation/screens/agreements/all_invoices_screen.dart';
 import '../presentation/screens/payment/payment_screen.dart';
 import '../presentation/screens/payment/qpay_screen.dart';
+import '../presentation/screens/settings/mashin_screen.dart';
 import '../presentation/screens/chat/chat_detail_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -50,12 +52,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/home',
         builder: (_, __) => const HomeScreen(),
       ),
+      GoRoute(path: '/mashin', builder: (_, __) => const MashinScreen()),
+      GoRoute(path: '/invoices', builder: (_, __) => const AllInvoicesScreen()),
       GoRoute(
         path: '/agreements/:id',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
           final agreement = state.extra as AgreementModel?;
-          return AgreementDetailScreen(agreementId: id, initialData: agreement);
+          // `?tab=2` opens straight on Нэхэмжлэх (invoice notifications).
+          final tab = int.tryParse(state.uri.queryParameters['tab'] ?? '') ?? 0;
+          return AgreementDetailScreen(agreementId: id, initialData: agreement, initialTab: tab);
         },
       ),
       GoRoute(

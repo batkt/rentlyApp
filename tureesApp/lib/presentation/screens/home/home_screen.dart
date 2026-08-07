@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/network/dio_client.dart';
+import '../../../core/socket/socket_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/notification_model.dart';
 import '../../providers/agreement_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/notification_provider.dart';
+import '../agreements/agreement_detail_screen.dart' show kAgreementInvoiceTab;
 import '../dashboard/dashboard_screen.dart';
 import '../payment/payment_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../settings/settings_screen.dart';
+import '../../../core/utils/app_snackbar.dart';
 
 final _navIndexProvider = StateProvider<int>((ref) => 0);
 
@@ -25,7 +29,7 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
   late final List<Widget> _screens;
 
   @override
@@ -37,13 +41,82 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       NotificationsScreen(),
       SettingsScreen(),
     ];
-    // Reset to home tab on every fresh mount (prevents stale index after logout/login)
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) ref.read(_navIndexProvider.notifier).state = 0;
-      // Load conversations early so the chat toast listener has data when a
-      // message arrives even before the floating bubble is first rendered.
       if (mounted) ref.read(conversationsProvider.notifier).load();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _onResumed();
+  }
+
+  Future<bool> _erkhShalgaya() async {
+    final ustsan = await ref.read(authStateProvider.notifier).erkhUstsanEsekhShalgaya();
+    if (!ustsan || !mounted) return ustsan;
+    await _erkhUstsaniiMedegdel();
+    return true;
+  }
+
+  /// Ends the session with an explanation instead of leaving the user on a
+  /// screen whose every request now fails.
+  Future<void> _erkhUstsaniiMedegdel() async {
+    if (!mounted) return;
+    await ref.read(authStateProvider.notifier).logout();
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.no_accounts_rounded, color: AppColors.error, size: 40),
+        title: const Text('Таны эрх устгагдсан байна'),
+        content: const Text(
+          'Таны аппликейшн ашиглах эрхийг цуцалсан байна. '
+          'Дэлгэрэнгүй мэдээллийг менежерээсээ авна уу.',
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Ойлголоо'),
+          ),
+        ],
+      ),
+    );
+    if (mounted) context.go('/login');
+  }
+
+  Future<void> _onResumed() async {
+    if (!mounted) return;
+    final user = ref.read(currentUserProvider);
+    if (user == null) return;
+
+    if (await _erkhShalgaya()) return;
+    if (!mounted) return;
+
+    final socket = ref.read(socketServiceProvider);
+    await socket.ensureConnected();
+    socket.joinOrgRoom(user.baiguullagiinId);
+    socket.joinUserRoom(user.id);
+
+    if (!mounted) return;
+    ref.invalidate(agreementsProvider);
+    ref.invalidate(agreementDetailProvider);
+    ref.invalidate(invoiceHistoryProvider);
+    ref.invalidate(transactionHistoryProvider);
+    ref.invalidate(niitUldegdelProvider);
+    ref.invalidate(uldegdelProvider);
+    ref.invalidate(agreementBalanceProvider);
+    ref.read(notificationsProvider.notifier).load();
+    ref.read(conversationsProvider.notifier).load();
   }
 
   bool _canSee(List<String> erkhuud, String key) {
@@ -62,38 +135,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final showNotifications = _canSee(erkhuud, 'notifications');
     final showProfile = _canSee(erkhuud, 'profile');
     final showChat = _canSee(erkhuud, 'chat');
-
-    // Map actual screen index → visible destination index
-    final visibleTabs = <int>[0]; // home always visible
+  final visibleTabs = <int>[0]; // home always visible
     if (showPayment) visibleTabs.add(1);
     if (showNotifications) visibleTabs.add(2);
     if (showProfile) visibleTabs.add(3);
+    // Any API call answering 401 means this account is no longer valid — an
+    // additional user deleted from the web portal otherwise keeps using the
+    // app, since the session is only a locally stored token.
+    ref.listen<bool>(erkhTsutslagdsanProvider, (_, next) {
+      if (!next || !mounted) return;
+      ref.read(erkhTsutslagdsanProvider.notifier).state = false;
+      _erkhUstsaniiMedegdel();
+    });
 
-    // Real-time notification banner
     ref.listen<NotificationModel?>(incomingNotificationProvider, (_, next) {
       if (next == null || !mounted) return;
-      // Dashboard/agreement balances and the нэхэмжлэх history list are plain
-      // (non-autoDispose) FutureProviders kept alive by the IndexedStack
-      // tabs, so they never refetch on their own — without this the tenant
-      // sees a notification toast but stale Нийт үлдэгдэл / гэрээнүүд
-      // үлдэгдэл until a manual pull-to-refresh. Not gated on `turul` since
-      // any server-side event that pushes a notification (new invoice,
-      // payment reconciled, discount applied, etc.) can also change balances
-      // — refetching is cheap, so just always do it.
       ref.invalidate(agreementsProvider);
       ref.invalidate(invoiceHistoryProvider);
+      if (!ref.read(notificationsEnabledProvider)) {
+        Future.microtask(() {
+          if (mounted) ref.read(incomingNotificationProvider.notifier).state = null;
+        });
+        return;
+      }
       final title = next.title.isNotEmpty ? next.title : 'Шинэ мэдэгдэл';
       final body = next.message;
+      final gereeniiId = next.gereeniiId;
+      final isInvoice = next.turul == 'nekhemjlekh' && gereeniiId != null && gereeniiId.isNotEmpty;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              // Фон нь brand өнгө тул текстийн өнгийг theme-д найдалгүй шууд
+              // цагаанаар өгнө (light theme-ийн snackbar текст бараан).
+              Text(title,
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
               if (body.isNotEmpty) ...[
                 const SizedBox(height: 2),
-                Text(body, style: const TextStyle(fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
+                Text(body,
+                    style: const TextStyle(color: Colors.white, fontSize: 11),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis),
               ],
             ],
           ),
@@ -105,7 +190,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             textColor: Colors.white,
             onPressed: () {
               ref.read(incomingNotificationProvider.notifier).state = null;
-              ref.read(_navIndexProvider.notifier).state = 2;
+              if (isInvoice) {
+                context.push('/agreements/$gereeniiId?tab=$kAgreementInvoiceTab');
+              } else {
+                ref.read(_navIndexProvider.notifier).state = 2;
+              }
             },
           ),
         ),
@@ -114,8 +203,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         if (mounted) ref.read(incomingNotificationProvider.notifier).state = null;
       });
     });
-
-    // Chat message banner — fires when unread count increases while not on chat screen
     ref.listen<ConversationsState>(conversationsProvider, (prev, next) {
       if (!mounted) return;
       final prevCount = prev?.conversations.fold<int>(0, (s, c) => s + c.unreadCount) ?? 0;
@@ -123,7 +210,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (nextCount <= prevCount) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Таньд шинэ  мессеж ирлээ'),
+          content: const Text('Таньд шинэ мессеж ирлээ',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
           backgroundColor: AppColors.primary,
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 1),
@@ -141,8 +229,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       );
     });
-
-    // Clamp currentIndex to a valid visible tab
     final safeScreenIndex = visibleTabs.contains(currentIndex) ? currentIndex : 0;
 
     final destinations = <NavigationDestination>[
@@ -259,9 +345,7 @@ class _FloatingChatBubbleState extends ConsumerState<_FloatingChatBubble>
       ref.read(conversationsProvider.notifier).markRead(conv.id);
       context.push('/chat/${conv.id}', extra: conv);
     } else if (convState.error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(convState.error!), backgroundColor: AppColors.error),
-      );
+      showAppSnackBar(context, convState.error!, turul: SnackTurul.aldaa);
     } else {
       context.push('/chat/loading');
     }
