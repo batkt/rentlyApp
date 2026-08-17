@@ -140,13 +140,14 @@ class AllInvoicesScreen extends ConsumerWidget {
             );
           }
 
-          // Group by month, newest month first (the list is already sorted).
+           
           final saruud = <String, List<NekhemjlekhBichlegT>>{};
           for (final b in jagsaalt) {
-            saruud.putIfAbsent(sariinTulkhuur(b.ognoo), () => []).add(b);
+            final sariinMuruud = saruud.putIfAbsent(sariinTulkhuur(b.ognoo), () => []);
+            if (sariinMuruud.any((m) => m.agreement.id == b.agreement.id)) continue;
+            sariinMuruud.add(b);
           }
           final turluud = saruud.keys.toList();
-
           final sonssonSar = ref.watch(_sarProvider);
           final songosonSar = turluud.contains(sonssonSar) ? sonssonSar! : turluud.first;
           final sariinJagsaalt = saruud[songosonSar]!;

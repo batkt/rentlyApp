@@ -324,7 +324,49 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ),
         ),
       ),
+      // "profile" эрхгүй нэмэлт хэрэглэгчид Профайл таб харагддаггүй бөгөөд
+      // гарах товч зөвхөн тэнд байсан тул апп-аас гарах ямар ч арга үлддэггүй
+      // байсан. Тэр тохиолдолд гарах товчийг энд гаргана.
+      actions: [
+        if (!_profileErkhtei(user)) ...[
+          IconButton(
+            tooltip: 'Гарах',
+            icon: const Icon(Icons.logout_rounded, color: Colors.white),
+            onPressed: _garya,
+          ),
+          const SizedBox(width: 4),
+        ],
+      ],
     );
+  }
+
+  bool _profileErkhtei(dynamic user) {
+    final erkhuud = (user?.appErkhuud as List?) ?? const [];
+    return erkhuud.isEmpty || erkhuud.contains('profile');
+  }
+
+  Future<void> _garya() async {
+    final batalgaa = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Гарах уу?'),
+        content: const Text('Та системээс гарахдаа итгэлтэй байна уу?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Болих'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Гарах'),
+          ),
+        ],
+      ),
+    );
+    if (batalgaa != true) return;
+    await ref.read(authStateProvider.notifier).logout();
+    if (mounted) context.go('/login');
   }
 
   Widget _buildFilterTabs(int? currentFilter, double hPad) {

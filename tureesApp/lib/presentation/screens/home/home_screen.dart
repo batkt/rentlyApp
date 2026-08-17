@@ -31,6 +31,8 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
   late final List<Widget> _screens;
+  Function(dynamic)? _ustgasanUiladel;
+  String? _ustgasaniiUzegdel;
 
   @override
   void initState() {
@@ -44,12 +46,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) ref.read(_navIndexProvider.notifier).state = 0;
+      // Апп-ыг шинээр нээхэд `didChangeAppLifecycleState` дуудагддаггүй тул
+      // эрх устсан эсэхийг энд шалгахгүй бол хуучин токеноороо нэвтэрсэн
+      // хэвээр үлддэг байсан.
+      if (mounted) _erkhShalgaya();
+      if (mounted) _ustgasniiKhulgeeg();
       if (mounted) ref.read(conversationsProvider.notifier).load();
     });
   }
 
+  /// Апп нээлттэй байхад эрх нь уствал сервер шууд мэдэгдэнэ.
+  ///
+  /// `SocketService.on` нь socket үүсээгүй байхад чимээгүй алгасдаг тул
+  /// холболтыг эхлээд баталгаажуулна.
+  Future<void> _ustgasniiKhulgeeg() async {
+    final user = ref.read(currentUserProvider);
+    if (user == null) return;
+    final socket = ref.read(socketServiceProvider);
+    await socket.ensureConnected();
+    if (!mounted) return;
+    _ustgasaniiUzegdel = 'khariltsagchUstlaa${user.id}';
+    _ustgasanUiladel = (_) {
+      if (mounted) _erkhUstsaniiMedegdel();
+    };
+    socket.on(_ustgasaniiUzegdel!, _ustgasanUiladel!);
+  }
+
   @override
   void dispose() {
+    if (_ustgasaniiUzegdel != null && _ustgasanUiladel != null) {
+      ref.read(socketServiceProvider).off(_ustgasaniiUzegdel!, _ustgasanUiladel!);
+    }
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

@@ -1,5 +1,15 @@
 class ApiConstants {
-  static const String baseUrl = 'https://turees.zevtabs.mn/api';
+  // production
+  static const String serverKhayag = 'https://turees.zevtabs.mn';
+  static const String baseUrl = '$serverKhayag/api';
+
+  // test rently
+  // static const String serverKhayag = 'https://rently.zevtabs.mn';
+  // static const String baseUrl = '$serverKhayag/api';
+
+  // test — шууд IP (nginx-гүй тул /api дагавар байхгүй)
+  // static const String serverKhayag = 'http://103.236.194.26:8081';
+  // static const String baseUrl = serverKhayag;
   static const Duration connectTimeout = Duration(seconds: 30);
   static const Duration receiveTimeout = Duration(seconds: 30);
 

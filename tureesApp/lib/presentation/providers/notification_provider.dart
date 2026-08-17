@@ -4,6 +4,7 @@ import '../../core/socket/socket_service.dart';
 import '../../core/storage/secure_storage.dart';
 import '../../data/models/notification_model.dart';
 import '../../data/models/task_model.dart';
+import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/notification_repository.dart';
 import 'auth_provider.dart';
 
@@ -17,8 +18,9 @@ class NotificationsEnabledNotifier extends StateNotifier<bool> {
   static const _key = 'app_notifications_enabled';
 
   final SecureStorageService _storage;
+  final Ref _ref;
 
-  NotificationsEnabledNotifier(this._storage) : super(true) {
+  NotificationsEnabledNotifier(this._storage, this._ref) : super(true) {
     PushNotificationService.instance.showForegroundNotifications = true;
     _load();
   }
@@ -35,12 +37,35 @@ class NotificationsEnabledNotifier extends StateNotifier<bool> {
     state = enabled;
     PushNotificationService.instance.showForegroundNotifications = enabled;
     await _storage.write(_key, enabled.toString());
+    await _serverTuluvSolyo(enabled);
+  }
+
+  /// Апп хаалттай/арын дэвсгэрт байхад мэдэгдлийг үйлдлийн систем өөрөө FCM
+  /// payload-оос зурдаг тул зөвхөн локал тохиргоо хангалтгүй — унтраахад
+  /// серверт хадгалсан FCM токеныг нь цэвэрлэж, push илгээгдэхийг зогсооно.
+  /// Асаахад одоогийн төхөөрөмжийн токеныг дахин бүртгэнэ.
+  Future<void> _serverTuluvSolyo(bool enabled) async {
+    final user = _ref.read(currentUserProvider);
+    if (user == null) return;
+    final repo = _ref.read(authRepositoryProvider);
+    try {
+      if (enabled) {
+        await PushNotificationService.instance.registerToken(
+          (token) => repo.saveFcmToken(user.id, token),
+        );
+      } else {
+        await repo.saveFcmToken(user.id, '');
+      }
+    } catch (_) {
+      // Сүлжээний алдаа локал тохиргоог буцаах шалтгаан биш — дараагийн
+      // нэвтрэлт дээр токен дахин бүртгэгдэнэ.
+    }
   }
 }
 
 final notificationsEnabledProvider =
     StateNotifierProvider<NotificationsEnabledNotifier, bool>((ref) {
-  return NotificationsEnabledNotifier(ref.read(secureStorageProvider));
+  return NotificationsEnabledNotifier(ref.read(secureStorageProvider), ref);
 });
 
 final notificationsProvider = StateNotifierProvider<NotificationsNotifier, NotificationsState>((ref) {
