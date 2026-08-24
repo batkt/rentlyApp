@@ -775,23 +775,22 @@ class _TurulChoice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: selected ? color : context.appInputFill,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: selected ? color : context.appDivider),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: selected ? Colors.white : context.appTextSecondary,
-            ),
+    // Wrap-ийн хүүхэд тул Expanded (Flex-ийн ParentData) ашиглаж болохгүй.
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? color : context.appInputFill,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: selected ? color : context.appDivider),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: selected ? Colors.white : context.appTextSecondary,
           ),
         ),
       ),
