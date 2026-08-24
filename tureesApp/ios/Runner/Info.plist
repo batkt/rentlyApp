@@ -28,8 +28,12 @@
 	<true/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Гэрээнд зураг авах болон бичиг баримт хавсаргахын тулд камер ашиглана</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Face ID ашиглан аппликейшнд нэвтрэх</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Байршилд тулгуурласан үйлчилгээ үзүүлэхийн тулд байршил ашиглана</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Дуут мессеж илгээхийн тулд микрофон ашиглана</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
