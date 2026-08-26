@@ -219,13 +219,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// Ask the server whether this account still exists. Returns true when it
-  /// was deleted (or deactivated) — the caller shows the warning and signs out.
+  /// was deleted (or deactivated).
+  ///
+  /// Signing out is deliberately left to the caller: dropping the auth state
+  /// here redirects to /login on the next frame, which tore down the warning
+  /// dialog before the user could read it. [ErkhKhamgaalagch] warns first,
+  /// then calls [logout].
   Future<bool> erkhUstsanEsekhShalgaya() async {
     if (!state.isAuthenticated) return false;
     final tuluv = await _repo.khereglegchShalgaya();
-    if (tuluv != KhereglegchiinTuluv.ustsan) return false;
-    await logout();
-    return true;
+    return tuluv == KhereglegchiinTuluv.ustsan;
   }
 
   Future<void> logout() async {

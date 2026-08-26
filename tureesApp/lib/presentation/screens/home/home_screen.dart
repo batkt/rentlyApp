@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/network/dio_client.dart';
 import '../../../core/socket/socket_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/notification_model.dart';
@@ -31,8 +30,6 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
   late final List<Widget> _screens;
-  Function(dynamic)? _ustgasanUiladel;
-  String? _ustgasaniiUzegdel;
 
   @override
   void initState() {
@@ -46,37 +43,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) ref.read(_navIndexProvider.notifier).state = 0;
-      // Апп-ыг шинээр нээхэд `didChangeAppLifecycleState` дуудагддаггүй тул
-      // эрх устсан эсэхийг энд шалгахгүй бол хуучин токеноороо нэвтэрсэн
-      // хэвээр үлддэг байсан.
-      if (mounted) _erkhShalgaya();
-      if (mounted) _ustgasniiKhulgeeg();
+      // Эрх устсан эсэхийг `ErkhKhamgaalagch` бүх дэлгэц дээр хянана.
       if (mounted) ref.read(conversationsProvider.notifier).load();
     });
   }
 
-  /// Апп нээлттэй байхад эрх нь уствал сервер шууд мэдэгдэнэ.
-  ///
-  /// `SocketService.on` нь socket үүсээгүй байхад чимээгүй алгасдаг тул
-  /// холболтыг эхлээд баталгаажуулна.
-  Future<void> _ustgasniiKhulgeeg() async {
-    final user = ref.read(currentUserProvider);
-    if (user == null) return;
-    final socket = ref.read(socketServiceProvider);
-    await socket.ensureConnected();
-    if (!mounted) return;
-    _ustgasaniiUzegdel = 'khariltsagchUstlaa${user.id}';
-    _ustgasanUiladel = (_) {
-      if (mounted) _erkhUstsaniiMedegdel();
-    };
-    socket.on(_ustgasaniiUzegdel!, _ustgasanUiladel!);
-  }
-
   @override
   void dispose() {
-    if (_ustgasaniiUzegdel != null && _ustgasanUiladel != null) {
-      ref.read(socketServiceProvider).off(_ustgasaniiUzegdel!, _ustgasanUiladel!);
-    }
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -86,48 +59,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     if (state == AppLifecycleState.resumed) _onResumed();
   }
 
-  Future<bool> _erkhShalgaya() async {
-    final ustsan = await ref.read(authStateProvider.notifier).erkhUstsanEsekhShalgaya();
-    if (!ustsan || !mounted) return ustsan;
-    await _erkhUstsaniiMedegdel();
-    return true;
-  }
-
-  /// Ends the session with an explanation instead of leaving the user on a
-  /// screen whose every request now fails.
-  Future<void> _erkhUstsaniiMedegdel() async {
-    if (!mounted) return;
-    await ref.read(authStateProvider.notifier).logout();
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.no_accounts_rounded, color: AppColors.error, size: 40),
-        title: const Text('Таны эрх устгагдсан байна'),
-        content: const Text(
-          'Таны аппликейшн ашиглах эрхийг цуцалсан байна. '
-          'Дэлгэрэнгүй мэдээллийг менежерээсээ авна уу.',
-          textAlign: TextAlign.center,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Ойлголоо'),
-          ),
-        ],
-      ),
-    );
-    if (mounted) context.go('/login');
-  }
-
   Future<void> _onResumed() async {
     if (!mounted) return;
     final user = ref.read(currentUserProvider);
     if (user == null) return;
-
-    if (await _erkhShalgaya()) return;
-    if (!mounted) return;
 
     final socket = ref.read(socketServiceProvider);
     await socket.ensureConnected();
@@ -166,15 +101,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     if (showPayment) visibleTabs.add(1);
     if (showNotifications) visibleTabs.add(2);
     if (showProfile) visibleTabs.add(3);
-    // Any API call answering 401 means this account is no longer valid — an
-    // additional user deleted from the web portal otherwise keeps using the
-    // app, since the session is only a locally stored token.
-    ref.listen<bool>(erkhTsutslagdsanProvider, (_, next) {
-      if (!next || !mounted) return;
-      ref.read(erkhTsutslagdsanProvider.notifier).state = false;
-      _erkhUstsaniiMedegdel();
-    });
-
     ref.listen<NotificationModel?>(incomingNotificationProvider, (_, next) {
       if (next == null || !mounted) return;
       ref.invalidate(agreementsProvider);

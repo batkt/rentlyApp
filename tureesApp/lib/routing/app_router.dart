@@ -16,6 +16,11 @@ import '../presentation/screens/payment/qpay_screen.dart';
 import '../presentation/screens/settings/mashin_screen.dart';
 import '../presentation/screens/chat/chat_detail_screen.dart';
 
+/// Root navigator of the app. Warnings that must survive a route change —
+/// e.g. the "эрх устгагдсан" dialog, which is followed by a redirect to
+/// /login — are shown against this key rather than a screen's own context.
+final tureesNavKey = GlobalKey<NavigatorState>();
+
 final routerProvider = Provider<GoRouter>((ref) {
   // Build the router ONCE. Recreating GoRouter on every auth change spawns a
   // fresh Navigator GlobalKey and triggers "GlobalKey used multiple times"
@@ -26,6 +31,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   ref.onDispose(refresh.dispose);
 
   return GoRouter(
+    navigatorKey: tureesNavKey,
     initialLocation: '/login',
     refreshListenable: refresh,
     redirect: (context, state) {
