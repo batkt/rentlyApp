@@ -61,9 +61,22 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     });
     try {
       final repo = ref.read(agreementRepositoryProvider);
+      // Дүнг ШУУД тооцуулна (uldegdelBodyo). Сүүлийн нэхэмжлэхийн хөлдөөсөн
+      // `niitUldegdel`-ийг уншвал turees дээр хийсэн өөрчлөлт болон QPay
+      // төлөлт энд тусахгүй, түрээслэгч хуучин дүнгээ дахин төлөх эрсдэлтэй.
+      // Дансны дугаарыг л нэхэмжлэхээс авна.
       final info = await repo.getLatestInvoiceInfo(agreement.id);
       if (!mounted) return;
-      final uldegdel = info.niitUldegdel;
+      double? uldegdel;
+      try {
+        uldegdel = await repo.getNiitUldegdel(
+          agreement.gereeniiDugaar,
+          agreement.barilgiinId,
+        );
+      } catch (_) {
+        uldegdel = info.niitUldegdel;
+      }
+      if (!mounted) return;
       setState(() {
         _realUldegdel = uldegdel;
         // Fall back to the contract's own account when the latest invoice

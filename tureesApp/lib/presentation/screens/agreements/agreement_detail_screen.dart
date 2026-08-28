@@ -516,18 +516,17 @@ class _MonthTransactionsSheet extends StatelessWidget {
                 final tx = txs[i];
                 final turul = tx['turul']?.toString() ?? '';
                 final isEkhniiUldegdel = tx['ekhniiUldegdelEsekh'] == true;
-                // QPay-гээр төлөгдсөн боловч банкны хуулгаар хараахан
-                // тулгагдаагүй төлбөр. Авлагад бичигдээгүй тул үлдэгдэлд
-                // нөлөөлөхгүй — зөвхөн түрээслэгчид «орсон» гэдгийг мэдэгдэнэ.
-                final isKhuleegdej = tx['khuleegdejBuiEsekh'] == true;
-                final khuleegdejBuiDun =
-                    (tx['khuleegdejBuiDun'] as num?)?.toDouble() ?? 0.0;
-                final isPayment = _paymentTypes.contains(turul);
-                final isKhyamdral = turul == 'khyamdral' || turul == 'khungulult';
-                final isAldangi = turul == 'aldangi';
                 final tulukhDun = (tx['tulukhDun'] as num?)?.toDouble() ?? 0.0;
                 final tulsunDun = (tx['tulsunDun'] as num?)?.toDouble() ?? 0.0;
                 final tulsunAldangi = (tx['tulsunAldangi'] as num?)?.toDouble() ?? 0.0;
+                // Алдангид зарцуулагдсан төлөлт. `tulukhDun` нь 0 тул ердийн
+                // замаар «0.00₮» гэж, бас улаанаар (зардал мэт) харагддаг
+                // байсан — үнэндээ түрээслэгчийн төлсөн мөнгө.
+                final isTulsunAldangi = turul == 'aldangi' && tulsunAldangi > 0;
+                final isPayment =
+                    _paymentTypes.contains(turul) || isTulsunAldangi;
+                final isKhyamdral = turul == 'khyamdral' || turul == 'khungulult';
+                final isAldangi = turul == 'aldangi' && !isTulsunAldangi;
                 final khyamdral = (tx['khyamdral'] as num?)?.toDouble() ?? 0.0;
                 final undsenDun = (tx['undsenDun'] as num?)?.toDouble() ?? 0.0;
                 final staffName = tx['guilgeeKhiisenAjiltniiNer']?.toString() ?? '';
@@ -545,18 +544,28 @@ class _MonthTransactionsSheet extends StatelessWidget {
                 // khuvaari always shows "Түрээсийн төлбөр" matching web; others prefer tailbar
                 final description = turul == 'khuvaari'
                     ? 'Түрээсийн төлбөр'
-                    : (tailbar.isNotEmpty ? tailbar : turulNer);
+                    // Backend-ийн тайлбар нь «систем алданги qpay ээр төлсөн»
+                    // гэсэн дотоод хэллэг тул түрээслэгчид ойлгомжтойгоор.
+                    : isTulsunAldangi
+                        ? 'Алданги төлөлт'
+                        : (tailbar.isNotEmpty ? tailbar : turulNer);
                 // Хэлбэр: matches web Khuulga — bank uses tulsunDans or aldangi label
-                final helber = turul == 'bank'
+                final helberTuukhii = turul == 'bank'
                     ? (tulsunAldangi > 0
                         ? 'Төлсөн алданги'
                         : (tulsunDans.isNotEmpty && tulsunDans.trim() != '' ? tulsunDans : 'Банк'))
                     : (isPayment && turul != 'bank' ? turulNer : '');
+                // Тайлбар нь хэлбэрээ аль хэдийн агуулж байвал доор нь дахин
+                // бичихгүй (ж: «QPay төлөлт — …» дээр «QPay» гэж давхарлах).
+                final helber = helberTuukhii.isNotEmpty &&
+                        description
+                            .toLowerCase()
+                            .contains(helberTuukhii.toLowerCase())
+                    ? ''
+                    : helberTuukhii;
 
                 double displayAmount;
-                if (isKhuleegdej) {
-                  displayAmount = khuleegdejBuiDun;
-                } else if (isPayment) {
+                if (isPayment) {
                   displayAmount = tulsunAldangi > 0 ? tulsunAldangi : (tulsunDun > 0 ? tulsunDun : tulukhDun);
                 } else if (isKhyamdral) {
                   // Discounts reduce the month's balance — show as a negative amount.
@@ -567,9 +576,7 @@ class _MonthTransactionsSheet extends StatelessWidget {
 
                 // khungulult reduces balance → same green direction as payments
                 final isCredit = isPayment || isKhyamdral;
-                final amountColor = isKhuleegdej
-                    ? AppColors.warning
-                    : isEkhniiUldegdel
+                final amountColor = isEkhniiUldegdel
                         ? AppColors.info
                         : isCredit
                             ? AppColors.success
@@ -577,9 +584,7 @@ class _MonthTransactionsSheet extends StatelessWidget {
                                 ? AppColors.error
                                 : context.appTextPrimary;
 
-                final rowBg = isKhuleegdej
-                    ? context.appWarningLight
-                    : isEkhniiUldegdel
+                final rowBg = isEkhniiUldegdel
                         ? context.appInfoLight
                         : Colors.transparent;
 
@@ -591,24 +596,18 @@ class _MonthTransactionsSheet extends StatelessWidget {
                       Container(
                         width: 38, height: 38,
                         decoration: BoxDecoration(
-                          color: isKhuleegdej
-                              ? AppColors.warning.withOpacity(0.15)
-                              : isEkhniiUldegdel
+                          color: isEkhniiUldegdel
                                   ? AppColors.info.withOpacity(0.15)
                                   : (isCredit ? AppColors.success : isAldangi ? AppColors.error : AppColors.primary)
                                       .withOpacity(0.12),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(
-                          isKhuleegdej
-                              ? Icons.schedule_rounded
-                              : isEkhniiUldegdel
+                          isEkhniiUldegdel
                                   ? Icons.account_balance_wallet_rounded
                                   : isCredit ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
                           size: 17,
-                          color: isKhuleegdej
-                              ? AppColors.warning
-                              : isEkhniiUldegdel
+                          color: isEkhniiUldegdel
                                   ? AppColors.info
                                   : isCredit ? AppColors.success : isAldangi ? AppColors.error : AppColors.primary,
                         ),
@@ -624,7 +623,9 @@ class _MonthTransactionsSheet extends StatelessWidget {
                                 fontWeight: FontWeight.w600,
                                 color: isEkhniiUldegdel ? AppColors.info : isAldangi ? AppColors.error : null,
                               ),
-                              maxLines: 1,
+                              // Нэг мөрөнд багтахгүй урт тайлбар таслагдаад
+                              // уншигдахгүй байсан.
+                              maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
                             Text(
@@ -633,24 +634,6 @@ class _MonthTransactionsSheet extends StatelessWidget {
                                 color: isEkhniiUldegdel ? AppColors.info.withOpacity(0.7) : context.appTextTertiary,
                               ),
                             ),
-                            if (isKhuleegdej)
-                              Container(
-                                margin: const EdgeInsets.only(top: 3),
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: AppColors.warning.withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(5),
-                                ),
-                                child: const Text(
-                                  'Баталгаажиж байна',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.warning,
-                                  ),
-                                ),
-                              ),
                             if (undsenDun > 0 && !isPayment && !isKhyamdral)
                               Text(
                                 'Түрээс: ${AppFormatters.currency(undsenDun)}',
@@ -696,7 +679,7 @@ class _MonthTransactionsSheet extends StatelessWidget {
                                 fontSize: 11,
                               ),
                             ),
-                          if (uldegdel != 0 && !isKhuleegdej)
+                          if (uldegdel != 0)
                             Text(
                               'Үлд: ${AppFormatters.currency(uldegdel)}',
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(

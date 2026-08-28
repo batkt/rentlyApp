@@ -21,15 +21,24 @@ final agreementsProvider = FutureProvider<List<AgreementModel>>((ref) async {
   );
   if (agreements.isEmpty) return agreements;
 
-  // Show the same balance PaymentScreen shows (the latest invoice's
-  // niitUldegdel) instead of a separately-computed ledger aggregate — the
-  // two were disagreeing (e.g. pre-billed future charges, late fees handled
-  // differently) since they came from different backend computations.
+  // Үлдэгдлийг `uldegdelBodyo`-оос ШУУД тооцуулна — tureesShine-ий
+  // useGereeniiUldegdel-тэй ижил эх сурвалж.
+  //
+  // Өмнө нь сүүлийн нэхэмжлэхийн `medeelel.niitUldegdel`-ийг уншдаг байсан.
+  // Тэр нь нэхэмжлэх үүсгэх мөчид хөлдөөж бичсэн тоо тул менежер turees
+  // дээр төлбөр бүртгэх/дүн засахад апп дээр хэзээ ч шинэчлэгддэггүй,
+  // зөвхөн ШИНЭ нэхэмжлэх үүсэхэд л өөрчлөгддөг байв. QPay төлөлт мөн
+  // үүнээс болж үлдэгдлийг бууруулж харагдахгүй байсан.
+  //
+  // getUldegdel нь ognoo-г [null, +2 жил] өгдөг тул урьдчилж бичигдсэн
+  // ирээдүйн зардлууд ч ороод, getNiitUldegdel дээр нь алдангийг нэмнэ —
+  // өөрөөр хэлбэл нэхэмжлэхийн нийт дүнтэй ижил утга гарна.
   final results = await Future.wait(agreements.map((a) async {
     try {
-      final info = await repo.getLatestInvoiceInfo(a.id);
-      final niitUldegdel = info.niitUldegdel;
-      if (niitUldegdel == null) return a;
+      final niitUldegdel = await repo.getNiitUldegdel(
+        a.gereeniiDugaar,
+        a.barilgiinId,
+      );
       return a.copyWith(uldegdel: niitUldegdel > 0 ? niitUldegdel : 0);
     } catch (_) {
       return a;
