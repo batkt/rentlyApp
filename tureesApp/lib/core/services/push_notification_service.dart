@@ -86,6 +86,47 @@ class PushNotificationService {
     }
   }
 
+  /// Утасны тохиргоон дээр мэдэгдэл унтраасан эсэх.
+  ///
+  /// `init` нь зөвшөөрлийг НЭГ удаа асуудаг: хэрэглэгч татгалзсан, эсвэл
+  /// дараа нь утасныхаа тохиргооноос унтраасан бол апп дахин асуухгүй, харин
+  /// push чимээгүй ирэхээ болино. Түүнийг илрүүлж анхааруулахад ашиглана.
+  Future<bool> medegdelUnturaasanEsekh() async {
+    try {
+      final tokhirgoo =
+          await FirebaseMessaging.instance.getNotificationSettings();
+      switch (tokhirgoo.authorizationStatus) {
+        case AuthorizationStatus.denied:
+          return true;
+        case AuthorizationStatus.notDetermined:
+          // Хараахан асуугаагүй — унтраасан гэж үзэхгүй.
+          return false;
+        case AuthorizationStatus.authorized:
+        case AuthorizationStatus.provisional:
+          return false;
+      }
+    } catch (_) {
+      // Firebase тохируулаагүй/алдаа — худал анхааруулга өгөхгүй.
+      return false;
+    }
+  }
+
+  /// Зөвшөөрлийг дахин асууна. Android 13+ дээр системийн цонх гарна;
+  /// бүрмөсөн татгалзсан эсвэл iOS дээр бол юу ч болохгүй тул дуудагч тал
+  /// үүний дараа утасны тохиргоо руу чиглүүлэх ёстой.
+  Future<void> zuvshuuruliigDakhinAsuuya() async {
+    try {
+      await FirebaseMessaging.instance
+          .requestPermission(alert: true, badge: true, sound: true);
+      await _localNotifications
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.requestNotificationsPermission();
+    } catch (e) {
+      debugPrint('PushNotificationService.zuvshuuruliigDakhinAsuuya: $e');
+    }
+  }
+
   /// Fetches the current device's FCM token and hands it to [onToken] so the
   /// caller can persist it (e.g. save it on the logged-in tenant's record).
   /// Also keeps it up to date if Firebase rotates the token later.

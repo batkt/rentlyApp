@@ -1,6 +1,10 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../core/services/push_notification_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/mashin_provider.dart';
@@ -9,11 +13,38 @@ import '../../providers/theme_provider.dart';
 import '../../widgets/common/app_button.dart';
 import '../home/home_screen.dart' show chatVisibleProvider;
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Хэрэглэгч утасны тохиргооноос мэдэгдлээ асаагаад буцаж ирэхэд
+    // анхааруулга нь өөрөө алга болох ёстой.
+    if (state == AppLifecycleState.resumed) {
+      ref.invalidate(medegdelUnturaasanProvider);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
     final isDark = ref.watch(themeModeProvider) == ThemeMode.dark;
 
@@ -31,6 +62,7 @@ class SettingsScreen extends ConsumerWidget {
                 _buildUserInfoCard(context, user),
                 const SizedBox(height: 16),
                 _buildNemeltKhereglegchid(context, ref),
+                _buildMedegdelAnkhaaruulga(context, ref),
                 _buildSettingsSection(context, ref, isDark),
                 const SizedBox(height: 16),
                 _buildLogoutSection(context, ref),
@@ -214,6 +246,100 @@ class SettingsScreen extends ConsumerWidget {
         );
       },
     );
+  }
+
+  /// Утасны тохиргоон дээр мэдэгдэл унтраалттай үед анхааруулна.
+  ///
+  /// Апп доторх «Мэдэгдэл харах» унтраалга нь зөвхөн апп нээлттэй үеийн
+  /// мэдэгдлийг л удирддаг — түгжигдсэн дэлгэц дээрх мэдэгдлийг үйлдлийн
+  /// систем шийддэг. Тиймээс тэндээс унтраасныг апп доторх тохиргооноос
+  /// мэдэх аргагүй бөгөөд хэрэглэгч мэдэгдэл ирэхгүйг шалтгаангүй гэж боддог.
+  Widget _buildMedegdelAnkhaaruulga(BuildContext context, WidgetRef ref) {
+    final unturaasan = ref.watch(medegdelUnturaasanProvider);
+
+    return unturaasan.maybeWhen(
+      orElse: () => const SizedBox.shrink(),
+      data: (unturaalttai) {
+        if (!unturaalttai) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: context.appWarningLight,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.warning.withOpacity(0.4)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.notifications_off_rounded,
+                        size: 20, color: AppColors.warning),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Мэдэгдэл унтраалттай байна',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleSmall
+                            ?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.warning,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Утасныхаа тохиргоон дээр энэ аппын мэдэгдлийг хаасан байна. '
+                  'Нэхэмжлэх, төлбөрийн мэдэгдэл танд ирэхгүй.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: context.appTextSecondary,
+                      ),
+                ),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: () => _medegdliigAsaaya(ref),
+                    icon: const Icon(Icons.settings_rounded, size: 16),
+                    label: const Text('Асаах'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.warning,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 6),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Эхлээд системийн зөвшөөрлийг дахин асууна (Android 13+ дээр цонх гарна).
+  /// Бүрмөсөн татгалзсан эсвэл iOS дээр бол энэ юу ч хийхгүй тул утасны
+  /// тохиргоог нь нээж өгнө.
+  Future<void> _medegdliigAsaaya(WidgetRef ref) async {
+    await PushNotificationService.instance.zuvshuuruliigDakhinAsuuya();
+    ref.invalidate(medegdelUnturaasanProvider);
+
+    final khevleer = await ref.read(medegdelUnturaasanProvider.future);
+    if (!khevleer) return;
+
+    // iOS дээр `app-settings:` нь аппын тохиргоог шууд нээнэ. `canLaunchUrl`
+    // энэ схем дээр найдваргүй хариу өгдөг тул шууд оролдоод, бүтэхгүй бол
+    // анхааруулга нь хэвээр үлдэнэ — хэрэглэгч гараар нээх боломжтой.
+    if (Platform.isIOS) {
+      try {
+        await launchUrl(Uri.parse('app-settings:'));
+      } catch (_) {}
+    }
   }
 
   Widget _buildSettingsSection(BuildContext context, WidgetRef ref, bool isDark) {

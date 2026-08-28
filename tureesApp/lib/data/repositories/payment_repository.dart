@@ -36,18 +36,32 @@ class PaymentRepository {
       urls: (data['urls'] as List?)?.map((e) => QpayUrlModel.fromJson(e)).toList() ?? [],
       amount: double.tryParse(data['_actualDun']?.toString() ?? '') ?? amount,
       gereeniiId: gereeniiId,
+      barilgiinId: barilgiinId,
     );
   }
 
-  Future<bool> verifyPayment(String invoiceId, String barilgiinId) async {
+  /// Нэхэмжлэл төлөгдсөн эсэхийг шалгана.
+  ///
+  /// Өмнө нь `/qpayShalgay` руу хандаад хариунаас `tuluv == 1` эсвэл
+  /// `paid == true`-г уншдаг байсан. Backend ийм талбар хэзээ ч буцаадаггүй
+  /// (`/qpayShalgay`-г өөр ямар ч клиент дуудахгүй тул хэн ч анзаараагүй) —
+  /// улмаас төлбөр төлөгдсөн ч шалгалт үргэлж `false` буцаадаг байв.
+  ///
+  /// `/qpayMedeelelAvya` нь QPay-н callback-ийн бичсэн `tulsunEsekh`-ийг
+  /// буцаадаг бөгөөд вэбийн /pay хуудас мөн энэ эх сурвалжийг ашигладаг.
+  Future<bool> verifyPayment({
+    required String baiguullagiinId,
+    required String barilgiinId,
+    required String zakhialgiinDugaar,
+  }) async {
     try {
-      final res = await _client.post(ApiConstants.qpayVerify, data: {
-        'invoiceId': invoiceId,
-        'barilgiinId': barilgiinId,
-      });
-      final data = res.data as Map<String, dynamic>;
-      return data['tuluv'] == 1 || data['paid'] == true;
+      final res = await _client.get(
+        ApiConstants.qpayTuluv(baiguullagiinId, barilgiinId, zakhialgiinDugaar),
+      );
+      final data = res.data;
+      return data is Map && data['tulsunEsekh'] == true;
     } catch (_) {
+      // 404 = нэхэмжлэл олдсонгүй, сүлжээний алдаа г.м — төлөгдсөн гэж үзэхгүй.
       return false;
     }
   }

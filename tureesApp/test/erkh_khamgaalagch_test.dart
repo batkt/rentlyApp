@@ -36,7 +36,14 @@ void main() {
     socket = _KhuurmagSocket(storage);
   });
 
-  Future<ProviderContainer> pumpKhamgaalagch(WidgetTester tester) async {
+  /// [ustgayaNevtersenii] — "нэвтэрсэн хойно нь устгасан" тохиолдол:
+  /// нэвтрэлт хэвийн болсны дараа л сервер бүртгэлийг байхгүй гэж хариулна.
+  /// `checkAuth` одоо энэ хариултыг ялгаж, аппыг нээх үедээ ч сешнийг
+  /// таслах болсон тул тугийг заавал дараа нь тавина.
+  Future<ProviderContainer> pumpKhamgaalagch(
+    WidgetTester tester, {
+    KhereglegchiinTuluv? ustgayaNevtersenii,
+  }) async {
     final container = ProviderContainer(overrides: [
       secureStorageProvider.overrideWithValue(storage),
       authRepositoryProvider.overrideWithValue(repo),
@@ -45,6 +52,7 @@ void main() {
     addTearDown(container.dispose);
     await container.read(authStateProvider.notifier).checkAuth();
     expect(container.read(authStateProvider).isAuthenticated, isTrue);
+    if (ustgayaNevtersenii != null) repo.tuluv = ustgayaNevtersenii;
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -84,8 +92,10 @@ void main() {
 
   testWidgets('Сокет ажиллаагүй ч сервер шалгалт хэрэглэгчийг гаргана',
       (tester) async {
-    repo.tuluv = KhereglegchiinTuluv.ustsan;
-    final container = await pumpKhamgaalagch(tester);
+    final container = await pumpKhamgaalagch(
+      tester,
+      ustgayaNevtersenii: KhereglegchiinTuluv.ustsan,
+    );
 
     expect(ankhaaruulga, findsOneWidget);
 
@@ -106,9 +116,45 @@ void main() {
     expect(container.read(authStateProvider).isAuthenticated, isFalse);
   });
 
+  testWidgets('Апп нээх үед устсан байсан ч анхааруулга гарна', (tester) async {
+    repo.tuluv = KhereglegchiinTuluv.ustsan;
+    final container = ProviderContainer(overrides: [
+      secureStorageProvider.overrideWithValue(storage),
+      authRepositoryProvider.overrideWithValue(repo),
+      socketServiceProvider.overrideWithValue(socket),
+    ]);
+    addTearDown(container.dispose);
+
+    var medegdsen = false;
+    await container
+        .read(authStateProvider.notifier)
+        .checkAuth(erkhUstsan: () => medegdsen = true);
+
+    expect(medegdsen, isTrue);
+    expect(container.read(authStateProvider).isAuthenticated, isFalse);
+    expect(storage.tsevrsen, isTrue);
+
+    container.read(erkhUstsanMedegdekhProvider.notifier).state = true;
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          navigatorKey: tureesNavKey,
+          builder: (_, child) => ErkhKhamgaalagch(child: child!),
+          home: const Scaffold(body: Text('нэвтрэх')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(ankhaaruulga, findsOneWidget);
+  });
+
   testWidgets('Сүлжээ тасарсан үед хэрэглэгчийг гаргахгүй', (tester) async {
-    repo.tuluv = KhereglegchiinTuluv.todorkhoigui;
-    final container = await pumpKhamgaalagch(tester);
+    final container = await pumpKhamgaalagch(
+      tester,
+      ustgayaNevtersenii: KhereglegchiinTuluv.todorkhoigui,
+    );
 
     expect(ankhaaruulga, findsNothing);
     expect(container.read(authStateProvider).isAuthenticated, isTrue);

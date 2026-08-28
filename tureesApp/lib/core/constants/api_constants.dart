@@ -1,11 +1,11 @@
 class ApiConstants {
   // production
-  static const String serverKhayag = 'https://turees.zevtabs.mn';
-  static const String baseUrl = '$serverKhayag/api';
+  // static const String serverKhayag = 'https://turees.zevtabs.mn';
+  // static const String baseUrl = '$serverKhayag/api';
 
   // test rently
-  // static const String serverKhayag = 'https://rently.zevtabs.mn';
-  // static const String baseUrl = '$serverKhayag/api';
+  static const String serverKhayag = 'https://rently.zevtabs.mn';
+  static const String baseUrl = '$serverKhayag/api';
 
   // test — шууд IP (nginx-гүй тул /api дагавар байхгүй)
   // static const String serverKhayag = 'http://103.236.194.26:8081';
@@ -41,6 +41,15 @@ class ApiConstants {
   // Payment
   static const String qpayGenerate = '/qpayGargaya';
   static const String qpayVerify = '/qpayShalgay';
+
+  /// Тухайн нэхэмжлэлийн төлөгдсөн эсэх (`tulsunEsekh`). QPay-н callback
+  /// бичсэн утгыг буцаадаг бөгөөд вэбийн /pay хуудас мөн үүнийг уншдаг.
+  static String qpayTuluv(
+    String baiguullagiinId,
+    String barilgiinId,
+    String zakhialgiinDugaar,
+  ) =>
+      '/qpayMedeelelAvya/$baiguullagiinId/$barilgiinId/$zakhialgiinDugaar';
   static const String qpayAmount = '/qpayGuilgeeUtgaAvya';
   static const String invoiceHistory = '/nekhemjlekhiinTuukh';
   static const String dans = '/dans';

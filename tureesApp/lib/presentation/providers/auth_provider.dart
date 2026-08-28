@@ -29,6 +29,11 @@ final nemeltKhereglegchidProvider = FutureProvider<List<UserModel>>((ref) async 
       );
 });
 
+/// Апп нээх үед сервер "энэ бүртгэл байхгүй" гэж хариулсан бол асаагдана.
+/// [ErkhKhamgaalagch] үүнийг хараад "Таны эрх устгагдсан байна" анхааруулгыг
+/// нэг удаа үзүүлээд буцааж унтраана.
+final erkhUstsanMedegdekhProvider = StateProvider<bool>((ref) => false);
+
 final currentUserProvider = Provider<UserModel?>((ref) {
   return ref.watch(authStateProvider).user;
 });
@@ -96,11 +101,27 @@ class AuthNotifier extends StateNotifier<AuthState> {
   AuthNotifier(this._repo, this._storage, this._socket, this._biometric)
       : super(const AuthState());
 
-  Future<void> checkAuth() async {
+  /// Апп нээх үед энэ бүртгэл сервер дээр байсаар байгаа эсэхийг шалгана.
+  ///
+  /// Өмнө нь [AuthRepository.getUserByToken] бүх алдааг залгичихдаг байсан тул
+  /// "бүртгэл устсан" ба "интернэт тасарсан" хоёр ялгагдахгүй: аль нь ч
+  /// чимээгүйхэн нэвтрэх дэлгэц рүү унагаадаг, харин ямар ч анхааруулга
+  /// гардаггүй байв. Одоо 401/403/404-ийг л эрх устсан гэж үзэж, хадгалсан
+  /// бүхнийг арчаад анхааруулга үзүүлэх туг асаана; сүлжээний алдаа бол
+  /// сешнийг хэвээр үлдээнэ.
+  Future<void> checkAuth({void Function()? erkhUstsan}) async {
     state = state.copyWith(isLoading: true);
     try {
       final isLoggedIn = await _storage.isLoggedIn();
       if (isLoggedIn) {
+        final tuluv = await _repo.khereglegchShalgaya();
+        if (tuluv == KhereglegchiinTuluv.ustsan) {
+          _socket.disconnect();
+          await _storage.clearAll();
+          state = const AuthState();
+          erkhUstsan?.call();
+          return;
+        }
         final user = await _repo.getUserByToken();
         if (user != null) {
           // Load from cache; if empty, fetch from server in background

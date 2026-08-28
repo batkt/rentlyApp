@@ -11,6 +11,11 @@ class QpayInvoiceModel {
   final double amount;
   final String gereeniiId;
 
+  /// Нэхэмжлэлийг үүсгэсэн барилга. Түрээслэгч олон барилгад гэрээтэй байж
+  /// болох тул төлөлт шалгахдаа нэвтэрсэн хэрэглэгчийн барилга биш, ЭНЭ
+  /// нэхэмжлэлийнхийг ашиглана.
+  final String barilgiinId;
+
   const QpayInvoiceModel({
     this.invoiceId,
     this.zakhialgiinDugaar,
@@ -19,6 +24,7 @@ class QpayInvoiceModel {
     required this.urls,
     required this.amount,
     required this.gereeniiId,
+    this.barilgiinId = '',
   });
 
   factory QpayInvoiceModel.fromJson(Map<String, dynamic> json) {
@@ -30,6 +36,7 @@ class QpayInvoiceModel {
       urls: (json['urls'] as List?)?.map((e) => QpayUrlModel.fromJson(e)).toList() ?? [],
       amount: double.tryParse(json['amount']?.toString() ?? '0') ?? 0.0,
       gereeniiId: json['gereeniiId']?.toString() ?? '',
+      barilgiinId: json['barilgiinId']?.toString() ?? '',
     );
   }
 }

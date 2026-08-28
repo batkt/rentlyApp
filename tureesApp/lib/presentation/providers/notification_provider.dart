@@ -63,6 +63,14 @@ class NotificationsEnabledNotifier extends StateNotifier<bool> {
   }
 }
 
+/// Утасны тохиргоон дээр мэдэгдэл унтраалттай эсэх.
+///
+/// Хэрэглэгч тохиргоогоо солиод буцаж ирэхэд шинэчлэгдэх ёстой тул
+/// апп идэвхжих бүрд `ref.invalidate` хийгддэг (`MedegdeliinZuvshuurulKhyanagch`).
+final medegdelUnturaasanProvider = FutureProvider<bool>((ref) async {
+  return PushNotificationService.instance.medegdelUnturaasanEsekh();
+});
+
 final notificationsEnabledProvider =
     StateNotifierProvider<NotificationsEnabledNotifier, bool>((ref) {
   return NotificationsEnabledNotifier(ref.read(secureStorageProvider), ref);

@@ -60,7 +60,15 @@ class _ErkhKhamgaalagchState extends ConsumerState<ErkhKhamgaalagch>
     // `checkAuth` has already run in main(), so a user is normally in place by
     // the first frame — ref.listen only fires on later changes.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _khereglegchidTokhiruulya(ref.read(currentUserProvider));
+      if (!mounted) return;
+      // main() дэх `checkAuth` эрх устсаныг илрүүлсэн бол сешн аль хэдийн
+      // тасарсан байна — энд зөвхөн анхааруулгыг нь үзүүлнэ. `ref.listen`
+      // эхний фрэймээс өмнө асаасан тугийг барьж авахгүй тул шууд уншина.
+      if (ref.read(erkhUstsanMedegdekhProvider)) {
+        ref.read(erkhUstsanMedegdekhProvider.notifier).state = false;
+        _ankhaaruulya();
+      }
+      _khereglegchidTokhiruulya(ref.read(currentUserProvider));
     });
   }
 
@@ -127,6 +135,45 @@ class _ErkhKhamgaalagchState extends ConsumerState<ErkhKhamgaalagch>
     }
   }
 
+  /// Анхааруулгыг л үзүүлнэ — сешнийг тасалдаггүй тул нэвтрээгүй үед ч
+  /// (апп нээх үед устсан нь илэрсэн тохиолдол) дуудаж болно.
+  ///
+  /// Диалог гарч чадаагүй нь — контекст бэлэн болоогүй, эсвэл Navigator
+  /// солигдож байх агшин таарсан — сешнийг таслахад саад болох ёсгүй тул
+  /// try/catch-д ороосон.
+  Future<void> _ankhaaruulya() async {
+    final ctx =
+        tureesNavKey.currentState?.overlay?.context ?? tureesNavKey.currentContext;
+    if (ctx == null) return;
+    try {
+      await showDialog<void>(
+        context: ctx,
+        barrierDismissible: false,
+        builder: (dialogCtx) => AlertDialog(
+          icon: const Icon(
+            Icons.no_accounts_rounded,
+            color: AppColors.error,
+            size: 40,
+          ),
+          title: const Text('Таны эрх устгагдсан байна'),
+          content: const Text(
+            'Таны аппликейшн ашиглах эрхийг цуцалсан байна. '
+            'Дэлгэрэнгүй мэдээллийг менежерээсээ авна уу.',
+            textAlign: TextAlign.center,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('Ойлголоо'),
+            ),
+          ],
+        ),
+      );
+    } catch (_) {
+      // Диалог гарч чадаагүй нь сешнийг таслахад саад болохгүй.
+    }
+  }
+
   /// Warns, then ends the session. The order matters: [AuthNotifier.logout]
   /// flips the router to /login on the next frame, which would take the dialog
   /// with it.
@@ -140,32 +187,7 @@ class _ErkhKhamgaalagchState extends ConsumerState<ErkhKhamgaalagch>
     // away while it is open.
     final auth = ref.read(authStateProvider.notifier);
     try {
-      final ctx = tureesNavKey.currentContext;
-      if (ctx != null) {
-        await showDialog<void>(
-          context: ctx,
-          barrierDismissible: false,
-          builder: (dialogCtx) => AlertDialog(
-            icon: const Icon(
-              Icons.no_accounts_rounded,
-              color: AppColors.error,
-              size: 40,
-            ),
-            title: const Text('Таны эрх устгагдсан байна'),
-            content: const Text(
-              'Таны аппликейшн ашиглах эрхийг цуцалсан байна. '
-              'Дэлгэрэнгүй мэдээллийг менежерээсээ авна уу.',
-              textAlign: TextAlign.center,
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogCtx),
-                child: const Text('Ойлголоо'),
-              ),
-            ],
-          ),
-        );
-      }
+      await _ankhaaruulya();
     } finally {
       // Runs even if the dialog could not be built — the session must end
       // either way.
@@ -186,6 +208,14 @@ class _ErkhKhamgaalagchState extends ConsumerState<ErkhKhamgaalagch>
       if (!tsutslagdsan) return;
       ref.read(erkhTsutslagdsanProvider.notifier).state = false;
       _erkhUstsan();
+    });
+
+    // Апп нээх үед илэрсэн тохиолдол — сешн нь `checkAuth` дотор аль хэдийн
+    // тасарсан тул зөвхөн анхааруулна.
+    ref.listen<bool>(erkhUstsanMedegdekhProvider, (_, ustsan) {
+      if (!ustsan) return;
+      ref.read(erkhUstsanMedegdekhProvider.notifier).state = false;
+      _ankhaaruulya();
     });
 
     return widget.child;

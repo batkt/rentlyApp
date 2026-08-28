@@ -47,13 +47,26 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
     }
   }
 
-  Future<bool> verifyPayment(String invoiceId) async {
+  /// Шалгалт нь `zakhialgiinDugaar`-аар явна — QPay-н callback болон
+  /// `qpay/<org>/<id>` сокетийн өрөө хоёулаа түүгээр түлхүүрлэгддэг.
+  Future<bool> verifyPayment(QpayInvoiceModel invoice) async {
     final user = _ref.read(currentUserProvider);
-    if (user == null) return false;
+    final zakhialgiinDugaar = invoice.zakhialgiinDugaar;
+    if (user == null ||
+        zakhialgiinDugaar == null ||
+        zakhialgiinDugaar.isEmpty) {
+      return false;
+    }
 
     state = state.copyWith(isVerifying: true);
     try {
-      final paid = await _repo.verifyPayment(invoiceId, user.barilgiinId);
+      final paid = await _repo.verifyPayment(
+        baiguullagiinId: user.baiguullagiinId,
+        barilgiinId: invoice.barilgiinId.isNotEmpty
+            ? invoice.barilgiinId
+            : user.barilgiinId,
+        zakhialgiinDugaar: zakhialgiinDugaar,
+      );
       state = state.copyWith(isVerifying: false, isPaid: paid);
       return paid;
     } catch (_) {

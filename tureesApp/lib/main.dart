@@ -25,7 +25,12 @@ void main() async {
   );
 
   final container = ProviderContainer();
-  await container.read(authStateProvider.notifier).checkAuth();
+  // Бүртгэл нь устсан байвал `checkAuth` сешнийг тасалдаг — анхааруулгыг нь
+  // эхний фрэйм дээр ErkhKhamgaalagch үзүүлэхийн тулд тугийг нь асаана.
+  await container.read(authStateProvider.notifier).checkAuth(
+        erkhUstsan: () =>
+            container.read(erkhUstsanMedegdekhProvider.notifier).state = true,
+      );
 
   runApp(
     UncontrolledProviderScope(

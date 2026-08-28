@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/socket/socket_service.dart';
+import '../../../core/constants/api_constants.dart';
 import '../../../data/models/payment_model.dart';
 import '../../providers/payment_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -25,47 +25,42 @@ class QpayScreen extends ConsumerStatefulWidget {
 }
 
 class _QpayScreenState extends ConsumerState<QpayScreen> with SingleTickerProviderStateMixin {
-  Timer? _pollTimer;
   late AnimationController _pulseController;
-  bool _isCheckingPayment = false;
   bool _paymentDone = false;
+
+  /// initState-д тогтоож, dispose-д ашиглана — `ref` тэр үед найдваргүй.
+  String? _tulultUzegdel;
+  SocketService? _sokhet;
 
   @override
   void initState() {
     super.initState();
     _pulseController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))..repeat(reverse: true);
-    _startPolling();
 
     final user = ref.read(currentUserProvider);
     final room = _qpayRoomId;
     if (user != null && room != null) {
-      ref.read(socketServiceProvider).joinQpayRoom(user.baiguullagiinId, room);
-      ref.read(socketServiceProvider).on('qpaySuccess', (_) => _onPaymentConfirmed());
+      // Backend нь төлбөрийн callback дээрээ `qpay/<org>/<zakhialgiinDugaar>`
+      // НЭРТЭЙ эвент цацдаг (`io.emit` — өрөө рүү биш бүгд рүү). Апп нь
+      // `'qpaySuccess'` гэсэн, backend хэзээ ч цацдаггүй эвентийг сонсдог
+      // байсан тул сокетоор төлбөр огт илэрдэггүй байв.
+      _sokhet = ref.read(socketServiceProvider);
+      _tulultUzegdel = SocketEvents.qpayRoom(user.baiguullagiinId, room);
+      _sokhet!.joinQpayRoom(user.baiguullagiinId, room);
+      _sokhet!.on(_tulultUzegdel!, _tulultSonsogch);
     }
   }
 
+  void _tulultSonsogch(dynamic _) => _onPaymentConfirmed();
+
   /// The backend emits `qpay/<baiguullagiinId>/<zakhialgiinDugaar>` from its
-  /// payment callback, so the room has to be keyed on the order number. It was
-  /// joining on the QPay invoice id, which never matches — leaving the 5s poll
-  /// as the only way a payment was noticed.
+  /// payment callback, so the room has to be keyed on the order number.
   String? get _qpayRoomId =>
       widget.invoice.zakhialgiinDugaar ?? widget.invoice.invoiceId;
 
-  void _startPolling() {
-    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
-      if (!mounted || _isCheckingPayment) return;
-      if (widget.invoice.invoiceId == null) return;
-      setState(() => _isCheckingPayment = true);
-      final paid = await ref.read(paymentNotifierProvider.notifier).verifyPayment(widget.invoice.invoiceId!);
-      if (mounted) setState(() => _isCheckingPayment = false);
-      if (paid) _onPaymentConfirmed();
-    });
-  }
-
   void _onPaymentConfirmed() {
-    if (_paymentDone) return; // socket and poll can both fire
+    if (_paymentDone) return; // socket push and the manual check can both fire
     _paymentDone = true;
-    _pollTimer?.cancel();
     ref.read(paymentNotifierProvider.notifier).markPaid();
     // Everything that quotes a balance is now stale.
     ref.invalidate(agreementsProvider);
@@ -96,13 +91,10 @@ class _QpayScreenState extends ConsumerState<QpayScreen> with SingleTickerProvid
 
   @override
   void dispose() {
-    _pollTimer?.cancel();
     _pulseController.dispose();
-    final user = ref.read(currentUserProvider);
-    final room = _qpayRoomId;
-    if (user != null && room != null) {
-      ref.read(socketServiceProvider).leaveQpayRoom(user.baiguullagiinId, room);
-      ref.read(socketServiceProvider).off('qpaySuccess');
+    final uzegdel = _tulultUzegdel;
+    if (_sokhet != null && uzegdel != null) {
+      _sokhet!.off(uzegdel, _tulultSonsogch);
     }
     super.dispose();
   }
@@ -125,13 +117,6 @@ class _QpayScreenState extends ConsumerState<QpayScreen> with SingleTickerProvid
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => context.pop(),
         ),
-        actions: [
-          if (_isCheckingPayment)
-            const Padding(
-              padding: EdgeInsets.only(right: 16),
-              child: Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))),
-            ),
-        ],
       ),
       body: Align(
         alignment: Alignment.topCenter,
@@ -398,9 +383,9 @@ class _QpayScreenState extends ConsumerState<QpayScreen> with SingleTickerProvid
   }
 
   Future<void> _checkPayment() async {
-    final invoiceId = widget.invoice.invoiceId;
-    if (invoiceId == null) return;
-    final paid = await ref.read(paymentNotifierProvider.notifier).verifyPayment(invoiceId);
+    final paid = await ref
+        .read(paymentNotifierProvider.notifier)
+        .verifyPayment(widget.invoice);
     if (!mounted) return;
     if (paid) {
       _onPaymentConfirmed();
