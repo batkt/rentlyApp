@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../data/models/agreement_model.dart';
+import '../../../data/models/user_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/agreement_provider.dart';
 import '../../widgets/cards/agreement_card.dart';
@@ -56,6 +57,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               ),
             ),
             SliverToBoxAdapter(child: _buildFilterTabs(filter, hPad)),
+            if (_medeelelZurson(user, agreementsAsync.valueOrNull))
+              SliverToBoxAdapter(child: _buildZuruuSanuulga(hPad)),
             _buildAgreementsList(agreementsAsync, hPad),
           ],
         ),
@@ -367,6 +370,66 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     if (batalgaa != true) return;
     await ref.read(authStateProvider.notifier).logout();
     if (mounted) context.go('/login');
+  }
+
+  /// Гэрээг харилцагчийн бүртгэлээр биш, гэрээн дээрх регистр/утсаар хайдаг.
+  /// Тиймээс бүртгэлийн мэдээлэл зөрсөн үед өөр хүний гэрээ харагдах эрсдэлтэй.
+  ///
+  /// Тусгайлан холбож өгсөн гэрээг (gereeniiIdnuud) шалгахгүй — нэмэлт
+  /// хэрэглэгчийн утас гэрээн дээр байхгүй байх нь хэвийн. Үлдсэн гэрээнүүдийн
+  /// АЛЬ Ч дээр хэрэглэгчийн утас байхгүй бол л сануулна; заримд нь таарч
+  /// байвал (гэр бүлийн өөр дугаар гэх мэт) хэвийн гэж үзнэ.
+  bool _medeelelZurson(UserModel? user, List<AgreementModel>? agreements) {
+    if (user == null || agreements == null || agreements.isEmpty) return false;
+
+    final utasnuud = user.utas
+        .map((u) => u.trim())
+        .where((u) => u.isNotEmpty)
+        .toSet();
+    if (utasnuud.isEmpty) return false;
+
+    final kholbosonIdnuud = user.gereeniiIdnuud.toSet();
+    final shalgakh =
+        agreements.where((a) => !kholbosonIdnuud.contains(a.id)).toList();
+    if (shalgakh.isEmpty) return false;
+
+    return shalgakh.every(
+      (a) => !a.utas.any((u) => utasnuud.contains(u.trim())),
+    );
+  }
+
+  Widget _buildZuruuSanuulga(double hPad) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(hPad, 4, hPad, 0),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.amber.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.warning_amber_rounded,
+                size: 20, color: Colors.amber),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Систем дээрх харилцагчийн мэдээлэл зөрж байна. Доорх гэрээ '
+                'таны бүртгэлтэй тохирохгүй байж болзошгүй тул менежертэйгээ '
+                'холбогдоно уу.',
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.4,
+                  color: context.appTextPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildFilterTabs(int? currentFilter, double hPad) {

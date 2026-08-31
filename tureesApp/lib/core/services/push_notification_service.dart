@@ -131,13 +131,32 @@ class PushNotificationService {
   /// caller can persist it (e.g. save it on the logged-in tenant's record).
   /// Also keeps it up to date if Firebase rotates the token later.
   Future<void> registerToken(Future<void> Function(String token) onToken) async {
-    if (!_initialized) return;
+    // Өмнө нь `if (!_initialized) return;` гэж ЧИМЭЭГҮЙ буцдаг байсан.
+    // `init()` нэг ч удаа унавал (сүлжээ, Play Services) тэр сессийн турш
+    // токен хэзээ ч бүртгэгдэхгүй, апп нь бүрэн ажиллаж байгаа мэт
+    // харагддаг — «мэдэгдэл ирэхгүй байна» гэдгийн шалтгаан нь энэ байж
+    // болно. Одоо дахин эхлүүлэхийг оролдоно.
+    if (!_initialized) {
+      debugPrint('[FCM] init хийгдээгүй тул дахин оролдож байна');
+      await init();
+    }
+    if (!_initialized) {
+      debugPrint('[FCM] init амжилтгүй — токен бүртгэгдэхгүй');
+      return;
+    }
     try {
       final token = await FirebaseMessaging.instance.getToken();
-      if (token != null) await onToken(token);
+      if (token == null) {
+        // Google Play Services байхгүй/хуучирсан төхөөрөмж дээр (жишээ нь
+        // Huawei) getToken үргэлж null буцаана — FCM тэнд ажиллахгүй.
+        debugPrint('[FCM] getToken null буцаалаа — push ажиллахгүй');
+        return;
+      }
+      debugPrint('[FCM] токен авлаа: ${token.substring(0, 12)}…');
+      await onToken(token);
       FirebaseMessaging.instance.onTokenRefresh.listen(onToken);
     } catch (e) {
-      debugPrint('PushNotificationService.registerToken failed: $e');
+      debugPrint('[FCM] registerToken амжилтгүй: $e');
     }
   }
 }

@@ -1,11 +1,11 @@
 class ApiConstants {
   // production
-  // static const String serverKhayag = 'https://turees.zevtabs.mn';
-  // static const String baseUrl = '$serverKhayag/api';
+  static const String serverKhayag = 'https://turees.zevtabs.mn';
+  static const String baseUrl = '$serverKhayag/api';
 
   // test rently
-  static const String serverKhayag = 'https://rently.zevtabs.mn';
-  static const String baseUrl = '$serverKhayag/api';
+  // static const String serverKhayag = 'https://rently.zevtabs.mn';
+  // static const String baseUrl = '$serverKhayag/api';
 
   // test — шууд IP (nginx-гүй тул /api дагавар байхгүй)
   // static const String serverKhayag = 'http://103.236.194.26:8081';
