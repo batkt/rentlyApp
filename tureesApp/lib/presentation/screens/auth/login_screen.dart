@@ -990,7 +990,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         ),
         const SizedBox(height: 4),
         Text(
-          'v3.0.6',
+          'v3.0.7',
           style: TextStyle(
             fontSize: 11,
             color: isDark ? const Color(0xFF334155) : AppColors.textTertiary,

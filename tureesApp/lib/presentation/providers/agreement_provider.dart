@@ -30,16 +30,20 @@ final agreementsProvider = FutureProvider<List<AgreementModel>>((ref) async {
   // зөвхөн ШИНЭ нэхэмжлэх үүсэхэд л өөрчлөгддөг байв. QPay төлөлт мөн
   // үүнээс болж үлдэгдлийг бууруулж харагдахгүй байсан.
   //
-  // getUldegdel нь ognoo-г [null, +2 жил] өгдөг тул урьдчилж бичигдсэн
-  // ирээдүйн зардлууд ч ороод, getNiitUldegdel дээр нь алдангийг нэмнэ —
-  // өөрөөр хэлбэл нэхэмжлэхийн нийт дүнтэй ижил утга гарна.
+  // getUldegdel нь ognoo-д өнөөдрийн огноог өгдөг ба backend түүнийг сарын
+  // эцэс болгож тайрдаг — веб дээрх bulkUldegdelBodyo-гийн анхны цонхтой
+  // яг ижил. getNiitUldegdel дээр нь алдангийг нэмнэ.
+  //
+  // Сөрөг утгыг 0 болгож дарахгүй: илүү төлсөн үед түрээслэгч өөрийн
+  // кредитээ харах ёстой. AppFormatters.balance сөрөг дүнг "-X₮" гэж,
+  // balanceColor ногооноор зөв үзүүлдэг.
   final results = await Future.wait(agreements.map((a) async {
     try {
       final niitUldegdel = await repo.getNiitUldegdel(
         a.gereeniiDugaar,
         a.barilgiinId,
       );
-      return a.copyWith(uldegdel: niitUldegdel > 0 ? niitUldegdel : 0);
+      return a.copyWith(uldegdel: niitUldegdel);
     } catch (_) {
       return a;
     }

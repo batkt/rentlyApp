@@ -14,6 +14,10 @@ class NotificationModel {
   final String? createdAt;
   final String? gereeniiId;
 
+  /// Менежер (ажилтан) үүсгэсэн бол дүүрдэг. Түрээслэгч өөрөө илгээсэн
+  /// хүсэлт/дуудлагад байхгүй — [uuriinIlgeesenKhuselt] үүгээр ялгана.
+  final String? ajiltniiId;
+
   const NotificationModel({
     required this.id,
     required this.title,
@@ -25,7 +29,18 @@ class NotificationModel {
     this.duudlagiinTurul,
     this.createdAt,
     this.gereeniiId,
+    this.ajiltniiId,
   });
+
+  /// Түрээслэгч өөрөө илгээсэн бичлэг үү? Эдгээр нь менежерт (turees) очих
+  /// зорилготой ба ижил `khariltsagchiinId`-тайгаа буцаж ирдэг тул
+  /// түрээслэгчийн мэдэгдлийн жагсаалтад орох ёсгүй.
+  /// tureesShine-ий `uuriinIlgeesenKhuselt`-тэй ижил дүрэм.
+  bool get uuriinIlgeesenKhuselt {
+    if ((ajiltniiId ?? '').isNotEmpty) return false;
+    return const {'duudlaga', 'sanal', 'gomdol', 'sanalKhuselt'}
+        .contains(turul);
+  }
 
   bool get isUnread => tuluv == 0;
 
@@ -76,6 +91,7 @@ class NotificationModel {
       duudlagiinTurul: json['duudlagiinTurul']?.toString(),
       createdAt: (json['createdAt'] ?? json['ognoo'])?.toString(),
       gereeniiId: json['gereeniiId']?.toString(),
+      ajiltniiId: json['ajiltniiId']?.toString(),
     );
   }
 }

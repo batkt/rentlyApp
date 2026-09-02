@@ -115,11 +115,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final isLoggedIn = await _storage.isLoggedIn();
       if (isLoggedIn) {
         final tuluv = await _repo.khereglegchShalgaya();
-        if (tuluv == KhereglegchiinTuluv.ustsan) {
+        if (tuluv == KhereglegchiinTuluv.ustsan ||
+            tuluv == KhereglegchiinTuluv.khugatsaaDuussan) {
           _socket.disconnect();
           await _storage.clearAll();
           state = const AuthState();
-          erkhUstsan?.call();
+          // Зөвхөн үнэхээр эрх нь устсан үед анхааруулна. Токены хугацаа
+          // дуусах нь хэвийн зүйл — чимээгүй гарган нэвтрэх дэлгэц рүү
+          // шилжүүлнэ.
+          if (tuluv == KhereglegchiinTuluv.ustsan) erkhUstsan?.call();
           return;
         }
         final user = await _repo.getUserByToken();
@@ -246,10 +250,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// here redirects to /login on the next frame, which tore down the warning
   /// dialog before the user could read it. [ErkhKhamgaalagch] warns first,
   /// then calls [logout].
-  Future<bool> erkhUstsanEsekhShalgaya() async {
-    if (!state.isAuthenticated) return false;
-    final tuluv = await _repo.khereglegchShalgaya();
-    return tuluv == KhereglegchiinTuluv.ustsan;
+  Future<KhereglegchiinTuluv> khereglegchiinTuluvShalgaya() async {
+    if (!state.isAuthenticated) return KhereglegchiinTuluv.baina;
+    return _repo.khereglegchShalgaya();
   }
 
   Future<void> logout() async {

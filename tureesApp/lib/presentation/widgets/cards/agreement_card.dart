@@ -168,6 +168,22 @@ class AgreementCard extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
+                        // Алданги нь дээрх нийт үлдэгдэл дотор аль хэдийн
+                        // багтсан ч тусад нь харагддаггүй байсан. Барьцааны
+                        // үлдэгдэл нь тусдаа сан тул мэдээлэл болгон харуулна.
+                        if (agreement.aldangiinUldegdel > 0 ||
+                            agreement.baritsaaniiUldegdel > 0) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            [
+                              if (agreement.aldangiinUldegdel > 0)
+                                'Алданги ${AppFormatters.currency(agreement.aldangiinUldegdel)}',
+                              if (agreement.baritsaaniiUldegdel > 0)
+                                'Барьцаа ${AppFormatters.currency(agreement.baritsaaniiUldegdel)}',
+                            ].join('  ·  '),
+                            style: theme.textTheme.labelSmall,
+                          ),
+                        ],
                       ],
                     ),
                   ),

@@ -77,11 +77,16 @@ class AgreementRepository {
     // Without an ognoo range, the backend caps this to "as of right now",
     // excluding pre-billed future-dated charges a just-generated invoice
     // already includes (tureesBack controller/tulbur.js uldegdelBodyo).
-    final farFuture = DateTime.now().add(const Duration(days: 730)).toIso8601String();
+    // It applies moment(ognoo[1]).endOf("month") to whatever we send, so
+    // today's date already reaches end-of-this-month — the same cut-off
+    // bulkUldegdelBodyo uses by default for the web list. Sending a date
+    // further out folds in every future month's scheduled charge and bills
+    // the tenant for rent that is not due yet.
+    final asOf = DateTime.now().toIso8601String();
     final res = await _client.post(ApiConstants.uldegdelBodyo, data: {
       'gereeniiDugaar': gereeniiDugaar,
       'barilgiinId': barilgiinId,
-      'ognoo': [null, farFuture],
+      'ognoo': [null, asOf],
     });
     return res.data as Map<String, dynamic>;
   }

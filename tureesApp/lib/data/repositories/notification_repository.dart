@@ -43,7 +43,13 @@ class NotificationRepository {
       'khuudasniiKhemjee': pageSize,
     });
     final list = (res.data['jagsaalt'] as List?) ?? [];
-    return list.map((e) => NotificationModel.fromJson(e)).toList();
+    // Түрээслэгчийн өөрийнх нь илгээсэн дуудлага/хүсэлт нь менежерт (turees)
+    // зориулагдсан ба ижил `khariltsagchiinId`-тайгаа буцаж ирдэг тул энд
+    // хасна — эс тэгвээс өөрийн илгээсэн зүйл өөрт нь мэдэгдэл болж харагдана.
+    return list
+        .map((e) => NotificationModel.fromJson(e))
+        .where((n) => !n.uuriinIlgeesenKhuselt)
+        .toList();
   }
 
   /// Submit a tenant request/complaint (Санал хүсэлт / Гомдол) via /sanalKhadgalya,

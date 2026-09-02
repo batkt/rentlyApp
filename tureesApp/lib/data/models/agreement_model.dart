@@ -26,6 +26,12 @@ class AgreementModel {
   /// callback back to this contract.
   final String? dans;
 
+  /// Алданги ба барьцааны үлдэгдэл. [uldegdel] дотор алданги аль хэдийн
+  /// нэмэгдсэн байдаг (getNiitUldegdel) тул эдгээрийг зөвхөн задаргаа
+  /// харуулахад ашиглана — нийт дүн дээр дахин нэмж БОЛОХГҮЙ.
+  final double aldangiinUldegdel;
+  final double baritsaaniiUldegdel;
+
   const AgreementModel({
     required this.id,
     required this.gereeniiDugaar,
@@ -47,6 +53,8 @@ class AgreementModel {
     required this.avlaga,
     required this.zardluud,
     this.duusakhOgnoo,
+    this.aldangiinUldegdel = 0,
+    this.baritsaaniiUldegdel = 0,
     this.zurguud = const [],
     this.dans,
   });
@@ -67,7 +75,11 @@ class AgreementModel {
   bool get isActive => tuluv == 1;
   bool get hasDebt => uldegdel > 0;
 
-  AgreementModel copyWith({double? uldegdel, List<dynamic>? zurguud}) {
+  AgreementModel copyWith({
+    double? uldegdel,
+    double? aldangiinUldegdel,
+    List<dynamic>? zurguud,
+  }) {
     return AgreementModel(
       id: id,
       gereeniiDugaar: gereeniiDugaar,
@@ -81,6 +93,8 @@ class AgreementModel {
       khugatsaa: khugatsaa,
       tuluv: tuluv,
       uldegdel: uldegdel ?? this.uldegdel,
+      aldangiinUldegdel: aldangiinUldegdel ?? this.aldangiinUldegdel,
+      baritsaaniiUldegdel: baritsaaniiUldegdel,
       baiguullagiinId: baiguullagiinId,
       barilgiinId: barilgiinId,
       davkhar: davkhar,
@@ -108,6 +122,10 @@ class AgreementModel {
       khugatsaa: json['khugatsaa'] != null ? int.tryParse(json['khugatsaa'].toString()) : null,
       tuluv: int.tryParse(json['tuluv']?.toString() ?? '0') ?? 0,
       uldegdel: double.tryParse(json['uldegdel']?.toString() ?? '0') ?? 0.0,
+      aldangiinUldegdel:
+          double.tryParse(json['aldangiinUldegdel']?.toString() ?? '0') ?? 0.0,
+      baritsaaniiUldegdel:
+          double.tryParse(json['baritsaaniiUldegdel']?.toString() ?? '0') ?? 0.0,
       baiguullagiinId: json['baiguullagiinId']?.toString() ?? '',
       barilgiinId: json['barilgiinId']?.toString() ?? '',
       davkhar: json['davkhar']?.toString(),

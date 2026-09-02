@@ -11,7 +11,7 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 });
 
 /// Account state as the server sees it.
-enum KhereglegchiinTuluv { baina, ustsan, todorkhoigui }
+enum KhereglegchiinTuluv { baina, ustsan, khugatsaaDuussan, todorkhoigui }
 
 class AuthRepository {
   final DioClient _client;
@@ -118,6 +118,14 @@ class AuthRepository {
       return KhereglegchiinTuluv.baina;
     } on DioException catch (e) {
       final code = e.response?.statusCode;
+      // Хугацаа дууссан токеныг backend тусад нь ялгаж өгдөг
+      // (tureesBack middlewares/aldaaBarigch.js -> aldaaTurul "jwt_expired").
+      // Үүнийг "эрх устсан" гэж үзвэл идэвхтэй хэрэглэгч апп нээх бүрдээ
+      // "Таны эрх устгагдсан байна" гэсэн буруу анхааруулга хүлээж авна.
+      final data = e.response?.data;
+      if (data is Map && data['aldaaTurul'] == 'jwt_expired') {
+        return KhereglegchiinTuluv.khugatsaaDuussan;
+      }
       if (code == 401 || code == 403 || code == 404) {
         return KhereglegchiinTuluv.ustsan;
       }

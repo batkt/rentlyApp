@@ -7,6 +7,7 @@ import '../../../core/network/dio_client.dart';
 import '../../../core/socket/socket_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/user_model.dart';
+import '../../../data/repositories/auth_repository.dart';
 import '../../../routing/app_router.dart';
 import '../../providers/auth_provider.dart';
 
@@ -127,11 +128,33 @@ class _ErkhKhamgaalagchState extends ConsumerState<ErkhKhamgaalagch>
     if (!ref.read(authStateProvider).isAuthenticated) return;
     _shalgaj = true;
     try {
-      final ustsan =
-          await ref.read(authStateProvider.notifier).erkhUstsanEsekhShalgaya();
-      if (ustsan) await _erkhUstsan();
+      final tuluv = await ref
+          .read(authStateProvider.notifier)
+          .khereglegchiinTuluvShalgaya();
+      if (tuluv == KhereglegchiinTuluv.ustsan) {
+        await _erkhUstsan();
+      } else if (tuluv == KhereglegchiinTuluv.khugatsaaDuussan) {
+        await _khugatsaaDuussan();
+      }
     } finally {
       _shalgaj = false;
+    }
+  }
+
+  /// Токены хугацаа дуусах нь эрх цуцлагдсан гэсэн үг биш — хэвийн зүйл.
+  /// Тиймээс "Таны эрх устгагдсан байна" гэж айлгалгүй, сешнийг чимээгүй
+  /// тасалж нэвтрэх дэлгэц рүү буцаана.
+  Future<void> _khugatsaaDuussan() async {
+    if (_medegdejBaina) return;
+    if (!ref.read(authStateProvider).isAuthenticated) return;
+    _medegdejBaina = true;
+    _tseag?.cancel();
+    _tseag = null;
+    final auth = ref.read(authStateProvider.notifier);
+    try {
+      await auth.logout();
+    } finally {
+      _medegdejBaina = false;
     }
   }
 

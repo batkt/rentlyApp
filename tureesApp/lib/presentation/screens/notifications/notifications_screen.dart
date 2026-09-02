@@ -99,9 +99,14 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       constraints: BoxConstraints(
         maxWidth: MediaQuery.sizeOf(context).width > 600 ? 560 : double.infinity,
+        // Өндрийг хязгаарлахгүй бол хуудас агуулгынхаа хэмжээгээр ургаж,
+        // гар гарч ирэхэд "Илгээх" товч дэлгэцнээс гарч, дотоод
+        // SingleChildScrollView гүйлгэх зайгүй болдог.
+        maxHeight: MediaQuery.sizeOf(context).height * 0.9,
       ),
       builder: (ctx) => _RequestFormSheet(
         initialTurul: initialTurul,
@@ -592,11 +597,17 @@ class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.fromLTRB(24, 20, 24, MediaQuery.of(context).viewInsets.bottom + 24),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      // Гарыг хаах хоёр арга: маягтын хоосон хэсэгт дарах, эсвэл гүйлгэх.
+      // Үүнгүйгээр гар хаагдахгүй тул "Илгээх" товч дарагдахгүй байсан.
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: SingleChildScrollView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             Row(
               children: [
                 Text('Шинэ хүсэлт', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
@@ -692,6 +703,7 @@ class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
