@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -36,6 +38,26 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   String _khariltsagchId = '';
   String _recoveryToken = '';
 
+  // Код дахин илгээх хүртэл үлдсэн секунд. Сервер 60 секундын завсар тавьдаг
+  // (sergeekhKodAvya), товчийг мөн тэр хугацаанд идэвхгүй болгоно — эс тэгвээс
+  // дараалж дарахад харилцагч руу дараалсан SMS очно.
+  static const int _dakhinIlgeekhSekund = 60;
+  int _uldsenSekund = 0;
+  Timer? _tooluur;
+
+  void _tooluurEkhluuley() {
+    _tooluur?.cancel();
+    setState(() => _uldsenSekund = _dakhinIlgeekhSekund);
+    _tooluur = Timer.periodic(const Duration(seconds: 1), (tooluur) {
+      if (!mounted) {
+        tooluur.cancel();
+        return;
+      }
+      setState(() => _uldsenSekund--);
+      if (_uldsenSekund <= 0) tooluur.cancel();
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -46,6 +68,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
 
   @override
   void dispose() {
+    _tooluur?.cancel();
     _phoneController.dispose();
     _otpController.dispose();
     _newPasswordController.dispose();
@@ -67,6 +90,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
         _khariltsagchId = id;
         _step = _Step.otp;
       });
+      _tooluurEkhluuley();
       if (mounted) {
         showAppSnackBar(context, 'Сэргээх код утсанд илгээлээ', turul: SnackTurul.amjilt);
       }
@@ -256,8 +280,13 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
         ),
         const SizedBox(height: 12),
         TextButton(
-          onPressed: _isLoading ? null : _sendCode,
-          child: const Text('Код дахин илгээх', style: TextStyle(fontSize: 13)),
+          onPressed: (_isLoading || _uldsenSekund > 0) ? null : _sendCode,
+          child: Text(
+            _uldsenSekund > 0
+                ? 'Код дахин илгээх ($_uldsenSekund сек)'
+                : 'Код дахин илгээх',
+            style: const TextStyle(fontSize: 13),
+          ),
         ),
         const SizedBox(height: 16),
         AppButton(
