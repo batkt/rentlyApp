@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/constants/api_constants.dart';
 import '../../../core/socket/socket_service.dart';
+import '../../../data/models/agreement_model.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/notification_model.dart';
 import '../../providers/agreement_provider.dart';
@@ -51,7 +55,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _uldegdelSergeekhTimer?.cancel();
+    _uldegdliinSonsogchdiigSalgaya();
     super.dispose();
+  }
+
+  /// Одоо сонсож буй гэрээнүүд. HomeScreen нь бүх табын бүрхүүл тул сонсогчийг
+  /// энд нэг л удаа барина — тухайн үед аль дэлгэц нээлттэй байгаагаас
+  /// үл хамааран үлдэгдэл харуулдаг БҮХ дэлгэц шинэчлэгдэнэ.
+  final Set<String> _sonsogdozBuiGeree = {};
+
+  void _uldegdliinSonsogchdiigTokhiruulya(List<String> gereeniiIdnuud) {
+    final socket = ref.read(socketServiceProvider);
+    final shine = gereeniiIdnuud.where((id) => id.isNotEmpty).toSet();
+
+    for (final id in _sonsogdozBuiGeree.difference(shine)) {
+      socket.off(SocketEvents.gereeniiUldegdel(id), _uldegdelSoligdloo);
+    }
+    for (final id in shine.difference(_sonsogdozBuiGeree)) {
+      socket.on(SocketEvents.gereeniiUldegdel(id), _uldegdelSoligdloo);
+    }
+    _sonsogdozBuiGeree
+      ..clear()
+      ..addAll(shine);
+  }
+
+  void _uldegdliinSonsogchdiigSalgaya() {
+    final socket = ref.read(socketServiceProvider);
+    for (final id in _sonsogdozBuiGeree) {
+      socket.off(SocketEvents.gereeniiUldegdel(id), _uldegdelSoligdloo);
+    }
+    _sonsogdozBuiGeree.clear();
+  }
+
+  /// Менежер хэд хэдэн төлөлтийг дараалан бүртгэхэд дохио бөөгнөрч ирдэг тул
+  /// богино завсраар нэгтгэнэ — эс тэгвээс гэрээ бүрийн үлдэгдлийг дахин
+  /// дахин татна.
+  Timer? _uldegdelSergeekhTimer;
+
+  void _uldegdelSoligdloo(dynamic _) {
+    if (!mounted) return;
+    _uldegdelSergeekhTimer?.cancel();
+    _uldegdelSergeekhTimer = Timer(const Duration(milliseconds: 800), () {
+      if (mounted) uldegdliigSergeekh(ref);
+    });
   }
 
   @override
@@ -95,6 +142,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
   @override
   Widget build(BuildContext context) {
+    // Гэрээний жагсаалт өөрчлөгдөх бүрд сонсогчдоо шинэчилнэ (шинэ гэрээ
+    // нэмэгдэх, барилга солигдох гэх мэт).
+    ref.listen<AsyncValue<List<AgreementModel>>>(agreementsProvider,
+        (previous, next) {
+      final jagsaalt = next.valueOrNull;
+      if (jagsaalt == null || !mounted) return;
+      _uldegdliinSonsogchdiigTokhiruulya(
+        jagsaalt.map((a) => a.id).toList(),
+      );
+    });
+    final gereenuud = ref.watch(agreementsProvider).valueOrNull;
+    if (gereenuud != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _uldegdliinSonsogchdiigTokhiruulya(
+            gereenuud.map((a) => a.id).toList(),
+          );
+        }
+      });
+    }
     final currentIndex = ref.watch(_navIndexProvider);
     final unreadCount = ref.watch(unreadCountProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;

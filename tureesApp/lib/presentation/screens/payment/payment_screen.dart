@@ -30,6 +30,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   final _amountController = TextEditingController();
   AgreementModel? _selectedAgreement;
   double? _realUldegdel;
+  /// Хамгийн сүүлд автоматаар бөглөсөн дүн. Хэрэглэгч дүнгээ өөрчлөөгүй л бол
+  /// шинэ үлдэгдлээр дарж бичнэ — өмнө нь зөвхөн хоосон талбарыг бөглөдөг
+  /// байсан тул менежер төлбөр бүртгэсэн ч "төлөх дүн" хуучнаараа үлддэг байв.
+  String? _avtomatDun;
   String? _dansniiDugaar;
   bool _loadingUldegdel = false;
   bool _autoSelectDone = false;
@@ -89,8 +93,13 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             : agreement.dans;
         _loadingUldegdel = false;
       });
-      if ((uldegdel ?? 0) > 0 && _amountController.text.isEmpty) {
-        _amountController.text = _numFmt.format(uldegdel!);
+      final odooginKhemjee = _amountController.text;
+      final khereglegchZasaagui =
+          odooginKhemjee.isEmpty || odooginKhemjee == _avtomatDun;
+      if ((uldegdel ?? 0) > 0 && khereglegchZasaagui) {
+        final shineDun = _numFmt.format(uldegdel!);
+        _amountController.text = shineDun;
+        _avtomatDun = shineDun;
       }
     } catch (_) {
       if (!mounted) return;
@@ -169,6 +178,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       if (previous == null || previous == next || !mounted) return;
       setState(() {
         _amountController.clear();
+        _avtomatDun = null;
         _realUldegdel = null;
       });
       final agreement = _selectedAgreement;

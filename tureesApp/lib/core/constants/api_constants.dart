@@ -119,4 +119,10 @@ class SocketEvents {
   static String orgRoom(String orgId) => 'baiguullaga$orgId';
   static String userRoom(String userId) => 'khariltsagch$userId';
   static String qpayRoom(String orgId, String invoiceId) => 'qpay/$orgId/$invoiceId';
+
+  /// Гэрээний үлдэгдэл өөрчлөгдөхөд сервер цохидог үйл явдал. Менежер turees
+  /// админ дээр төлөлт бүртгэх/устгах, эсвэл QPay төлөлт бүртгэгдэхэд ирнэ
+  /// (tureesBack: controller/tulbur.js `uldegdelSoligdloo`).
+  static String gereeniiUldegdel(String gereeniiId) =>
+      'gereeniiUldegdel$gereeniiId';
 }
