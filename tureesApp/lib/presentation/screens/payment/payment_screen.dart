@@ -174,6 +174,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       final agreement = _selectedAgreement;
       if (agreement != null) _fetchRealUldegdel(agreement);
     });
+    // `_realUldegdel` нь энэ State дотор хадгалагддаг ба уг дэлгэц
+    // IndexedStack дотор амьд үлддэг тул таб сольж эргэж ирэхэд `initState`
+    // ажиллахгүй. Кэш хаягдах бүрд дүнгээ дахин асууна.
+    ref.listen<int>(uldegdelSergeeltProvider, (previous, next) {
+      if (previous == null || previous == next || !mounted) return;
+      final agreement = _selectedAgreement;
+      if (agreement != null) _fetchRealUldegdel(agreement);
+    });
     final paymentState = ref.watch(paymentNotifierProvider);
     final agreementsAsync = ref.watch(agreementsProvider);
 

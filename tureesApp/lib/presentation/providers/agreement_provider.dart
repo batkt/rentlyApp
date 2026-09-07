@@ -53,19 +53,19 @@ final agreementsProvider = FutureProvider<List<AgreementModel>>((ref) async {
 
 final selectedAgreementProvider = StateProvider<AgreementModel?>((ref) => null);
 
-final agreementDetailProvider = FutureProvider.family<AgreementModel?, String>((ref, id) async {
+final agreementDetailProvider = FutureProvider.autoDispose.family<AgreementModel?, String>((ref, id) async {
   final repo = ref.read(agreementRepositoryProvider);
   return repo.getAgreementById(id);
 });
 
-final agreementBalanceProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, gereeniiDugaar) async {
+final agreementBalanceProvider = FutureProvider.autoDispose.family<Map<String, dynamic>, String>((ref, gereeniiDugaar) async {
   final user = ref.watch(currentUserProvider);
   if (user == null) return {};
   final repo = ref.read(agreementRepositoryProvider);
   return repo.getBalance(gereeniiDugaar, user.barilgiinId);
 });
 
-final invoiceHistoryProvider = FutureProvider.family<List<Map<String, dynamic>>, String>((ref, gereeniiId) async {
+final invoiceHistoryProvider = FutureProvider.autoDispose.family<List<Map<String, dynamic>>, String>((ref, gereeniiId) async {
   final repo = ref.read(agreementRepositoryProvider);
   return repo.getInvoiceHistory(gereeniiId);
 });
@@ -79,7 +79,7 @@ typedef NekhemjlekhBichlegT = ({
 
 /// Every contract's invoices in one list, newest first. A tenant with a dozen
 /// contracts had to open each one separately to see what was billed.
-final bukhNekhemjlekhProvider = FutureProvider<List<NekhemjlekhBichlegT>>((ref) async {
+final bukhNekhemjlekhProvider = FutureProvider.autoDispose<List<NekhemjlekhBichlegT>>((ref) async {
   final agreements = await ref.watch(agreementsProvider.future);
   if (agreements.isEmpty) return [];
   final repo = ref.read(agreementRepositoryProvider);
@@ -112,20 +112,20 @@ final bukhNekhemjlekhProvider = FutureProvider<List<NekhemjlekhBichlegT>>((ref) 
   return bukh;
 });
 
-final uldegdelProvider = FutureProvider.family<Map<String, dynamic>, ({String gereeniiDugaar, String barilgiinId})>((ref, args) async {
+final uldegdelProvider = FutureProvider.autoDispose.family<Map<String, dynamic>, ({String gereeniiDugaar, String barilgiinId})>((ref, args) async {
   final repo = ref.read(agreementRepositoryProvider);
   return repo.getUldegdel(args.gereeniiDugaar, args.barilgiinId);
 });
 
 typedef NiitUldegdelArgs = ({String gereeniiDugaar, String barilgiinId});
 
-final niitUldegdelProvider = FutureProvider.family<double, NiitUldegdelArgs>((ref, args) async {
+final niitUldegdelProvider = FutureProvider.autoDispose.family<double, NiitUldegdelArgs>((ref, args) async {
   final repo = ref.read(agreementRepositoryProvider);
   return repo.getNiitUldegdel(args.gereeniiDugaar, args.barilgiinId);
 });
 
 final transactionHistoryProvider =
-    FutureProvider.family<List<Map<String, dynamic>>, String>((ref, gereeniiId) async {
+    FutureProvider.autoDispose.family<List<Map<String, dynamic>>, String>((ref, gereeniiId) async {
   final repo = ref.read(agreementRepositoryProvider);
   return repo.getTransactionHistory(gereeniiId);
 });
@@ -162,6 +162,29 @@ final barilguudWithAgreementsProvider = FutureProvider<Set<String>>((ref) async 
   final combined = {...all, ...allByReg};
   return combined.map((a) => a.barilgiinId).where((id) => id.isNotEmpty).toSet();
 });
+
+/// Bumped every time the cached payment data is dropped. Screens that keep a
+/// balance in their own `State` — Төлбөрийн таб нь HomeScreen-ий IndexedStack
+/// дотор амьд үлддэг тул `initState` дахин ажиллахгүй — watch this and re-ask
+/// the server instead of showing the amount they fetched once.
+final uldegdelSergeeltProvider = StateProvider<int>((ref) => 0);
+
+/// Drops every cached balance/payment value.
+///
+/// Түрээслэгчийн үлдэгдлийг менежер turees админ дээр өөрчилдөг тул апп руу
+/// ирэх ямар ч дохио байхгүй. Кэшийг зориудаар хаяхгүй бол хэрэглэгч
+/// системээс гарч дахин нэвтрэх хүртэл хуучин дүнгээ хардаг байсан.
+void uldegdliigSergeekh(WidgetRef ref) {
+  ref.invalidate(agreementsProvider);
+  ref.invalidate(agreementDetailProvider);
+  ref.invalidate(agreementBalanceProvider);
+  ref.invalidate(invoiceHistoryProvider);
+  ref.invalidate(transactionHistoryProvider);
+  ref.invalidate(niitUldegdelProvider);
+  ref.invalidate(uldegdelProvider);
+  ref.invalidate(bukhNekhemjlekhProvider);
+  ref.read(uldegdelSergeeltProvider.notifier).state++;
+}
 
 // Mutable state for zurguud (files) of the currently opened agreement
 final agreementZurguudProvider = StateProvider.family<List<dynamic>, String>((ref, agreementId) => []);

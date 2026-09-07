@@ -70,15 +70,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     socket.joinUserRoom(user.id);
 
     if (!mounted) return;
-    ref.invalidate(agreementsProvider);
-    ref.invalidate(agreementDetailProvider);
-    ref.invalidate(invoiceHistoryProvider);
-    ref.invalidate(transactionHistoryProvider);
-    ref.invalidate(niitUldegdelProvider);
-    ref.invalidate(uldegdelProvider);
-    ref.invalidate(agreementBalanceProvider);
+    uldegdliigSergeekh(ref);
     ref.read(notificationsProvider.notifier).load();
     ref.read(conversationsProvider.notifier).load();
+  }
+
+  /// Таб солих бүрд үлдэгдлийг дахин татна. IndexedStack дотор дэлгэцүүд
+  /// амьд үлддэг тул өөрөө дахин асуухгүй. Дараалан дарахад сервер рүү
+  /// давхар хүсэлт явуулахгүйн тулд богино завсар барина.
+  DateTime? _suuliinSergeelt;
+  void _tabSolikhod() {
+    final odoo = DateTime.now();
+    final suulchiin = _suuliinSergeelt;
+    if (suulchiin != null && odoo.difference(suulchiin) < const Duration(seconds: 3)) {
+      return;
+    }
+    _suuliinSergeelt = odoo;
+    uldegdliigSergeekh(ref);
   }
 
   bool _canSee(List<String> erkhuud, String key) {
@@ -103,8 +111,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     if (showProfile) visibleTabs.add(3);
     ref.listen<NotificationModel?>(incomingNotificationProvider, (_, next) {
       if (next == null || !mounted) return;
-      ref.invalidate(agreementsProvider);
-      ref.invalidate(invoiceHistoryProvider);
+      uldegdliigSergeekh(ref);
       if (!ref.read(notificationsEnabledProvider)) {
         Future.microtask(() {
           if (mounted) ref.read(incomingNotificationProvider.notifier).state = null;
@@ -235,6 +242,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         selectedIndex: navBarIndex,
         onDestinationSelected: (i) {
           ref.read(_navIndexProvider.notifier).state = visibleTabs[i];
+          _tabSolikhod();
         },
         backgroundColor: isDark ? const Color(0xFF1E2A28) : AppColors.surface,
         indicatorColor: isDark ? const Color(0xFF1A3D37) : AppColors.primaryContainer,

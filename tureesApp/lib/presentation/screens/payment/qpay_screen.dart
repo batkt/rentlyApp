@@ -63,11 +63,7 @@ class _QpayScreenState extends ConsumerState<QpayScreen> with SingleTickerProvid
     _paymentDone = true;
     ref.read(paymentNotifierProvider.notifier).markPaid();
     // Everything that quotes a balance is now stale.
-    ref.invalidate(agreementsProvider);
-    ref.invalidate(invoiceHistoryProvider);
-    ref.invalidate(transactionHistoryProvider);
-    ref.invalidate(niitUldegdelProvider);
-    ref.invalidate(uldegdelProvider);
+    uldegdliigSergeekh(ref);
     showDialog(
       context: context,
       barrierDismissible: false,
