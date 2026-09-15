@@ -8,7 +8,15 @@ class QpayInvoiceModel {
   final String? qrText;
   final String? qrImage;
   final List<QpayUrlModel> urls;
+
+  /// QPay шимтгэл орсон нийт дүн.
   final double amount;
+
+  /// Хэрэглэгчийн оруулсан шимтгэлгүй дүн, шимтгэл, түүний төрөл ("300" /
+  /// "1%"). Backend хуучин хувилбартай бол null байна.
+  final double? anhniiDun;
+  final double? shimtgel;
+  final String? shimtgelTurul;
   final String gereeniiId;
 
   /// Нэхэмжлэлийг үүсгэсэн барилга. Түрээслэгч олон барилгад гэрээтэй байж
@@ -23,9 +31,14 @@ class QpayInvoiceModel {
     this.qrImage,
     required this.urls,
     required this.amount,
+    this.anhniiDun,
+    this.shimtgel,
+    this.shimtgelTurul,
     required this.gereeniiId,
     this.barilgiinId = '',
   });
+
+  bool get shimtgelteiEsekh => (shimtgel ?? 0) > 0;
 
   factory QpayInvoiceModel.fromJson(Map<String, dynamic> json) {
     return QpayInvoiceModel(

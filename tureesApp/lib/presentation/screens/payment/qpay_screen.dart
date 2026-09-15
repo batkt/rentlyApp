@@ -164,6 +164,20 @@ class _QpayScreenState extends ConsumerState<QpayScreen> with SingleTickerProvid
             AppFormatters.currency(widget.invoice.amount),
             style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w800),
           ),
+          if (widget.invoice.shimtgelteiEsekh) ...[
+            const SizedBox(height: 4),
+            const Text(
+              'QPay шимтгэл орсон төлбөр',
+              style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              '${AppFormatters.currency(widget.invoice.anhniiDun)} + '
+              'шимтгэл ${AppFormatters.currency(widget.invoice.shimtgel)}'
+              '${widget.invoice.shimtgelTurul == '1%' ? ' (1%)' : ''}',
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ],
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
