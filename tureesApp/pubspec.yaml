@@ -79,6 +79,8 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
+  config:
+    enable-lldb-debugging: false
 
   assets:
     - assets/images/

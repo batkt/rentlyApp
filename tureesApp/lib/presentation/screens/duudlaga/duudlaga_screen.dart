@@ -423,6 +423,9 @@ class _CreateDuudlagaSheetState extends ConsumerState<_CreateDuudlagaSheet> {
           TextField(
             controller: _messageController,
             maxLines: 4,
+            textInputAction: TextInputAction.done,
+            onEditingComplete: () => FocusScope.of(context).unfocus(),
+            onSubmitted: (_) => FocusScope.of(context).unfocus(),
             decoration: InputDecoration(
               hintText: 'Асуудлын тайлбарыг оруулна уу...',
               filled: true,

@@ -47,10 +47,13 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> with 
           indicatorColor: AppColors.primary,
           labelColor: AppColors.primary,
           unselectedLabelColor: context.appTextTertiary,
+          labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+          labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.normal),
           tabs: const [
-            Tab(text: 'Мэдэгдэл'),
-            Tab(text: 'Шаардлага'),
-            Tab(text: 'Дуудлага'),
+            Tab(child: FittedBox(fit: BoxFit.scaleDown, child: Text('Мэдэгдэл'))),
+            Tab(child: FittedBox(fit: BoxFit.scaleDown, child: Text('Санал & гомдол'))),
+            Tab(child: FittedBox(fit: BoxFit.scaleDown, child: Text('Дуудлага'))),
           ],
         ),
         actions: [
@@ -526,7 +529,7 @@ class _RequestFormSheet extends ConsumerStatefulWidget {
 class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
   final _msgCtrl = TextEditingController();
   final _duudlagaTitleCtrl = TextEditingController();
-  late String _turul = widget.initialTurul;
+  late String _turul = widget.initialTurul == 'shaardlaga' ? 'sanal' : widget.initialTurul;
   String _duudlagaSubTurul = '';
   bool _isDropdownOpen = false;
   bool _loading = false;
@@ -616,7 +619,6 @@ class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
               ],
             ),
             const SizedBox(height: 8),
-            // Шаардлага-г жагсаалт дээр шүүдэг байсан ч илгээх боломж байгаагүй.
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -626,12 +628,6 @@ class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
                   selected: _turul == 'sanal',
                   color: AppColors.info,
                   onTap: () => setState(() => _turul = 'sanal'),
-                ),
-                _TurulChoice(
-                  label: 'Шаардлага',
-                  selected: _turul == 'shaardlaga',
-                  color: AppColors.error,
-                  onTap: () => setState(() => _turul = 'shaardlaga'),
                 ),
                 _TurulChoice(
                   label: 'Гомдол',
@@ -655,6 +651,7 @@ class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
                 controller: _duudlagaTitleCtrl,
                 maxLength: 40,
                 textCapitalization: TextCapitalization.sentences,
+                textInputAction: TextInputAction.next,
                 onChanged: (_) => setState(() {}),
                 decoration: InputDecoration(
                   labelText: 'Гарчиг',
@@ -668,10 +665,20 @@ class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
               controller: _msgCtrl,
               maxLines: _isDuudlaga ? 3 : 4,
               textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(
+              textInputAction: TextInputAction.done,
+              onEditingComplete: () => FocusScope.of(context).unfocus(),
+              onSubmitted: (_) => FocusScope.of(context).unfocus(),
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
                 labelText: 'Тайлбар',
-                // Төрөл бүрт өөр өөр байсныг нэг болгов.
                 hintText: 'Дэлгэрэнгүй тайлбараа бичнэ үү...',
+                suffixIcon: _msgCtrl.text.trim().isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.check_circle_rounded, color: AppColors.primary),
+                        tooltip: 'Болсон',
+                        onPressed: () => FocusScope.of(context).unfocus(),
+                      )
+                    : null,
               ),
             ),
             if (_isDuudlaga) ...[
