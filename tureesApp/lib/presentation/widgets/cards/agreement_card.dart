@@ -169,19 +169,44 @@ class AgreementCard extends StatelessWidget {
                           ),
                         ),
                         // Алданги нь дээрх нийт үлдэгдэл дотор аль хэдийн
-                        // багтсан ч тусад нь харагддаггүй байсан. Барьцааны
-                        // үлдэгдэл нь тусдаа сан тул мэдээлэл болгон харуулна.
+                        // багтсан ч тусад нь харагддаггүй байсан.
+                        //
+                        // Барьцаа нь тусдаа сан. Өмнө нь `baritsaaniiUldegdel`
+                        // буюу АЛЬ ХЭДИЙН төлөгдсөн дүнг өртэй юм шиг
+                        // харуулдаг байсан — түрээслэгч төлөх ёстой гэж
+                        // ойлгож байв. Одоо төлөх үлдэгдэл (анхаарах шар) ба
+                        // төлөгдсөн (ногоон) хоёрыг өнгөөр нь ялгана.
                         if (agreement.aldangiinUldegdel > 0 ||
-                            agreement.baritsaaniiUldegdel > 0) ...[
+                            agreement.baritsaaTulukhUldegdel > 0 ||
+                            agreement.baritsaaTulsun) ...[
                           const SizedBox(height: 4),
-                          Text(
-                            [
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 2,
+                            children: [
                               if (agreement.aldangiinUldegdel > 0)
-                                'Алданги ${AppFormatters.currency(agreement.aldangiinUldegdel)}',
-                              if (agreement.baritsaaniiUldegdel > 0)
-                                'Барьцаа ${AppFormatters.currency(agreement.baritsaaniiUldegdel)}',
-                            ].join('  ·  '),
-                            style: theme.textTheme.labelSmall,
+                                Text(
+                                  'Алданги ${AppFormatters.currency(agreement.aldangiinUldegdel)}',
+                                  style: theme.textTheme.labelSmall,
+                                ),
+                              if (agreement.baritsaaTulukhUldegdel > 0)
+                                Text(
+                                  'Барьцаа төлөөгүй '
+                                  '${AppFormatters.currency(agreement.baritsaaTulukhUldegdel)}',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: AppColors.warning,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                )
+                              else if (agreement.baritsaaTulsun)
+                                Text(
+                                  'Барьцаа төлөгдсөн '
+                                  '${AppFormatters.currency(agreement.baritsaaniiUldegdel)}',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: AppColors.success,
+                                  ),
+                                ),
+                            ],
                           ),
                         ],
                       ],

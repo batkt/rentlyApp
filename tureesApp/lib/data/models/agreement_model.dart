@@ -26,10 +26,17 @@ class AgreementModel {
   /// callback back to this contract.
   final String? dans;
 
-  /// Алданги ба барьцааны үлдэгдэл. [uldegdel] дотор алданги аль хэдийн
-  /// нэмэгдсэн байдаг (getNiitUldegdel) тул эдгээрийг зөвхөн задаргаа
-  /// харуулахад ашиглана — нийт дүн дээр дахин нэмж БОЛОХГҮЙ.
+  /// Алданги. [uldegdel] дотор аль хэдийн нэмэгдсэн байдаг
+  /// (getNiitUldegdel) тул зөвхөн задаргаа харуулахад ашиглана — нийт дүн
+  /// дээр дахин нэмж БОЛОХГҮЙ.
   final double aldangiinUldegdel;
+
+  /// Гэрээгээр авахаар тохирсон барьцааны нийт дүн.
+  final double baritsaaAvakhDun;
+
+  /// Барьцаанаас АЛЬ ХЭДИЙН авсан (төлөгдсөн) дүн — үлдэж төлөх дүн БИШ.
+  /// Төлөх үлдэгдлийг [baritsaaTulukhUldegdel] бодно (tureesBack
+  /// qpayRoute-ийн нэхэмжлэлийн задаргаатай ижил).
   final double baritsaaniiUldegdel;
 
   const AgreementModel({
@@ -54,6 +61,7 @@ class AgreementModel {
     required this.zardluud,
     this.duusakhOgnoo,
     this.aldangiinUldegdel = 0,
+    this.baritsaaAvakhDun = 0,
     this.baritsaaniiUldegdel = 0,
     this.zurguud = const [],
     this.dans,
@@ -69,6 +77,18 @@ class AgreementModel {
     if (start == null || khugatsaa == null) return null;
     return DateTime(start.year, start.month + khugatsaa!, start.day);
   }
+
+  /// Барьцаанаас үлдэж төлөх дүн. Гэрээнд барьцаа тохироогүй эсвэл бүрэн
+  /// төлөгдсөн бол 0.
+  double get baritsaaTulukhUldegdel {
+    final uldegdel = baritsaaAvakhDun - baritsaaniiUldegdel;
+    return uldegdel > 0 ? uldegdel : 0;
+  }
+
+  /// Барьцаа бүрэн төлөгдсөн эсэх (барьцаатай гэрээнд л утгатай).
+  bool get baritsaaTulsun =>
+      baritsaaTulukhUldegdel == 0 &&
+      (baritsaaniiUldegdel > 0 || baritsaaAvakhDun > 0);
 
   String get tenantName => '${ovog ?? ''} $ner'.trim();
   String get shortName => ovog != null && ovog!.isNotEmpty ? '${ovog![0]}.$ner' : ner;
@@ -94,6 +114,7 @@ class AgreementModel {
       tuluv: tuluv,
       uldegdel: uldegdel ?? this.uldegdel,
       aldangiinUldegdel: aldangiinUldegdel ?? this.aldangiinUldegdel,
+      baritsaaAvakhDun: baritsaaAvakhDun,
       baritsaaniiUldegdel: baritsaaniiUldegdel,
       baiguullagiinId: baiguullagiinId,
       barilgiinId: barilgiinId,
@@ -124,6 +145,8 @@ class AgreementModel {
       uldegdel: double.tryParse(json['uldegdel']?.toString() ?? '0') ?? 0.0,
       aldangiinUldegdel:
           double.tryParse(json['aldangiinUldegdel']?.toString() ?? '0') ?? 0.0,
+      baritsaaAvakhDun:
+          double.tryParse(json['baritsaaAvakhDun']?.toString() ?? '0') ?? 0.0,
       baritsaaniiUldegdel:
           double.tryParse(json['baritsaaniiUldegdel']?.toString() ?? '0') ?? 0.0,
       baiguullagiinId: json['baiguullagiinId']?.toString() ?? '',

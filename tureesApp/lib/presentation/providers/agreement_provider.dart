@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/agreement_model.dart';
 import '../../data/repositories/agreement_repository.dart';
+import '../../data/services/geree_html_builder.dart';
 import 'auth_provider.dart';
 
 // null = Бүгд (all), 1 = Идэвхтэй (active). Applied client-side so the
@@ -57,6 +58,59 @@ final agreementDetailProvider = FutureProvider.autoDispose.family<AgreementModel
   final repo = ref.read(agreementRepositoryProvider);
   return repo.getAgreementById(id);
 });
+
+/// Гэрээг загвартай нь нийлүүлсэн HTML — turees вэбийн "Гэрээ харах" товч юу
+/// үзүүлдэгтэй ижил баримт. Загвар нь гэрээ болгонд өөр тул гэрээний id-гаар.
+final gereeniiKhuudasProvider =
+    FutureProvider.autoDispose.family<String, String>((ref, gereeniiId) async {
+  final repo = ref.read(agreementRepositoryProvider);
+
+  final geree = await repo.getGereeniiTuukhii(gereeniiId);
+  if (geree == null) throw const GereeKhuudasAldaa('Гэрээний мэдээлэл олдсонгүй');
+
+  final zagvariinId = geree['gereeniiZagvariinId']?.toString() ?? '';
+  if (zagvariinId.isEmpty) {
+    throw const GereeKhuudasAldaa(
+      'Энэ гэрээнд хэвлэх загвар холбогдоогүй байна. Байгууллагатайгаа '
+      'холбогдоно уу.',
+    );
+  }
+
+  final zagvar = await repo.getGereeniiZagvar(zagvariinId);
+  if (zagvar == null || zagvar.isEmpty) {
+    throw const GereeKhuudasAldaa('Гэрээний загвар олдсонгүй');
+  }
+
+  final aktiinZagvariinId = geree['aktiinZagvariinId']?.toString() ?? '';
+  final barilgiinId = geree['barilgiinId']?.toString() ?? '';
+  final baiguullagiinId = geree['baiguullagiinId']?.toString() ?? '';
+
+  // Акт болон барилгын мэдээлэл (тамга, гарын үсэг) аль аль нь заавал
+  // байх албагүй — олдохгүй бол гэрээг нь ямар ч байсан үзүүлнэ.
+  final akt = aktiinZagvariinId.isEmpty
+      ? null
+      : await repo.getAktiinZagvar(aktiinZagvariinId);
+  final barilga = (baiguullagiinId.isEmpty || barilgiinId.isEmpty)
+      ? null
+      : await repo.getBarilga(baiguullagiinId, barilgiinId);
+
+  return GereeHtmlBuilder.bii(
+    geree: geree,
+    zagvar: zagvar,
+    akt: akt,
+    barilga: barilga,
+  );
+});
+
+/// Хэрэглэгчид шууд үзүүлэхэд тохиромжтой алдаа — Dio-гийн техникийн
+/// мессежийг биш үүнийг л дэлгэцэнд гаргана.
+class GereeKhuudasAldaa implements Exception {
+  final String message;
+  const GereeKhuudasAldaa(this.message);
+
+  @override
+  String toString() => message;
+}
 
 final agreementBalanceProvider = FutureProvider.autoDispose.family<Map<String, dynamic>, String>((ref, gereeniiDugaar) async {
   final user = ref.watch(currentUserProvider);

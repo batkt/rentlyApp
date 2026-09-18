@@ -16,6 +16,7 @@ import '../../providers/agreement_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/common/app_loading.dart';
 import '../../widgets/common/sar_songolt.dart';
+import 'geree_kharakh_screen.dart';
 
 /// Tab order of [AgreementDetailScreen]: Мэдээлэл, Гүйлгээ, Нэхэмжлэх, Файл.
 const int kAgreementInvoiceTab = 2;
@@ -226,6 +227,8 @@ class _InfoTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
+        _GereeKharakhTovch(agreement: agreement),
+        const SizedBox(height: 16),
         _Section(
           title: 'Гэрээний мэдээлэл',
           icon: Icons.assignment_rounded,
@@ -267,6 +270,66 @@ class _InfoTab extends StatelessWidget {
         ],
         const SizedBox(height: 32),
       ],
+    );
+  }
+}
+
+/// Гэрээг эх хувиар нь (загвар, тамга, гарын үсэгтэй) нээх товч. Түрээслэгч
+/// өмнө нь гарын үсэг зурсан гэрээгээ апп дээрээс огт харж чаддаггүй байсан.
+class _GereeKharakhTovch extends StatelessWidget {
+  final AgreementModel agreement;
+
+  const _GereeKharakhTovch({required this.agreement});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.primaryContainer,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => GereeKharakhScreen(
+              gereeniiId: agreement.id,
+              gereeniiDugaar: agreement.gereeniiDugaar,
+            ),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          child: Row(
+            children: [
+              const Icon(Icons.description_rounded,
+                  size: 22, color: AppColors.primaryDark),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Гэрээ харах',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primaryDark,
+                          ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Байгуулсан гэрээг эх хувиар нь унших',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.primaryDark.withOpacity(0.75),
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded,
+                  color: AppColors.primaryDark),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

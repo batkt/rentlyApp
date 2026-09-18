@@ -65,6 +65,59 @@ class AgreementRepository {
     }
   }
 
+  /// Гэрээний түүхий баримт. [getAgreementById] нь зөвхөн апп дээр
+  /// харуулдаг талбаруудыг [AgreementModel] рүү шүүж авдаг бол гэрээг
+  /// хэвлэхэд загварын орлуулга бүрт нь тохирох талбар хэрэгтэй тул
+  /// серверээс ирсэн баримтыг бүхэлд нь буцаана.
+  Future<Map<String, dynamic>?> getGereeniiTuukhii(String id) async {
+    final res = await _client.get('${ApiConstants.geree}/$id');
+    final data = res.data;
+    return data is Map<String, dynamic> ? data : null;
+  }
+
+  /// Гэрээний хэвлэх загвар (толгой, заалтууд, хөл).
+  Future<Map<String, dynamic>?> getGereeniiZagvar(String id) async {
+    final res = await _client.get('${ApiConstants.gereeniiZagvar}/$id');
+    final data = res.data;
+    return data is Map<String, dynamic> ? data : null;
+  }
+
+  /// Актын загвар — гэрээнд холбогдсон үед л татна.
+  Future<Map<String, dynamic>?> getAktiinZagvar(String id) async {
+    try {
+      final res = await _client.get('${ApiConstants.aktiinZagvar}/$id');
+      final data = res.data;
+      return data is Map<String, dynamic> ? data : null;
+    } catch (_) {
+      // Акт олдохгүй бол гэрээг нь харуулахад саад болох ёсгүй.
+      return null;
+    }
+  }
+
+  /// Байгууллагын барилгын баримт — гэрээ дээрх тамга, гарын үсэг, хаяг
+  /// зэрэг нь барилга дээрээ хадгалагддаг.
+  Future<Map<String, dynamic>?> getBarilga(
+    String baiguullagiinId,
+    String barilgiinId,
+  ) async {
+    try {
+      final res = await _client.get(
+        '${ApiConstants.organization}/$baiguullagiinId',
+      );
+      final barilguud = (res.data as Map<String, dynamic>?)?['barilguud'];
+      if (barilguud is! List) return null;
+      for (final barilga in barilguud) {
+        if (barilga is Map<String, dynamic> &&
+            barilga['_id']?.toString() == barilgiinId) {
+          return barilga;
+        }
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<Map<String, dynamic>> getBalance(String gereeniiDugaar, String barilgiinId) async {
     final res = await _client.post(ApiConstants.gereeBalance, data: {
       'gereeniiDugaar': gereeniiDugaar,

@@ -29,6 +29,8 @@ class ApiConstants {
 
   // Agreement
   static const String geree = '/geree';
+  static const String gereeniiZagvar = '/gereeniiZagvar';
+  static const String aktiinZagvar = '/aktiinZagvar';
   static const String gereeBalance = '/gereeniiToololtAvya';
   static const String uldegdelBodyo = '/uldegdelBodyo';
   static const String bulkUldegdelBodyo = '/bulkUldegdelBodyo';
@@ -87,6 +89,15 @@ class ApiConstants {
   static const String gereeniiZurguudKhadgalakh = '/gereeniiZurguudKhadgalakh';
   static String zuragAvya(String baiguullagiinId, String id) =>
       '$baseUrl/zuragAvya/jpg/$baiguullagiinId/$id';
+
+  /// Тамга (`tamga`, `gereeniiTamga`), гарын үсэг (`gariinUseg`) зэрэг
+  /// төрлөөр нь зураг татах — гэрээ хэвлэхэд ашиглана.
+  static String zuragAvyaTuruleer(
+    String turul,
+    String baiguullagiinId,
+    String id,
+  ) =>
+      '$baseUrl/zuragAvya/$turul/$baiguullagiinId/$id';
   static String fileAvya(String baiguullagiinId, String id) =>
       '$baseUrl/fileAvya/$baiguullagiinId/$id';
 
