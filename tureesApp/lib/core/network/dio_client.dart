@@ -29,7 +29,6 @@ class DioClient {
       ApiConstants.login,
       ApiConstants.loginWithOrg,
       ApiConstants.verifyPhone,
-      ApiConstants.resetPasswordCheck,
       ApiConstants.sergeekhKodAvya,
       ApiConstants.nuutsUgSergeeye,
       ApiConstants.getUserByToken,

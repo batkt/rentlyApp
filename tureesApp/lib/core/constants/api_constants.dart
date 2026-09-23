@@ -18,7 +18,6 @@ class ApiConstants {
   static const String loginWithOrg = '/khariltsagchBaiguullagaarNevtrey';
   static const String verifyPhone = '/khariltsagchUtasShalgakh';
   static const String getUserByToken = '/tokenoorKhariltsagchAvya';
-  static const String resetPasswordCheck = '/khariltsagchNuutsUgSolikh';
   static const String sergeekhKodAvya = '/sergeekhKodAvya';
   static const String nuutsUgSergeeye = '/nuutsUgSergeeye';
   static const String khariltsagch = '/khariltsagch';
