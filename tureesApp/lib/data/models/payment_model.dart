@@ -40,6 +40,42 @@ class QpayInvoiceModel {
 
   bool get shimtgelteiEsekh => (shimtgel ?? 0) > 0;
 
+  /// `POST /qpayGargaya`-н хариуг унших. Сервер `qpayShimtgelTusdaa`
+  /// тохиргоотой үед нэхэмжлэхийн дүн дээр QPay шимтгэл нэмдэг тул нийт
+  /// дүнг ЗААВАЛ хариунаас (`niitDun`) авна — [oruulsanDun] бол хэрэглэгч
+  /// бичсэн шимтгэлгүй дүн ба зөвхөн хариу нийт дүн агуулаагүй тохиолдолд
+  /// нөөц болгож хэрэглэнэ. Үүнийг сольвол QR 400₮ гуйж байхад дэлгэц дээр
+  /// 100₮ харагдана.
+  factory QpayInvoiceModel.fromQpayGargaya(
+    Map<String, dynamic> data, {
+    required double oruulsanDun,
+    required String gereeniiId,
+    required String barilgiinId,
+  }) {
+    return QpayInvoiceModel(
+      invoiceId: data['id']?.toString() ??
+          data['invoice_id']?.toString() ??
+          data['invoiceId']?.toString(),
+      zakhialgiinDugaar: data['zakhialgiinDugaar']?.toString(),
+      qrText: data['qr_code']?.toString() ??
+          data['qr_text']?.toString() ??
+          data['qrText']?.toString(),
+      qrImage: data['qr_image']?.toString() ?? data['qrImage']?.toString(),
+      urls: (data['urls'] as List?)
+              ?.map((e) => QpayUrlModel.fromJson(e))
+              .toList() ??
+          [],
+      amount: double.tryParse(data['niitDun']?.toString() ?? '') ??
+          double.tryParse(data['_actualDun']?.toString() ?? '') ??
+          oruulsanDun,
+      anhniiDun: double.tryParse(data['anhniiDun']?.toString() ?? ''),
+      shimtgel: double.tryParse(data['shimtgel']?.toString() ?? ''),
+      shimtgelTurul: data['shimtgelTurul']?.toString(),
+      gereeniiId: gereeniiId,
+      barilgiinId: barilgiinId,
+    );
+  }
+
   factory QpayInvoiceModel.fromJson(Map<String, dynamic> json) {
     return QpayInvoiceModel(
       invoiceId: json['invoice_id']?.toString() ?? json['invoiceId']?.toString(),
