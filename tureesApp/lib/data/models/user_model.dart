@@ -17,6 +17,10 @@ class UserModel {
   /// on register/customerTin.
   final List<String> gereeniiIdnuud;
 
+  /// Нэг утсан дээр өөр регистр/ТИН-тэй бүртгэл байгаа эсэх (backend тооцно).
+  /// Тэдгээрийн гэрээ ч мөн [gereeniiIdnuud]-д нэгтгэгдсэн ирдэг тул сануулга харуулна.
+  final bool medeelelZuruutei;
+
   const UserModel({
     required this.id,
     required this.ner,
@@ -31,6 +35,7 @@ class UserModel {
     this.token,
     this.appErkhuud = const [],
     this.gereeniiIdnuud = const [],
+    this.medeelelZuruutei = false,
   });
 
   String get fullName => '$ovog $ner'.trim();
@@ -53,6 +58,7 @@ class UserModel {
       appErkhuud: (json['appErkhuud'] as List?)?.map((e) => e.toString()).toList() ?? [],
       gereeniiIdnuud:
           (json['gereeniiIdnuud'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      medeelelZuruutei: json['medeelelZuruutei'] == true,
     );
   }
 

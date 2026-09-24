@@ -381,6 +381,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   /// байвал (гэр бүлийн өөр дугаар гэх мэт) хэвийн гэж үзнэ.
   bool _medeelelZurson(UserModel? user, List<AgreementModel>? agreements) {
     if (user == null || agreements == null || agreements.isEmpty) return false;
+    // Нэг утсан дээр өөр регистр/ТИН-тэй бүртгэлийн гэрээ нэгтгэгдсэн.
+    if (user.medeelelZuruutei) return true;
 
     final utasnuud = user.utas
         .map((u) => u.trim())
