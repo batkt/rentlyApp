@@ -17,6 +17,7 @@ import '../../providers/auth_provider.dart';
 import '../../widgets/common/app_loading.dart';
 import '../../widgets/common/sar_songolt.dart';
 import 'geree_kharakh_screen.dart';
+import '../../../core/utils/responsive.dart';
 
 /// Tab order of [AgreementDetailScreen]: Мэдээлэл, Гүйлгээ, Нэхэмжлэх, Файл.
 const int kAgreementInvoiceTab = 2;
@@ -188,11 +189,14 @@ class _AgreementDetailScreenState extends ConsumerState<AgreementDetailScreen>
                 labelColor: Colors.white,
                 unselectedLabelColor: Colors.white60,
                 labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                // Жижиг дэлгэц дээр (~320-360) анхдагч 16px зайнаас болж "Нэхэмжл…" гэж
+                // таслагддаг байв — зайг багасгаж, багтахгүй бол үсгийг жижигрүүлнэ.
+                labelPadding: const EdgeInsets.symmetric(horizontal: 4),
                 tabs: const [
-                  Tab(text: 'Мэдээлэл'),
-                  Tab(text: 'Гүйлгээ'),
-                  Tab(text: 'Нэхэмжлэх'),
-                  Tab(text: 'Файл'),
+                  Tab(child: FittedBox(fit: BoxFit.scaleDown, child: Text('Мэдээлэл'))),
+                  Tab(child: FittedBox(fit: BoxFit.scaleDown, child: Text('Гүйлгээ'))),
+                  Tab(child: FittedBox(fit: BoxFit.scaleDown, child: Text('Нэхэмжлэх'))),
+                  Tab(child: FittedBox(fit: BoxFit.scaleDown, child: Text('Файл'))),
                 ],
               ),
             ),
@@ -225,7 +229,7 @@ class _InfoTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.symmetric(horizontal: context.tovZai(), vertical: 12),
       children: [
         _GereeKharakhTovch(agreement: agreement),
         const SizedBox(height: 16),
@@ -449,7 +453,7 @@ class _TransactionsTab extends ConsumerWidget {
         final keys = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
 
         return ListView.builder(
-          padding: const EdgeInsets.all(12),
+          padding: EdgeInsets.symmetric(horizontal: context.tovZai(), vertical: 12),
           itemCount: keys.length,
           itemBuilder: (context, index) {
             final key = keys[index];
@@ -889,7 +893,7 @@ class _InvoiceTabState extends ConsumerState<_InvoiceTab> {
                       message: 'Энэ өдөр нэхэмжлэх байхгүй байна',
                     )
                   : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+                      padding: EdgeInsets.fromLTRB(context.tovZai(), 4, context.tovZai(), 24),
                       itemCount: muruud.length,
                       itemBuilder: (context, index) => _NekhemjlekhMur(
                         inv: muruud[index],
@@ -1440,8 +1444,22 @@ class _FilesTab extends ConsumerStatefulWidget {
   ConsumerState<_FilesTab> createState() => _FilesTabState();
 }
 
+/// Сонгосон боловч хараахан хадгалаагүй файл/зураг.
+class _ShineFail {
+  final File file;
+  final String ner;
+  final bool zuragEsekh;
+
+  const _ShineFail({required this.file, required this.ner, required this.zuragEsekh});
+}
+
 class _FilesTabState extends ConsumerState<_FilesTab> {
+  static const _deedToo = 5;
+
   bool _uploading = false;
+
+  /// Хэрэглэгч "Хадгалах" дарах хүртэл сервер рүү илгээхгүй.
+  final List<_ShineFail> _khuleegdejBui = [];
 
   List<dynamic> get _zurguud {
     final localList = ref.watch(agreementZurguudProvider(widget.agreement.id));
@@ -1449,76 +1467,88 @@ class _FilesTabState extends ConsumerState<_FilesTab> {
     return widget.agreement.zurguud;
   }
 
-  Future<void> _pickAndUploadImages() async {
-    final picker = ImagePicker();
-    final picked = await picker.pickMultiImage(imageQuality: 85);
-    if (picked.isEmpty) return;
+  int get _uldsenToo => _deedToo - _zurguud.length - _khuleegdejBui.length;
 
-    final remaining = 5 - _zurguud.length;
-    if (remaining <= 0) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Файлын дээд тоо 5 байна')));
-      return;
-    }
-
-    setState(() => _uploading = true);
-    try {
-      final repo = ref.read(agreementRepositoryProvider);
-      final newIds = <String>[];
-      for (final xfile in picked.take(remaining)) {
-        final id = await repo.uploadImage(File(xfile.path), widget.agreement.baiguullagiinId);
-        if (id.isNotEmpty) newIds.add(id);
-      }
-      if (newIds.isNotEmpty) {
-        final merged = [..._zurguud, ...newIds];
-        await repo.saveZurguud(widget.agreement.id, merged);
-        ref.read(agreementZurguudProvider(widget.agreement.id).notifier).state = merged;
-        ref.invalidate(agreementDetailProvider(widget.agreement.id));
-      }
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Зураг оруулахад алдаа: $e')));
-    } finally {
-      if (mounted) setState(() => _uploading = false);
-    }
+  void _deedTooKhetersen() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Файлын дээд тоо $_deedToo байна')),
+    );
   }
 
-  Future<void> _pickAndUploadFiles() async {
+  Future<void> _pickImages() async {
+    if (_uldsenToo <= 0) return _deedTooKhetersen();
+    final picked = await ImagePicker().pickMultiImage(imageQuality: 85);
+    if (picked.isEmpty || !mounted) return;
+    final uldsen = _uldsenToo;
+    if (picked.length > uldsen) _deedTooKhetersen();
+    setState(() {
+      _khuleegdejBui.addAll(picked.take(uldsen).map(
+            (x) => _ShineFail(file: File(x.path), ner: x.name, zuragEsekh: true),
+          ));
+    });
+  }
+
+  Future<void> _pickFiles() async {
+    if (_uldsenToo <= 0) return _deedTooKhetersen();
     final result = await FilePicker.platform.pickFiles(
       allowMultiple: true,
       type: FileType.custom,
       allowedExtensions: ['pdf', 'xlsx', 'xls', 'doc', 'docx'],
     );
-    if (result == null || result.files.isEmpty) return;
+    if (result == null || result.files.isEmpty || !mounted) return;
+    final songoson = result.files.where((f) => f.path != null).toList();
+    final uldsen = _uldsenToo;
+    if (songoson.length > uldsen) _deedTooKhetersen();
+    setState(() {
+      _khuleegdejBui.addAll(songoson.take(uldsen).map(
+            (f) => _ShineFail(file: File(f.path!), ner: f.name, zuragEsekh: false),
+          ));
+    });
+  }
 
-    final remaining = 5 - _zurguud.length;
-    if (remaining <= 0) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Файлын дээд тоо 5 байна')));
-      return;
+  /// Хүлээгдэж буй бүх файлыг илгээж, гэрээнд НЭГ удаа хадгална. Дундаас нь
+  /// алдаа гарвал амжилттай илгээгдсэнийг нь хадгалж, үлдсэнийг нь жагсаалтад
+  /// үлдээнэ — хэрэглэгч дахин "Хадгалах" дарж болно.
+  Future<void> _khadgalakh() async {
+    if (_khuleegdejBui.isEmpty || _uploading) return;
+    setState(() => _uploading = true);
+    final repo = ref.read(agreementRepositoryProvider);
+    final baiguullagiinId = widget.agreement.baiguullagiinId;
+    final shineUtguud = <dynamic>[];
+    final ilgeesen = <_ShineFail>[];
+    Object? aldaa;
+    try {
+      for (final f in List<_ShineFail>.from(_khuleegdejBui)) {
+        if (f.zuragEsekh) {
+          final id = await repo.uploadImage(f.file, baiguullagiinId);
+          if (id.isNotEmpty) shineUtguud.add(id);
+        } else {
+          final id = await repo.uploadFile(f.file, baiguullagiinId, f.ner);
+          if (id.isNotEmpty) shineUtguud.add({'id': id, 'ner': f.ner, 'turul': 'pdf'});
+        }
+        ilgeesen.add(f);
+      }
+    } catch (e) {
+      aldaa = e;
     }
 
-    setState(() => _uploading = true);
     try {
-      final repo = ref.read(agreementRepositoryProvider);
-      final newEntries = <Map<String, dynamic>>[];
-      for (final pf in result.files.take(remaining)) {
-        if (pf.path == null) continue;
-        final id = await repo.uploadFile(File(pf.path!), widget.agreement.baiguullagiinId, pf.name);
-        if (id.isNotEmpty) {
-          newEntries.add({'id': id, 'ner': pf.name, 'turul': 'pdf'});
-        }
-      }
-      if (newEntries.isNotEmpty) {
-        final merged = [..._zurguud, ...newEntries];
+      if (shineUtguud.isNotEmpty) {
+        final merged = [..._zurguud, ...shineUtguud];
         await repo.saveZurguud(widget.agreement.id, merged);
         ref.read(agreementZurguudProvider(widget.agreement.id).notifier).state = merged;
         ref.invalidate(agreementDetailProvider(widget.agreement.id));
       }
+      if (mounted) setState(() => _khuleegdejBui.removeWhere(ilgeesen.contains));
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Файл оруулахад алдаа: $e')));
-    } finally {
-      if (mounted) setState(() => _uploading = false);
+      aldaa ??= e;
     }
+
+    if (!mounted) return;
+    setState(() => _uploading = false);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(aldaa == null ? 'Амжилттай хадгалагдлаа' : 'Хадгалахад алдаа: $aldaa'),
+    ));
   }
 
   Future<void> _deleteItem(int index) async {
@@ -1560,45 +1590,185 @@ class _FilesTabState extends ConsumerState<_FilesTab> {
     }
   }
 
+  // Зургийг вэб рүү шилжүүлэхгүйгээр апп дотроо бүтэн дэлгэцээр (томруулж,
+  // гүйлгэж) харуулна.
+  void _zuragKharakh(List<ImageProvider> zurguud, int ekhniiIndex) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Хаах',
+      barrierColor: Colors.black.withValues(alpha: 0.92),
+      pageBuilder: (_, __, ___) => _ZuragKharakhDialog(zurguud: zurguud, ekhniiIndex: ekhniiIndex),
+    );
+  }
+
+  Widget _zuragKhavtas({required Widget zurag, required VoidCallback onTap, required VoidCallback onRemove}) {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            onTap: onTap,
+            child: ClipRRect(borderRadius: BorderRadius.circular(12), child: zurag),
+          ),
+        ),
+        Positioned(
+          top: 6, right: 6,
+          child: GestureDetector(
+            onTap: onRemove,
+            child: Container(
+              width: 26, height: 26,
+              decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), shape: BoxShape.circle),
+              child: const Icon(Icons.close_rounded, color: Colors.white, size: 16),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Нарийн дэлгэц (Fold-ийн гадна дэлгэц) дээр 2, дэлгэсэн/таблет дээр 3-4 багана.
+  static const _gridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
+    maxCrossAxisExtent: 220, crossAxisSpacing: 8, mainAxisSpacing: 8, childAspectRatio: 1,
+  );
+
+  Widget _failMur({
+    required String ner,
+    required VoidCallback? onTap,
+    required Widget trailing,
+    Color? border,
+  }) {
+    final isExcel = ner.endsWith('.xlsx') || ner.endsWith('.xls');
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: context.appCardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: border ?? context.appDivider),
+      ),
+      child: ListTile(
+        leading: Icon(
+          isExcel ? Icons.table_chart_rounded : Icons.picture_as_pdf_rounded,
+          color: isExcel ? Colors.green.shade600 : Colors.red.shade600,
+          size: 28,
+        ),
+        title: Text(ner, style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+        onTap: onTap,
+        trailing: trailing,
+      ),
+    );
+  }
+
+  Widget _nemekhTovchnuud() {
+    final idevkhtei = _uldsenToo > 0 && !_uploading;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        FilledButton.icon(
+          onPressed: idevkhtei ? _pickImages : null,
+          icon: const Icon(Icons.add_photo_alternate_rounded, size: 18),
+          label: const Text('Зураг нэмэх'),
+          style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+        ),
+        FilledButton.icon(
+          onPressed: idevkhtei ? _pickFiles : null,
+          icon: const Icon(Icons.attach_file_rounded, size: 18),
+          label: const Text('Файл нэмэх'),
+          style: FilledButton.styleFrom(backgroundColor: Colors.blueGrey),
+        ),
+        Text('${_zurguud.length + _khuleegdejBui.length}/$_deedToo',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.appTextTertiary)),
+      ],
+    );
+  }
+
+  Widget _khuleegdejBuiKheseg() {
+    final zurguud = _khuleegdejBui.where((f) => f.zuragEsekh).toList();
+    final failuud = _khuleegdejBui.where((f) => !f.zuragEsekh).toList();
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Хадгалаагүй (${_khuleegdejBui.length})',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          if (zurguud.isNotEmpty) ...[
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: _gridDelegate,
+              itemCount: zurguud.length,
+              itemBuilder: (_, i) => _zuragKhavtas(
+                zurag: Image.file(zurguud[i].file, fit: BoxFit.cover),
+                onTap: () => _zuragKharakh(zurguud.map<ImageProvider>((f) => FileImage(f.file)).toList(), i),
+                onRemove: _uploading ? () {} : () => setState(() => _khuleegdejBui.remove(zurguud[i])),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          ...failuud.map((f) => _failMur(
+                ner: f.ner,
+                onTap: null,
+                border: AppColors.primary.withValues(alpha: 0.25),
+                trailing: IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 20),
+                  onPressed: _uploading ? null : () => setState(() => _khuleegdejBui.remove(f)),
+                ),
+              )),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _uploading ? null : () => setState(_khuleegdejBui.clear),
+                  child: const Text('Болих'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _uploading ? null : _khadgalakh,
+                  icon: _uploading
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.save_rounded, size: 18),
+                  label: Text(_uploading ? 'Хадгалж байна...' : 'Хадгалах'),
+                  style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final zurguud = _zurguud;
-    final canAdd = zurguud.length < 5 && !_uploading;
 
-    if (zurguud.isEmpty && !_uploading) {
+    if (zurguud.isEmpty && _khuleegdejBui.isEmpty && !_uploading) {
       return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.folder_open_rounded, size: 56, color: context.appTextTertiary),
-            const SizedBox(height: 12),
-            Text('Файл байхгүй байна', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: context.appTextTertiary)),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                FilledButton.icon(
-                  onPressed: _pickAndUploadImages,
-                  icon: const Icon(Icons.add_photo_alternate_rounded, size: 18),
-                  label: const Text('Зураг нэмэх'),
-                  style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
-                ),
-                const SizedBox(width: 10),
-                FilledButton.icon(
-                  onPressed: _pickAndUploadFiles,
-                  icon: const Icon(Icons.attach_file_rounded, size: 18),
-                  label: const Text('Файл нэмэх'),
-                  style: FilledButton.styleFrom(backgroundColor: Colors.blueGrey),
-                ),
-              ],
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.folder_open_rounded, size: 56, color: context.appTextTertiary),
+              const SizedBox(height: 12),
+              Text('Файл байхгүй байна', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: context.appTextTertiary)),
+              const SizedBox(height: 20),
+              _nemekhTovchnuud(),
+            ],
+          ),
         ),
       );
-    }
-
-    if (_uploading && zurguud.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
     }
 
     final imageItems = <Map<String, dynamic>>[];
@@ -1611,9 +1781,14 @@ class _FilesTabState extends ConsumerState<_FilesTab> {
         fileItems.add({'index': i, ...Map<String, dynamic>.from(item)});
       }
     }
+    final zuragniiUrluud = imageItems
+        .map((item) => ApiConstants.zuragAvya(widget.agreement.baiguullagiinId, item['id'] as String))
+        .toList();
+
+    final hPad = context.tovZai();
 
     return ListView(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 12),
       children: [
         if (imageItems.isNotEmpty) ...[
           Text('Зурагнууд', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
@@ -1621,48 +1796,28 @@ class _FilesTabState extends ConsumerState<_FilesTab> {
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2, crossAxisSpacing: 8, mainAxisSpacing: 8, childAspectRatio: 1,
-            ),
+            gridDelegate: _gridDelegate,
             itemCount: imageItems.length,
             itemBuilder: (_, i) {
-              final item = imageItems[i];
-              final idx = item['index'] as int;
-              final imageUrl = ApiConstants.zuragAvya(widget.agreement.baiguullagiinId, item['id'] as String);
-              return Stack(
-                children: [
-                  GestureDetector(
-                    onTap: () => _openUrl(imageUrl),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        imageUrl,
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        height: double.infinity,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: context.appSurface,
-                          child: Icon(Icons.broken_image_rounded, color: context.appTextTertiary),
-                        ),
-                        loadingBuilder: (_, child, progress) => progress == null ? child
-                            : Center(child: CircularProgressIndicator(
-                                value: progress.expectedTotalBytes != null
-                                    ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes! : null)),
-                      ),
-                    ),
+              final idx = imageItems[i]['index'] as int;
+              final imageUrl = zuragniiUrluud[i];
+              return _zuragKhavtas(
+                zurag: Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: double.infinity,
+                  errorBuilder: (_, __, ___) => Container(
+                    color: context.appSurface,
+                    child: Icon(Icons.broken_image_rounded, color: context.appTextTertiary),
                   ),
-                  Positioned(
-                    top: 6, right: 6,
-                    child: GestureDetector(
-                      onTap: () => _confirmDelete(context, idx),
-                      child: Container(
-                        width: 26, height: 26,
-                        decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), shape: BoxShape.circle),
-                        child: const Icon(Icons.close_rounded, color: Colors.white, size: 16),
-                      ),
-                    ),
-                  ),
-                ],
+                  loadingBuilder: (_, child, progress) => progress == null ? child
+                      : Center(child: CircularProgressIndicator(
+                          value: progress.expectedTotalBytes != null
+                              ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes! : null)),
+                ),
+                onTap: () => _zuragKharakh(zuragniiUrluud.map<ImageProvider>(NetworkImage.new).toList(), i),
+                onRemove: () => _confirmDelete(context, idx),
               );
             },
           ),
@@ -1675,59 +1830,107 @@ class _FilesTabState extends ConsumerState<_FilesTab> {
           ...fileItems.map((item) {
             final idx = item['index'] as int;
             final fileUrl = ApiConstants.fileAvya(widget.agreement.baiguullagiinId, item['id']?.toString() ?? '');
-            final name = item['ner']?.toString() ?? 'Файл';
-            final isExcel = name.endsWith('.xlsx') || name.endsWith('.xls');
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              decoration: BoxDecoration(
-                color: context.appCardBg,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: context.appDivider),
-              ),
-              child: ListTile(
-                leading: Icon(
-                  isExcel ? Icons.table_chart_rounded : Icons.picture_as_pdf_rounded,
-                  color: isExcel ? Colors.green.shade600 : Colors.red.shade600,
-                  size: 28,
-                ),
-                title: Text(name, style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                onTap: () => _openUrl(fileUrl),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded, size: 20),
-                  color: AppColors.error,
-                  onPressed: () => _confirmDelete(context, idx),
-                ),
+            return _failMur(
+              ner: item['ner']?.toString() ?? 'Файл',
+              onTap: () => _openUrl(fileUrl),
+              trailing: IconButton(
+                icon: const Icon(Icons.delete_outline_rounded, size: 20),
+                color: AppColors.error,
+                onPressed: () => _confirmDelete(context, idx),
               ),
             );
           }),
           const SizedBox(height: 8),
         ],
 
-        Row(
+        if (_khuleegdejBui.isNotEmpty) ...[
+          _khuleegdejBuiKheseg(),
+          const SizedBox(height: 12),
+        ],
+
+        _nemekhTovchnuud(),
+      ],
+    );
+  }
+}
+
+/// Бүтэн дэлгэцийн зураг харагч: чимхэж томруулна, хажуу тийш гүйлгэнэ.
+class _ZuragKharakhDialog extends StatefulWidget {
+  final List<ImageProvider> zurguud;
+  final int ekhniiIndex;
+
+  const _ZuragKharakhDialog({required this.zurguud, required this.ekhniiIndex});
+
+  @override
+  State<_ZuragKharakhDialog> createState() => _ZuragKharakhDialogState();
+}
+
+class _ZuragKharakhDialogState extends State<_ZuragKharakhDialog> {
+  late final PageController _controller = PageController(initialPage: widget.ekhniiIndex);
+  late int _index = widget.ekhniiIndex;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: SafeArea(
+        child: Stack(
           children: [
-            if (canAdd)
-              FilledButton.icon(
-                onPressed: _uploading ? null : _pickAndUploadImages,
-                icon: _uploading
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.add_photo_alternate_rounded, size: 18),
-                label: const Text('Зураг'),
-                style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+            PageView.builder(
+              controller: _controller,
+              itemCount: widget.zurguud.length,
+              onPageChanged: (i) => setState(() => _index = i),
+              itemBuilder: (_, i) => InteractiveViewer(
+                minScale: 1,
+                maxScale: 5,
+                child: Center(
+                  child: Image(
+                    image: widget.zurguud[i],
+                    fit: BoxFit.contain,
+                    loadingBuilder: (_, child, progress) => progress == null
+                        ? child
+                        : const CircularProgressIndicator(color: Colors.white),
+                    errorBuilder: (_, __, ___) =>
+                        const Icon(Icons.broken_image_rounded, color: Colors.white54, size: 64),
+                  ),
+                ),
               ),
-            if (canAdd) ...[
-              const SizedBox(width: 8),
-              FilledButton.icon(
-                onPressed: _uploading ? null : _pickAndUploadFiles,
-                icon: const Icon(Icons.attach_file_rounded, size: 18),
-                label: const Text('Файл'),
-                style: FilledButton.styleFrom(backgroundColor: Colors.blueGrey),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                tooltip: 'Хаах',
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
               ),
-            ],
-            const SizedBox(width: 8),
-            Text('${zurguud.length}/5', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.appTextTertiary)),
+            ),
+            if (widget.zurguud.length > 1)
+              Positioned(
+                bottom: 16,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text('${_index + 1} / ${widget.zurguud.length}',
+                        style: const TextStyle(color: Colors.white, fontSize: 13)),
+                  ),
+                ),
+              ),
           ],
         ),
-      ],
+      ),
     );
   }
 }

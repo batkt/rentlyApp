@@ -10,6 +10,7 @@ import '../../providers/agreement_provider.dart';
 import '../../widgets/cards/agreement_card.dart';
 import '../../widgets/common/app_loading.dart';
 import '../../widgets/common/app_text_field.dart';
+import '../../../core/utils/responsive.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -33,8 +34,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final user = ref.watch(currentUserProvider);
     final filter = ref.watch(agreementFilterProvider);
     final agreementsAsync = ref.watch(agreementsProvider);
-    final sw = MediaQuery.sizeOf(context).width;
-    final hPad = ((sw - 720) / 2).clamp(16.0, 48.0);
+    // Өмнө нь 48-аар таглагдсан тул ~816-аас өргөн дэлгэц дээр голлохгүй сунадаг байв.
+    final hPad = context.tovZai(min: 16);
 
     return Scaffold(
       backgroundColor: context.appBackground,

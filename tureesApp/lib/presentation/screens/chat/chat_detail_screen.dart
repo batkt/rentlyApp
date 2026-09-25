@@ -13,6 +13,7 @@ import '../../../data/models/chat_model.dart';
 import '../../providers/chat_provider.dart';
 import '../../widgets/common/app_loading.dart';
 import '../../../core/utils/app_snackbar.dart';
+import '../../../core/utils/responsive.dart';
 
 class ChatDetailScreen extends ConsumerStatefulWidget {
   final String conversationId;
@@ -288,7 +289,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               }
               return ListView.builder(
                 controller: _scrollController,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: EdgeInsets.symmetric(horizontal: context.tovZai(min: 16), vertical: 12),
                 itemCount: state.messages.length,
                 itemBuilder: (context, index) {
                   final message = state.messages[index];
@@ -346,7 +347,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         color: context.appSurface,
         border: Border(top: BorderSide(color: context.appDivider)),
       ),
-      padding: EdgeInsets.fromLTRB(12, 10, 12, MediaQuery.of(context).padding.bottom + 10),
+      padding: EdgeInsets.fromLTRB(context.tovZai(), 10, context.tovZai(), MediaQuery.of(context).padding.bottom + 10),
       child: Row(
         children: [
           GestureDetector(
@@ -529,7 +530,10 @@ class _MessageBubble extends StatelessWidget {
           ],
           Flexible(
             child: Container(
-              constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.72),
+              // Дэлгэсэн Fold/таблет дээр хэт өргөн бөмбөлөг болохоос сэргийлнэ.
+              constraints: BoxConstraints(
+                maxWidth: (MediaQuery.sizeOf(context).width * 0.72).clamp(0.0, 480.0),
+              ),
               decoration: BoxDecoration(
                 color: isMine ? AppColors.primary : context.appCardBg,
                 borderRadius: BorderRadius.only(

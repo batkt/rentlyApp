@@ -18,6 +18,7 @@ import '../payment/payment_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../settings/settings_screen.dart';
 import '../../../core/utils/app_snackbar.dart';
+import '../../../core/utils/responsive.dart';
 
 final _navIndexProvider = StateProvider<int>((ref) => 0);
 
@@ -295,22 +296,56 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     // Visible destination index for the NavigationBar
     final navBarIndex = visibleTabs.indexOf(safeScreenIndex).clamp(0, destinations.length - 1);
 
+    void onSongokh(int i) {
+      ref.read(_navIndexProvider.notifier).state = visibleTabs[i];
+      _tabSolikhod();
+    }
+
+    final body = Stack(
+      children: [
+        IndexedStack(
+          index: safeScreenIndex,
+          children: _screens,
+        ),
+        if (showChat && ref.watch(chatVisibleProvider) && safeScreenIndex < 2) const _FloatingChatBubble(),
+      ],
+    );
+
+    // Дэлгэсэн Fold / таблет дээр доод цэсний оронд хажуугийн NavigationRail.
+    if (context.urgunDelgets) {
+      return Scaffold(
+        body: Row(
+          children: [
+            SafeArea(
+              right: false,
+              child: NavigationRail(
+                selectedIndex: navBarIndex,
+                onDestinationSelected: onSongokh,
+                backgroundColor: isDark ? const Color(0xFF1E2A28) : AppColors.surface,
+                indicatorColor: isDark ? const Color(0xFF1A3D37) : AppColors.primaryContainer,
+                labelType: NavigationRailLabelType.all,
+                groupAlignment: 0,
+                destinations: destinations
+                    .map((d) => NavigationRailDestination(
+                          icon: d.icon,
+                          selectedIcon: d.selectedIcon,
+                          label: Text(d.label),
+                        ))
+                    .toList(),
+              ),
+            ),
+            VerticalDivider(width: 1, thickness: 1, color: isDark ? Colors.white10 : Colors.black12),
+            Expanded(child: body),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
-      body: Stack(
-        children: [
-          IndexedStack(
-            index: safeScreenIndex,
-            children: _screens,
-          ),
-          if (showChat && ref.watch(chatVisibleProvider) && safeScreenIndex < 2) const _FloatingChatBubble(),
-        ],
-      ),
+      body: body,
       bottomNavigationBar: NavigationBar(
         selectedIndex: navBarIndex,
-        onDestinationSelected: (i) {
-          ref.read(_navIndexProvider.notifier).state = visibleTabs[i];
-          _tabSolikhod();
-        },
+        onDestinationSelected: onSongokh,
         backgroundColor: isDark ? const Color(0xFF1E2A28) : AppColors.surface,
         indicatorColor: isDark ? const Color(0xFF1A3D37) : AppColors.primaryContainer,
         surfaceTintColor: Colors.transparent,
@@ -334,6 +369,9 @@ class _FloatingChatBubble extends ConsumerStatefulWidget {
 class _FloatingChatBubbleState extends ConsumerState<_FloatingChatBubble>
     with SingleTickerProviderStateMixin {
   Offset _position = const Offset(20, 200);
+  // Эвхэх/дэлгэх үед дэлгэцийн өргөн өөрчлөгдөхөд аль ирмэгт наалдсаныг нь санаж,
+  // байрлалыг шинэ хэмжээнд дахин тооцно (эс бөгөөс дэлгэцээс гадуур гарна).
+  bool _barruunTald = true;
   bool _isDragging = false;
   bool _isNearDropZone = false;
   late AnimationController _pulseController;
@@ -382,6 +420,14 @@ class _FloatingChatBubbleState extends ConsumerState<_FloatingChatBubble>
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
+    final minY = MediaQuery.of(context).padding.top + 8;
+    final maxY = size.height - 100 > minY ? size.height - 100 : minY;
+    final bairshil = _isDragging
+        ? _position
+        : Offset(
+            _barruunTald ? (size.width - 72).clamp(0.0, double.infinity) : 12.0,
+            _position.dy.clamp(minY, maxY),
+          );
     final convState = ref.watch(conversationsProvider);
     final hasConv = convState.conversations.isNotEmpty;
     final unread = convState.conversations.fold<int>(0, (s, c) => s + c.unreadCount);
@@ -417,10 +463,13 @@ class _FloatingChatBubbleState extends ConsumerState<_FloatingChatBubble>
           ),
         // Draggable bubble
         Positioned(
-          left: _position.dx,
-          top: _position.dy,
+          left: bairshil.dx,
+          top: bairshil.dy,
           child: GestureDetector(
-            onPanStart: (_) => setState(() => _isDragging = true),
+            onPanStart: (_) => setState(() {
+              _position = bairshil;
+              _isDragging = true;
+            }),
             onPanUpdate: (details) {
               final topPad = MediaQuery.of(context).padding.top + 8;
               final newPos = Offset(
@@ -442,8 +491,12 @@ class _FloatingChatBubbleState extends ConsumerState<_FloatingChatBubble>
                 return;
               }
               setState(() { _isDragging = false; _isNearDropZone = false; });
-              final snapX = _position.dx < size.width / 2 ? 12.0 : size.width - 72.0;
-              setState(() => _position = Offset(snapX, _position.dy));
+              final barruun = _position.dx >= size.width / 2;
+              final snapX = barruun ? size.width - 72.0 : 12.0;
+              setState(() {
+                _barruunTald = barruun;
+                _position = Offset(snapX, _position.dy);
+              });
             },
             onTap: _isDragging ? null : _openChat,
             child: AnimatedBuilder(

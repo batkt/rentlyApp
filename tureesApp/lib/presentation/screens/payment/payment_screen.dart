@@ -37,6 +37,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   String? _dansniiDugaar;
   bool _loadingUldegdel = false;
   bool _autoSelectDone = false;
+  /// Барьцаатай гэрээнд үндсэн төлбөр болон барьцааг тус тусад нь төлнө.
+  bool _baritsaaTulukh = false;
 
   @override
   void initState() {
@@ -96,7 +98,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       final odooginKhemjee = _amountController.text;
       final khereglegchZasaagui =
           odooginKhemjee.isEmpty || odooginKhemjee == _avtomatDun;
-      if ((uldegdel ?? 0) > 0 && khereglegchZasaagui) {
+      if ((uldegdel ?? 0) > 0 && khereglegchZasaagui && !_baritsaaTulukh) {
         final shineDun = _numFmt.format(uldegdel!);
         _amountController.text = shineDun;
         _avtomatDun = shineDun;
@@ -112,6 +114,34 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
   double get _displayUldegdel => _realUldegdel ?? _selectedAgreement?.uldegdel ?? 0;
 
+  /// Барьцааны үлдэгдлийг жагсаалтын шинэ утгаас уншина — сонгосон гэрээний
+  /// объект энэ State-д хадгалагддаг тул барьцаа төлсний дараа хуучирдаг.
+  double get _baritsaaUldegdel {
+    final songoson = _selectedAgreement;
+    if (songoson == null) return 0;
+    final shine = ref
+        .read(agreementsProvider)
+        .valueOrNull
+        ?.where((a) => a.id == songoson.id)
+        .firstOrNull;
+    return (shine ?? songoson).baritsaaTulukhUldegdel;
+  }
+
+  void _tulburiinTurulSolikh(bool baritsaa) {
+    setState(() {
+      _baritsaaTulukh = baritsaa;
+      final dun = baritsaa ? _baritsaaUldegdel : _displayUldegdel;
+      if (dun > 0) {
+        final text = _numFmt.format(dun);
+        _amountController.text = text;
+        _avtomatDun = text;
+      } else {
+        _amountController.clear();
+        _avtomatDun = null;
+      }
+    });
+  }
+
   Future<void> _generateQpay() async {
     final rawText = _amountController.text.replaceAll(',', '').replaceAll(' ', '');
     final amount = double.tryParse(rawText);
@@ -121,6 +151,13 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     }
     if (amount == null || amount <= 0) {
       _showError('Мөнгөн дүн оруулна уу');
+      return;
+    }
+    final baritsaa = _baritsaaTulukh && _baritsaaUldegdel > 0;
+    if (baritsaa && amount > _baritsaaUldegdel) {
+      _showError(
+        'Барьцааны үлдэгдлээс (${AppFormatters.currency(_baritsaaUldegdel)}) их дүн төлөх боломжгүй',
+      );
       return;
     }
     // The backend only wires up the contract-specific QPay callback when both
@@ -142,6 +179,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       register: _selectedAgreement!.register ?? '',
       amount: amount,
       dansniiDugaar: dans,
+      tulburiinTurul: baritsaa ? 'baritsaa' : null,
     );
 
     final state = ref.read(paymentNotifierProvider);
@@ -167,6 +205,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           _realUldegdel = null;
           _dansniiDugaar = null;
           _autoSelectDone = false;
+          _baritsaaTulukh = false;
           _amountController.clear();
         });
       }
@@ -180,6 +219,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         _amountController.clear();
         _avtomatDun = null;
         _realUldegdel = null;
+        _baritsaaTulukh = false;
       });
       final agreement = _selectedAgreement;
       if (agreement != null) _fetchRealUldegdel(agreement);
@@ -214,6 +254,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           children: [
             _buildAgreementSelector(agreementsAsync),
             const SizedBox(height: 16),
+            if (_selectedAgreement != null && _baritsaaUldegdel > 0) ...[
+              _buildTulburiinTurul(),
+              const SizedBox(height: 16),
+            ],
             _buildAmountInput(),
             const SizedBox(height: 8),
             _buildQuickAmounts(),
@@ -251,6 +295,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                 setState(() {
                   _autoSelectDone = true;
                   _selectedAgreement = active.first;
+                  _baritsaaTulukh = false;
                   _realUldegdel = null;
                   _amountController.clear();
                 });
@@ -335,6 +380,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                   onChanged: (v) {
                     setState(() {
                       _selectedAgreement = v;
+                      _baritsaaTulukh = false;
                       _realUldegdel = null;
                       _dansniiDugaar = null;
                       _amountController.clear();
@@ -374,9 +420,52 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     );
   }
 
+  Widget _buildTulburiinTurul() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Юуг төлөх вэ?',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: SegmentedButton<bool>(
+            showSelectedIcon: false,
+            segments: const [
+              ButtonSegment(
+                value: false,
+                icon: Icon(Icons.receipt_long_rounded, size: 18),
+                label: FittedBox(fit: BoxFit.scaleDown, child: Text('Үндсэн төлбөр')),
+              ),
+              ButtonSegment(
+                value: true,
+                icon: Icon(Icons.savings_rounded, size: 18),
+                label: FittedBox(fit: BoxFit.scaleDown, child: Text('Барьцаа')),
+              ),
+            ],
+            selected: {_baritsaaTulukh},
+            onSelectionChanged: (s) => _tulburiinTurulSolikh(s.first),
+          ),
+        ),
+        if (_baritsaaTulukh) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Барьцааны төлбөр түрээсийн төлбөрөөс тусдаа бүртгэгдэнэ.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.appTextTertiary),
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _buildQuickAmounts() {
     const fixed = [10000, 50000, 100000, 200000, 500000];
-    final uldegdel = _displayUldegdel;
+    final baritsaa = _baritsaaTulukh && _baritsaaUldegdel > 0;
+    final uldegdel = baritsaa ? _baritsaaUldegdel : _displayUldegdel;
+    final kharuulakhDunguud =
+        baritsaa ? fixed.where((d) => d <= uldegdel).toList() : fixed;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -400,9 +489,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                     children: [
                       const Icon(Icons.receipt_long_rounded, size: 16, color: AppColors.error),
                       const SizedBox(width: 8),
-                      const Text(
-                        'Нэхэмжлэлийн нийт дүн',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.error),
+                      Text(
+                        baritsaa ? 'Барьцааны үлдэгдэл' : 'Нэхэмжлэлийн нийт дүн',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.error),
                       ),
                     ],
                   ),
@@ -420,7 +509,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: fixed.map((amount) {
+          children: kharuulakhDunguud.map((amount) {
             final isSelected = _amountController.text == _numFmt.format(amount);
             return GestureDetector(
               onTap: () => setState(() => _amountController.text = _numFmt.format(amount)),

@@ -18,6 +18,7 @@ class PaymentRepository {
     required String register,
     required double amount,
     String? dansniiDugaar,
+    String? tulburiinTurul,
   }) async {
     final res = await _client.post(ApiConstants.qpayGenerate, data: {
       'barilgiinId': barilgiinId,
@@ -25,6 +26,8 @@ class PaymentRepository {
       'burtgeliinDugaar': register,
       'dun': amount,
       if (dansniiDugaar != null) 'dansniiDugaar': dansniiDugaar,
+      // "baritsaa" үед backend төлбөрийг авлагад биш барьцаанд бүртгэнэ.
+      if (tulburiinTurul != null) 'tulburiinTurul': tulburiinTurul,
     });
 
     final data = res.data as Map<String, dynamic>;

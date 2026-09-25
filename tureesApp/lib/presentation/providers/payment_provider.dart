@@ -28,6 +28,7 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
     required String register,
     required double amount,
     String? dansniiDugaar,
+    String? tulburiinTurul,
   }) async {
     final user = _ref.read(currentUserProvider);
     if (user == null) return;
@@ -40,6 +41,7 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
         register: register.isNotEmpty ? register : (user.register ?? ''),
         amount: amount,
         dansniiDugaar: dansniiDugaar,
+        tulburiinTurul: tulburiinTurul,
       );
       state = state.copyWith(isLoading: false, invoice: invoice);
     } catch (e) {
