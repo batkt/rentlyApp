@@ -1630,6 +1630,14 @@ class _FilesTabState extends ConsumerState<_FilesTab> {
   static const _gridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
     maxCrossAxisExtent: 220, crossAxisSpacing: 8, mainAxisSpacing: 8, childAspectRatio: 1,
   );
+  // Хадгалаагүй хэсэгт жижиг thumbnail — нэг мөрөнд 3-4 зураг багтана.
+  static const _jijigGridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
+    maxCrossAxisExtent: 110, crossAxisSpacing: 8, mainAxisSpacing: 8, childAspectRatio: 1,
+  );
+
+  // Бүх товч ижил өндөр, ижил хэлбэртэй байна.
+  static final _tovchniiKhelber = RoundedRectangleBorder(borderRadius: BorderRadius.circular(12));
+  static const _tovchniiUndur = Size.fromHeight(48);
 
   Widget _failMur({
     required String ner,
@@ -1660,25 +1668,40 @@ class _FilesTabState extends ConsumerState<_FilesTab> {
 
   Widget _nemekhTovchnuud() {
     final idevkhtei = _uldsenToo > 0 && !_uploading;
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      crossAxisAlignment: WrapCrossAlignment.center,
+    final niit = _zurguud.length + _khuleegdejBui.length;
+    Widget tovch({required IconData icon, required String label, required VoidCallback onPressed}) {
+      return Expanded(
+        child: OutlinedButton.icon(
+          onPressed: idevkhtei ? onPressed : null,
+          icon: Icon(icon, size: 20),
+          label: FittedBox(fit: BoxFit.scaleDown, child: Text(label)),
+          style: OutlinedButton.styleFrom(
+            minimumSize: _tovchniiUndur,
+            shape: _tovchniiKhelber,
+            foregroundColor: AppColors.primary,
+            side: BorderSide(color: AppColors.primary.withValues(alpha: idevkhtei ? 0.5 : 0.2)),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        FilledButton.icon(
-          onPressed: idevkhtei ? _pickImages : null,
-          icon: const Icon(Icons.add_photo_alternate_rounded, size: 18),
-          label: const Text('Зураг нэмэх'),
-          style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+        Row(
+          children: [
+            tovch(icon: Icons.add_photo_alternate_rounded, label: 'Зураг нэмэх', onPressed: _pickImages),
+            const SizedBox(width: 8),
+            tovch(icon: Icons.attach_file_rounded, label: 'Файл нэмэх', onPressed: _pickFiles),
+          ],
         ),
-        FilledButton.icon(
-          onPressed: idevkhtei ? _pickFiles : null,
-          icon: const Icon(Icons.attach_file_rounded, size: 18),
-          label: const Text('Файл нэмэх'),
-          style: FilledButton.styleFrom(backgroundColor: Colors.blueGrey),
+        const SizedBox(height: 8),
+        Text(
+          '$niit/$_deedToo файл · зураг, PDF, Excel, Word',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.appTextTertiary),
         ),
-        Text('${_zurguud.length + _khuleegdejBui.length}/$_deedToo',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.appTextTertiary)),
       ],
     );
   }
@@ -1696,14 +1719,23 @@ class _FilesTabState extends ConsumerState<_FilesTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Хадгалаагүй (${_khuleegdejBui.length})',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.cloud_upload_outlined, size: 18, color: AppColors.primary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text('Хадгалаагүй (${_khuleegdejBui.length})',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           if (zurguud.isNotEmpty) ...[
             GridView.builder(
               shrinkWrap: true,
+              padding: EdgeInsets.zero,
               physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: _gridDelegate,
+              gridDelegate: _jijigGridDelegate,
               itemCount: zurguud.length,
               itemBuilder: (_, i) => _zuragKhavtas(
                 zurag: Image.file(zurguud[i].file, fit: BoxFit.cover),
@@ -1728,6 +1760,7 @@ class _FilesTabState extends ConsumerState<_FilesTab> {
               Expanded(
                 child: OutlinedButton(
                   onPressed: _uploading ? null : () => setState(_khuleegdejBui.clear),
+                  style: OutlinedButton.styleFrom(minimumSize: _tovchniiUndur, shape: _tovchniiKhelber),
                   child: const Text('Болих'),
                 ),
               ),
@@ -1738,8 +1771,12 @@ class _FilesTabState extends ConsumerState<_FilesTab> {
                   icon: _uploading
                       ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                       : const Icon(Icons.save_rounded, size: 18),
-                  label: Text(_uploading ? 'Хадгалж байна...' : 'Хадгалах'),
-                  style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+                  label: FittedBox(fit: BoxFit.scaleDown, child: Text(_uploading ? 'Хадгалж байна...' : 'Хадгалах')),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    minimumSize: _tovchniiUndur,
+                    shape: _tovchniiKhelber,
+                  ),
                 ),
               ),
             ],
@@ -1795,6 +1832,7 @@ class _FilesTabState extends ConsumerState<_FilesTab> {
           const SizedBox(height: 8),
           GridView.builder(
             shrinkWrap: true,
+            padding: EdgeInsets.zero,
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: _gridDelegate,
             itemCount: imageItems.length,
