@@ -231,6 +231,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         if (mounted) ref.read(incomingNotificationProvider.notifier).state = null;
       });
     });
+    // Барилга солигдоход conversationsProvider шинээр үүсдэг тул тухайн барилгын чатыг ачаална.
+    ref.listen<String>(selectedBarilgiinIdProvider, (prev, next) {
+      if (prev != next && mounted) ref.read(conversationsProvider.notifier).load();
+    });
     ref.listen<ConversationsState>(conversationsProvider, (prev, next) {
       if (!mounted) return;
       final prevCount = prev?.conversations.fold<int>(0, (s, c) => s + c.unreadCount) ?? 0;

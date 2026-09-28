@@ -10,9 +10,12 @@ import 'auth_provider.dart';
 
 final conversationsProvider = StateNotifierProvider<ConversationsNotifier, ConversationsState>((ref) {
   final user = ref.watch(currentUserProvider);
+  // Барилга солиход тухайн барилгын чат руу шилжинэ.
+  final barilgiinId = ref.watch(selectedBarilgiinIdProvider);
   return ConversationsNotifier(
     ref.read(chatRepositoryProvider),
     user,
+    barilgiinId,
     ref.read(socketServiceProvider),
     ref,
   );
@@ -55,11 +58,12 @@ class ConversationsState {
 class ConversationsNotifier extends StateNotifier<ConversationsState> {
   final ChatRepository _repo;
   final UserModel? _user;
+  final String _barilgiinId;
   final SocketService _socket;
   final Ref _ref;
   String? _event;
 
-  ConversationsNotifier(this._repo, this._user, this._socket, this._ref) : super(const ConversationsState()) {
+  ConversationsNotifier(this._repo, this._user, this._barilgiinId, this._socket, this._ref) : super(const ConversationsState()) {
     final user = _user;
     if (user != null) {
       _event = 'shineChatKhariult${user.id}';
@@ -102,7 +106,7 @@ class ConversationsNotifier extends StateNotifier<ConversationsState> {
         khariltsagchiinId: user.id,
         khariltsagchiinNer: user.fullName.isNotEmpty ? user.fullName : user.primaryPhone,
         baiguullagiinId: user.baiguullagiinId,
-        barilgiinId: user.barilgiinId,
+        barilgiinId: _barilgiinId.isNotEmpty ? _barilgiinId : user.barilgiinId,
       );
       // conv.unreadCount is the MANAGER-facing counter (backend increments it
       // whenever the tenant sends a message, so managers see it as unread —

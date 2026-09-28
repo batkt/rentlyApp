@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/agreement_model.dart';
 import '../../data/repositories/agreement_repository.dart';
 import '../../data/services/geree_html_builder.dart';
+import '../../data/models/user_model.dart';
 import 'auth_provider.dart';
 
 // null = Бүгд (all), 1 = Идэвхтэй (active). Applied client-side so the
@@ -13,13 +14,12 @@ final agreementsProvider = FutureProvider<List<AgreementModel>>((ref) async {
   if (user == null) return [];
   final selectedBarilgiinId = ref.watch(selectedBarilgiinIdProvider);
   final repo = ref.read(agreementRepositoryProvider);
-  final agreements = await repo.getAgreements(
-    register: user.register ?? '',
-    customerTin: user.customerTin,
-    gereeniiIdnuud: user.gereeniiIdnuud,
-    barilgiinId: selectedBarilgiinId.isNotEmpty ? selectedBarilgiinId : null,
-    pageSize: 999999,
-  );
+  final barilgiinId = selectedBarilgiinId.isNotEmpty ? selectedBarilgiinId : null;
+  // Холбосон гэрээ (gereeniiIdnuud) болон регистр/ТИН-ээр олдох гэрээг хоёуланг
+  // нь авч нэгтгэнэ. Өмнө нь gereeniiIdnuud хоосон биш бол зөвхөн тэдгээрийг
+  // авдаг байсан тул backend нэг утастай өөр бүртгэлийн гэрээг нэгтгэхэд
+  // хэрэглэгчийн регистрээр олддог (өөр барилгын) гэрээнүүд алга болдог байв.
+  final agreements = await _gereenuudNegtgey(repo, user, barilgiinId: barilgiinId);
   if (agreements.isEmpty) return agreements;
 
   // Үлдэгдлийг `uldegdelBodyo`-оос ШУУД тооцуулна — tureesShine-ий
@@ -184,6 +184,36 @@ final transactionHistoryProvider =
   return repo.getTransactionHistory(gereeniiId);
 });
 
+/// Холбосон гэрээ болон регистр/ТИН-ээр олдсон гэрээг давхардалгүй нэгтгэнэ.
+Future<List<AgreementModel>> _gereenuudNegtgey(
+  AgreementRepository repo,
+  UserModel user, {
+  String? barilgiinId,
+}) async {
+  final khuseltuud = <Future<List<AgreementModel>>>[
+    if (user.gereeniiIdnuud.isNotEmpty)
+      repo.getAgreements(
+        register: '',
+        gereeniiIdnuud: user.gereeniiIdnuud,
+        barilgiinId: barilgiinId,
+        pageSize: 999999,
+      ),
+    repo.getAgreements(
+      register: user.register ?? '',
+      customerTin: user.customerTin,
+      barilgiinId: barilgiinId,
+      pageSize: 999999,
+    ),
+  ];
+  final khariunuud = await Future.wait(khuseltuud);
+  final uzsen = <String>{};
+  return [
+    for (final jagsaalt in khariunuud)
+      for (final a in jagsaalt)
+        if (uzsen.add(a.id)) a,
+  ];
+}
+
 /// Set of barilgiinIds that have at least one agreement for the current user.
 /// Used to filter the building picker so only buildings with contracts are shown.
 final barilguudWithAgreementsProvider = FutureProvider<Set<String>>((ref) async {
@@ -191,15 +221,9 @@ final barilguudWithAgreementsProvider = FutureProvider<Set<String>>((ref) async 
   if (user == null) return {};
   final repo = ref.read(agreementRepositoryProvider);
 
-  // Contracts linked from the dashboard are authoritative — the buildings
-  // they live in are exactly the ones this user should be able to switch to.
   if (user.gereeniiIdnuud.isNotEmpty) {
-    final linked = await repo.getAgreements(
-      register: '',
-      gereeniiIdnuud: user.gereeniiIdnuud,
-      pageSize: 999999,
-    );
-    return linked.map((a) => a.barilgiinId).where((id) => id.isNotEmpty).toSet();
+    final negtgesen = await _gereenuudNegtgey(repo, user);
+    return negtgesen.map((a) => a.barilgiinId).where((id) => id.isNotEmpty).toSet();
   }
 
   // Fetch agreements by phone number (primaryPhone) as requested: "check by utasniiDugaar"
