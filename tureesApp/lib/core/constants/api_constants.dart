@@ -20,6 +20,7 @@ class ApiConstants {
   static const String getUserByToken = '/tokenoorKhariltsagchAvya';
   static const String sergeekhKodAvya = '/sergeekhKodAvya';
   static const String nuutsUgSergeeye = '/nuutsUgSergeeye';
+  static const String nuutsUgSolikh = '/khariltsagchNuutsUgSolikh';
   static const String khariltsagch = '/khariltsagch';
   static const String khariltsagchidTokenOnooyo = '/khariltsagchidTokenOnooyo';
 

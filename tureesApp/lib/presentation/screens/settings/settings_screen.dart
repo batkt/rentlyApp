@@ -358,7 +358,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
             _SettingsItem(
               icon: Icons.lock_rounded,
               label: 'Нууц үг солих',
-              onTap: () => context.push('/reset-password'),
+              onTap: () => context.push('/change-password'),
             ),
             const Divider(height: 1),
             if (ref.watch(mashinBurtgelKharuulakhProvider)) ...[

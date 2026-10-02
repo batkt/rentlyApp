@@ -43,6 +43,7 @@ final agreementsProvider = FutureProvider<List<AgreementModel>>((ref) async {
       final niitUldegdel = await repo.getNiitUldegdel(
         a.gereeniiDugaar,
         a.barilgiinId,
+        tsutsalsan: a.tuluv == -1,
       );
       return a.copyWith(uldegdel: niitUldegdel);
     } catch (_) {

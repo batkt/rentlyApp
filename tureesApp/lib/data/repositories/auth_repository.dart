@@ -156,6 +156,14 @@ class AuthRepository {
     return data['token']?.toString() ?? '';
   }
 
+  /// Тохиргооноос нууц үг солих: хуучин нууц үг зөв бол л солигдоно.
+  Future<void> changePassword(String khuuchinNuutsUg, String shineNuutsUg) async {
+    await _client.post(ApiConstants.nuutsUgSolikh, data: {
+      'khuuchinNuutsUg': khuuchinNuutsUg,
+      'shineNuutsUg': shineNuutsUg,
+    });
+  }
+
   /// Step 3: updates the password using the one-time token from step 2.
   Future<void> updatePassword(String id, String newPassword, String token) async {
     await _client.put(

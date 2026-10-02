@@ -56,6 +56,14 @@ class MashinRepository {
     String? ekhlekhOgnoo,
     String? duusakhOgnoo,
   }) async {
+    // Машин бүртгэлийн "Тайлбар" баганад менежер аль гэрээ/талбайн машин
+    // болохыг шууд харна.
+    final tailbar = [
+      if (gereeniiDugaar != null && gereeniiDugaar.isNotEmpty)
+        'Гэрээ: $gereeniiDugaar',
+      if (talbainDugaar != null && talbainDugaar.isNotEmpty)
+        'Талбай: $talbainDugaar',
+    ].join(', ');
     await _client.post(ApiConstants.mashin, data: {
       'baiguullagiinId': baiguullagiinId,
       'barilgiinId': barilgiinId,
@@ -73,6 +81,10 @@ class MashinRepository {
         'gereeniiDugaar': gereeniiDugaar,
       if (ekhlekhOgnoo != null) 'ekhlekhOgnoo': ekhlekhOgnoo,
       if (duusakhOgnoo != null) 'duusakhOgnoo': duusakhOgnoo,
+      // Вэбийн форм ажилтны нэрийг өөрөө бичдэг — апп-аас бүртгэснийг
+      // "Бүртгэсэн ажилтан" баганад ялгаж харуулна.
+      'burtgesenAjiltaniiNer': 'Rently app',
+      if (tailbar.isNotEmpty) 'temdeglel': tailbar,
     });
   }
 

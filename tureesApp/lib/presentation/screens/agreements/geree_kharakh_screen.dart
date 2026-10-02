@@ -82,7 +82,11 @@ class _GereeWebViewState extends State<_GereeWebView> {
 <meta name="viewport" content="width=$_khuudasniiUrgun,user-scalable=yes">
 <style>
   /* Цагаан хуудас саарал дэвсгэр дээр — баримт мэт унших. */
-  html{background:#EDF0F2;}
+  /* iOS өргөн хуудсыг жижигрүүлэхдээ бичвэрийг өөрөө томруулдаг. Загварын
+     толгой "БАТЛАВ ... БАТЛАВ" гэх мэтээр олон зайгаар байрлуулагдсан тул
+     томорсон бичвэр мөрөнд багтахгүй тасарч, баруун багана зүүн тийш
+     унадаг байв — вэбтэй ижил хэмжээгээр нь үлдээнэ. */
+  html{background:#EDF0F2;-webkit-text-size-adjust:100%;text-size-adjust:100%;}
   body{margin:0;padding:18px 0 28px;width:${_khuudasniiUrgun}px;
        background:#EDF0F2;
        font-family:'Times New Roman',Times,serif;font-size:12pt;

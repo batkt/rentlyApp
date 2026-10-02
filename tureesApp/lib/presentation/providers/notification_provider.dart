@@ -189,7 +189,7 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
     if (user == null) return;
     await _repo.submitSanal(
       baiguullagiinId: user.baiguullagiinId,
-      barilgiinId: user.barilgiinId,
+      barilgiinId: _ref.read(selectedBarilgiinIdProvider),
       khariltsagchiinId: user.id,
       khariltsagchiinNer: user.fullName,
       message: message,
@@ -296,7 +296,7 @@ class TasksNotifier extends StateNotifier<TasksState> {
       title: title,
       description: description,
       baiguullagiinId: user.baiguullagiinId,
-      barilgiinId: user.barilgiinId,
+      barilgiinId: _ref.read(selectedBarilgiinIdProvider),
       khariltsagchiinId: user.id,
       khariltsagchiinNer: user.fullName,
     );
@@ -355,7 +355,7 @@ class DuudlagaNotifier extends StateNotifier<DuudlagaState> {
     if (user == null) return;
     await _repo.submitDuudlaga(
       baiguullagiinId: user.baiguullagiinId,
-      barilgiinId: user.barilgiinId,
+      barilgiinId: _ref.read(selectedBarilgiinIdProvider),
       khariltsagchiinId: user.id,
       khariltsagchiinNer: user.fullName,
       title: title,

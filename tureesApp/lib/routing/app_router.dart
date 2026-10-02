@@ -14,6 +14,7 @@ import '../presentation/screens/agreements/all_invoices_screen.dart';
 import '../presentation/screens/payment/payment_screen.dart';
 import '../presentation/screens/payment/qpay_screen.dart';
 import '../presentation/screens/settings/mashin_screen.dart';
+import '../presentation/screens/settings/change_password_screen.dart';
 import '../presentation/screens/chat/chat_detail_screen.dart';
 
 /// Root navigator of the app. Warnings that must survive a route change —
@@ -59,6 +60,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const HomeScreen(),
       ),
       GoRoute(path: '/mashin', builder: (_, __) => const MashinScreen()),
+      GoRoute(path: '/change-password', builder: (_, __) => const ChangePasswordScreen()),
       GoRoute(path: '/invoices', builder: (_, __) => const AllInvoicesScreen()),
       GoRoute(
         path: '/agreements/:id',

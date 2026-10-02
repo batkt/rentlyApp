@@ -207,17 +207,73 @@ class _NotificationsTab extends ConsumerWidget {
             if (items[index].isUnread) {
               ref.read(notificationsProvider.notifier).markRead(items[index].id);
             }
-            final gereeniiId = items[index].gereeniiId;
-            if (items[index].turul == 'nekhemjlekh' && gereeniiId != null && gereeniiId.isNotEmpty) {
-              // Open the Нэхэмжлэх tab directly — the notification is about an
-              // invoice, so landing on Мэдээлэл made the tenant hunt for it.
-              context.push('/agreements/$gereeniiId?tab=$kAgreementInvoiceTab');
-            }
+            _medegdelKharuulya(context, items[index]);
           },
         ),
       ),
     );
   }
+}
+
+/// Жагсаалтад мэдэгдэл 2 мөрөөр тасардаг тул дарахад бүтэн бичвэрийг
+/// томоор нь жижиг цонхонд харуулна.
+void _medegdelKharuulya(BuildContext context, NotificationModel medegdel) {
+  final gereeniiId = medegdel.gereeniiId;
+  final nekhemjlekhtei = medegdel.turul == 'nekhemjlekh' &&
+      gereeniiId != null &&
+      gereeniiId.isNotEmpty;
+  showDialog(
+    context: context,
+    builder: (dialogContext) {
+      final theme = Theme.of(dialogContext);
+      return AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          medegdel.title,
+          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        content: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(dialogContext).size.height * 0.5,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SelectableText(
+                  medegdel.message,
+                  style: theme.textTheme.bodyLarge?.copyWith(fontSize: 17, height: 1.45),
+                ),
+                if (medegdel.createdAt != null) ...[
+                  const SizedBox(height: 14),
+                  Text(
+                    AppFormatters.dateTime(medegdel.createdAt),
+                    style: theme.textTheme.labelMedium?.copyWith(color: dialogContext.appTextTertiary),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          if (nekhemjlekhtei)
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                // Нэхэмжлэхийн тухай мэдэгдэл тул шууд Нэхэмжлэх таб руу.
+                context.push('/agreements/$gereeniiId?tab=$kAgreementInvoiceTab');
+              },
+              child: const Text('Нэхэмжлэх харах'),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Хаах'),
+          ),
+        ],
+      );
+    },
+  );
 }
 
 class _RequestsTab extends ConsumerStatefulWidget {

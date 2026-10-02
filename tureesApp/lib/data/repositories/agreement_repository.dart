@@ -126,7 +126,13 @@ class AgreementRepository {
     return res.data as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> getUldegdel(String gereeniiDugaar, String barilgiinId) async {
+  /// [tsutsalsan] — цуцлагдсан (tuluv -1) гэрээ. Backend анхдагчаар
+  /// цуцлагдсан гэрээг хасдаг тул тэмдэглэхгүй бол үлдэгдэл үргэлж 0 ирнэ.
+  Future<Map<String, dynamic>> getUldegdel(
+    String gereeniiDugaar,
+    String barilgiinId, {
+    bool tsutsalsan = false,
+  }) async {
     // Without an ognoo range, the backend caps this to "as of right now",
     // excluding pre-billed future-dated charges a just-generated invoice
     // already includes (tureesBack controller/tulbur.js uldegdelBodyo).
@@ -140,6 +146,7 @@ class AgreementRepository {
       'gereeniiDugaar': gereeniiDugaar,
       'barilgiinId': barilgiinId,
       'ognoo': [null, asOf],
+      if (tsutsalsan) 'tsutsalsanTurul': true,
     });
     return res.data as Map<String, dynamic>;
   }
@@ -192,8 +199,16 @@ class AgreementRepository {
     }
   }
 
-  Future<double> getNiitUldegdel(String gereeniiDugaar, String barilgiinId) async {
-    final res = await getUldegdel(gereeniiDugaar, barilgiinId);
+  Future<double> getNiitUldegdel(
+    String gereeniiDugaar,
+    String barilgiinId, {
+    bool tsutsalsan = false,
+  }) async {
+    final res = await getUldegdel(
+      gereeniiDugaar,
+      barilgiinId,
+      tsutsalsan: tsutsalsan,
+    );
     // uldegdelBodyo never folds aldangi (late fee) into `uldegdel` — it's
     // always returned as a separate field, so add it here to match the
     // invoice/QPay total the tenant actually owes.

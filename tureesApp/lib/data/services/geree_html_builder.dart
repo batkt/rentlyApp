@@ -62,6 +62,7 @@ class GereeHtmlBuilder {
       ...zaaltuud,
     ];
     _orluulya(khesguud, geree);
+    _uldsenOrluulgaArilgaya(khesguud);
 
     // Загварт нэр байхгүй бол вэб толгой/хөлийг нь огт үзүүлдэггүй.
     final nertei = _mur(zagvar['ner']).isNotEmpty;
@@ -224,6 +225,18 @@ class GereeHtmlBuilder {
       if (utga is List || utga is Map) return;
       sold(tulkhuur, utga == null ? '' : utga.toString());
     });
+  }
+
+  /// Гэрээн дээр утга нь байхгүй талбарын орлуулга (`<zakhirliinOvog>`,
+  /// `<zoriulalt>` г.м) түрээслэгчид түүхий хэлбэрээрээ харагдаж байсан —
+  /// хоосон үлдээнэ. Зөвхөн талбарын нэр шиг бичвэрийг барина.
+  static final RegExp _uldsenOrluulga =
+      RegExp(r'&lt;[A-Za-z][A-Za-z0-9_.]*&gt;');
+
+  static void _uldsenOrluulgaArilgaya(List<String> khesguud) {
+    for (var i = 0; i < khesguud.length; i++) {
+      khesguud[i] = khesguud[i].replaceAll(_uldsenOrluulga, '');
+    }
   }
 
   static void _zardliinOrluulga(

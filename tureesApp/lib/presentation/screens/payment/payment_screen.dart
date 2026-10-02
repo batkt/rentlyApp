@@ -78,6 +78,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         uldegdel = await repo.getNiitUldegdel(
           agreement.gereeniiDugaar,
           agreement.barilgiinId,
+          tsutsalsan: agreement.tuluv == -1,
         );
       } catch (_) {
         uldegdel = info.niitUldegdel;
