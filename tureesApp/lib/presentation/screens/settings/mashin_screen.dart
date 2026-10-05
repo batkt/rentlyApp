@@ -35,9 +35,21 @@ class _MashinScreenState extends ConsumerState<MashinScreen> {
     _controller.addListener(_keyboardSolikh);
   }
 
+  final _dugaarFocus = FocusNode();
+
   void _keyboardSolikh() {
     final useg = _controller.text.length >= 4;
-    if (useg != _usegOruulakh) setState(() => _usegOruulakh = useg);
+    if (useg == _usegOruulakh) return;
+    setState(() => _usegOruulakh = useg);
+    // An open keyboard ignores a keyboardType change (Flutter only sends
+    // updateConfig), so drop focus and take it back next frame — the new input
+    // connection opens with the new keyboard.
+    if (_dugaarFocus.hasFocus) {
+      _dugaarFocus.unfocus();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _dugaarFocus.requestFocus();
+      });
+    }
   }
 
   /// Contract the plate is registered against. The parking module lists a
@@ -48,6 +60,7 @@ class _MashinScreenState extends ConsumerState<MashinScreen> {
   void dispose() {
     _controller.removeListener(_keyboardSolikh);
     _controller.dispose();
+    _dugaarFocus.dispose();
     super.dispose();
   }
 
@@ -265,6 +278,7 @@ class _MashinScreenState extends ConsumerState<MashinScreen> {
                       label: 'Улсын дугаар',
                       hint: '1234АБВ',
                       controller: _controller,
+                      focusNode: _dugaarFocus,
                       maxLength: 7,
                       keyboardType: _usegOruulakh
                           ? TextInputType.text
