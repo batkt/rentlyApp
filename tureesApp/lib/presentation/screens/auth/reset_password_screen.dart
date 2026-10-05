@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/storage/secure_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/repositories/auth_repository.dart';
 import '../../widgets/common/app_button.dart';
@@ -38,24 +39,74 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   String _khariltsagchId = '';
   String _recoveryToken = '';
 
-  // Код дахин илгээх хүртэл үлдсэн секунд. Сервер 60 секундын завсар тавьдаг
+  // Код дахин илгээх хүртэл үлдсэн секунд. Сервер 2 минутын завсар тавьдаг
   // (sergeekhKodAvya), товчийг мөн тэр хугацаанд идэвхгүй болгоно — эс тэгвээс
   // дараалж дарахад харилцагч руу дараалсан SMS очно.
-  static const int _dakhinIlgeekhSekund = 60;
+  static const int _dakhinIlgeekhSekund = 120;
   int _uldsenSekund = 0;
   Timer? _tooluur;
 
-  void _tooluurEkhluuley() {
+  /// 95 → "1:35".
+  String get _uldsenKhugatsaa =>
+      '${_uldsenSekund ~/ 60}:${(_uldsenSekund % 60).toString().padLeft(2, '0')}';
+
+  // Дуусах хугацааг утас бүрээр хадгална — хэрэглэгч дэлгэцээс гараад буцаж
+  // орох, эсвэл аппаа хаагаад нээхэд ч тоолуур үргэлжилнэ.
+  String _tooluuriinTulkhuur(String utas) => 'sergeekh_kod_duusakh_$utas';
+  DateTime? _tooluurDuusakh;
+
+  /// [sekund] секундын тоолуур эхлүүлж, дуусах хугацааг хадгална.
+  void _tooluurEkhluuley([int sekund = _dakhinIlgeekhSekund]) {
+    final duusakh = DateTime.now().add(Duration(seconds: sekund));
+    ref.read(secureStorageProvider).write(
+          _tooluuriinTulkhuur(_phoneController.text.trim()),
+          duusakh.millisecondsSinceEpoch.toString(),
+        );
+    _tooluurAjilluulya(duusakh);
+  }
+
+  void _tooluurAjilluulya(DateTime duusakh) {
     _tooluur?.cancel();
-    setState(() => _uldsenSekund = _dakhinIlgeekhSekund);
+    _tooluurDuusakh = duusakh;
+    // Үлдсэн хугацааг дуусах цагаас тооцно — апп background-д байсан ч зөв.
+    int uldsen() {
+      final s = duusakh.difference(DateTime.now()).inMilliseconds / 1000;
+      return s <= 0 ? 0 : s.ceil();
+    }
+
+    setState(() => _uldsenSekund = uldsen());
+    if (_uldsenSekund <= 0) return;
     _tooluur = Timer.periodic(const Duration(seconds: 1), (tooluur) {
       if (!mounted) {
         tooluur.cancel();
         return;
       }
-      setState(() => _uldsenSekund--);
+      setState(() => _uldsenSekund = uldsen());
       if (_uldsenSekund <= 0) tooluur.cancel();
     });
+  }
+
+  /// Тухайн дугаарт өмнө нь код илгээсэн бол үлдсэн хугацааг сэргээнэ.
+  Future<void> _khadgalsanTooluurSergeeye() async {
+    final utas = _phoneController.text.trim();
+    if (utas.length < 8) {
+      if (_tooluurDuusakh != null) {
+        _tooluur?.cancel();
+        _tooluurDuusakh = null;
+        setState(() => _uldsenSekund = 0);
+      }
+      return;
+    }
+    final saved = await ref.read(secureStorageProvider).read(_tooluuriinTulkhuur(utas));
+    final ms = int.tryParse(saved ?? '');
+    if (!mounted || utas != _phoneController.text.trim()) return;
+    if (ms == null) {
+      _tooluur?.cancel();
+      _tooluurDuusakh = null;
+      setState(() => _uldsenSekund = 0);
+      return;
+    }
+    _tooluurAjilluulya(DateTime.fromMillisecondsSinceEpoch(ms));
   }
 
   @override
@@ -64,11 +115,16 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
     if (widget.initialPhone != null) {
       _phoneController.text = widget.initialPhone!;
     }
+    _phoneController.addListener(_khadgalsanTooluurSergeeye);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _khadgalsanTooluurSergeeye();
+    });
   }
 
   @override
   void dispose() {
     _tooluur?.cancel();
+    _phoneController.removeListener(_khadgalsanTooluurSergeeye);
     _phoneController.dispose();
     _otpController.dispose();
     _newPasswordController.dispose();
@@ -95,6 +151,13 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
         showAppSnackBar(context, 'Сэргээх код утсанд илгээлээ', turul: SnackTurul.amjilt);
       }
     } catch (e) {
+      // Сервер "Дахин код авахад N секунд үлдлээ." (429) гэвэл тоолуурыг
+      // серверийн үлдсэн хугацаагаар эхлүүлнэ.
+      if (e is DioException && e.response?.statusCode == 429) {
+        final msg = e.response?.data is Map ? '${e.response?.data['aldaa']}' : '';
+        final sekund = int.tryParse(RegExp(r'\d+').firstMatch(msg)?.group(0) ?? '');
+        if (mounted) _tooluurEkhluuley(sekund ?? _dakhinIlgeekhSekund);
+      }
       if (mounted) {
         showAppSnackBar(context, _parseError(e), turul: SnackTurul.aldaa);
       }
@@ -244,8 +307,9 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
         ),
         const SizedBox(height: 28),
         AppButton(
-          label: 'Код авах',
-          onPressed: _isLoading ? null : _sendCode,
+          // Буцаж утасны алхам руу ороод дахин дарж болохгүй — мөн 2 минут хүлээнэ.
+          label: _uldsenSekund > 0 ? 'Код авах ($_uldsenKhugatsaa)' : 'Код авах',
+          onPressed: (_isLoading || _uldsenSekund > 0) ? null : _sendCode,
           isLoading: _isLoading,
           icon: Icons.send_rounded,
         ),
@@ -283,7 +347,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
           onPressed: (_isLoading || _uldsenSekund > 0) ? null : _sendCode,
           child: Text(
             _uldsenSekund > 0
-                ? 'Код дахин илгээх ($_uldsenSekund сек)'
+                ? 'Код дахин илгээх ($_uldsenKhugatsaa)'
                 : 'Код дахин илгээх',
             style: const TextStyle(fontSize: 13),
           ),
