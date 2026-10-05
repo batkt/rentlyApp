@@ -109,14 +109,14 @@ class _AiTuslakhScreenState extends ConsumerState<AiTuslakhScreen>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    aiTab ? 'AI туслах' : 'Захиргаа',
+                    aiTab ? 'AI туслах' : 'Оператор',
                     style: Theme.of(context)
                         .textTheme
                         .titleSmall
                         ?.copyWith(fontWeight: FontWeight.w700),
                   ),
                   Text(
-                    aiTab ? 'Аппын талаар юу ч асуугаарай' : 'Захиргаатай шууд чатлах',
+                    aiTab ? 'Аппын талаар юу ч асуугаарай' : 'Оператортой шууд чатлах',
                     style: TextStyle(fontSize: 11, color: context.appTextSecondary),
                   ),
                 ],
@@ -152,7 +152,7 @@ class _AiTuslakhScreenState extends ConsumerState<AiTuslakhScreen>
                       child: const Icon(Icons.support_agent_rounded, size: 18),
                     ),
                     iconMargin: const EdgeInsets.only(bottom: 2),
-                    text: 'Захиргаа',
+                    text: 'Оператор',
                   ),
                 ],
               )
@@ -606,7 +606,7 @@ class _AiTuslakhChatState extends ConsumerState<_AiTuslakhChat> {
             child: TextButton.icon(
               onPressed: widget.onOperator,
               icon: const Icon(Icons.support_agent_rounded, size: 18),
-              label: const Text('Захиргаатай шууд чатлах'),
+              label: const Text('Оператортой шууд чатлах'),
               style: TextButton.styleFrom(foregroundColor: AppColors.primary),
             ),
           ),

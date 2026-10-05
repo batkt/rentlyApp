@@ -239,7 +239,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         .where((m) => !m.isFromUser && m.ajiltanNer != null && m.ajiltanNer!.isNotEmpty)
         .lastOrNull
         ?.ajiltanNer;
-    final name = agentName ?? 'Захиргаа';
+    final name = agentName ?? 'Оператор';
 
     ref.listen(messagesProvider(widget.conversationId), (prev, next) {
       if ((prev?.messages.length ?? 0) < next.messages.length) {
@@ -391,7 +391,12 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                 textCapitalization: TextCapitalization.sentences,
                 decoration: const InputDecoration(
                   hintText: 'Мессеж бичих...',
+                  // Гаднах Container хүрээ зурдаг — theme-ийн enabled/focused
+                  // хүрээг ч унтраахгүй бол давхар хүрээтэй харагдана.
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
                   contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   filled: false,
                 ),
