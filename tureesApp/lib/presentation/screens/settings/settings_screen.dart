@@ -6,12 +6,12 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/services/push_notification_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../providers/ai_tuslakh_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/mashin_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/common/app_button.dart';
-import '../home/home_screen.dart' show chatVisibleProvider;
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -343,7 +343,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   }
 
   Widget _buildSettingsSection(BuildContext context, WidgetRef ref, bool isDark) {
-    final chatVisible = ref.watch(chatVisibleProvider);
+    final aiTuslakhIdevkhtei = ref.watch(aiTuslakhIdevkhteiProvider);
     final notifEnabled = ref.watch(notificationsEnabledProvider);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -382,12 +382,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
             const Divider(height: 1),
             ListTile(
               leading: const Icon(Icons.chat_bubble_rounded, size: 20, color: AppColors.primary),
-              title: const Text('Чат харуулах'),
+              title: const Text('Чат ба AI туслах'),
+              subtitle: Text(
+                aiTuslakhIdevkhtei ? 'Нүүр хуудсанд харагдаж байна' : 'Нүүр хуудсанд нуугдсан',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.appTextTertiary),
+              ),
+              onTap: () => ref.read(aiTuslakhIdevkhteiProvider.notifier).set(!aiTuslakhIdevkhtei),
               trailing: Switch.adaptive(
-                value: chatVisible,
+                value: aiTuslakhIdevkhtei,
                 activeThumbColor: AppColors.primary,
                 activeTrackColor: AppColors.primaryContainer,
-                onChanged: (v) => ref.read(chatVisibleProvider.notifier).state = v,
+                onChanged: (v) => ref.read(aiTuslakhIdevkhteiProvider.notifier).set(v),
               ),
             ),
             const Divider(height: 1),

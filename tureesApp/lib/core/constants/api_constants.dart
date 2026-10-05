@@ -24,6 +24,9 @@ class ApiConstants {
   static const String khariltsagch = '/khariltsagch';
   static const String khariltsagchidTokenOnooyo = '/khariltsagchidTokenOnooyo';
 
+  // AI туслах — хариу нь text/plain-ээр stream ирнэ.
+  static const String aiTuslakh = '/aiTuslakh';
+
   // Organization
   static const String organization = '/baiguullaga';
 

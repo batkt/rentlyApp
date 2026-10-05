@@ -79,13 +79,22 @@ class DioClient {
     return await _dio.get(path, queryParameters: queryParameters, options: options);
   }
 
+  /// `cancelToken` нь урт хүсэлтийг (жишээ нь AI туслахын stream хариу)
+  /// хэрэглэгч зогсооход тасалж чадахын тулд.
   Future<Response> post(
     String path, {
     dynamic data,
     Map<String, dynamic>? queryParameters,
     Options? options,
+    CancelToken? cancelToken,
   }) async {
-    return await _dio.post(path, data: data, queryParameters: queryParameters, options: options);
+    return await _dio.post(
+      path,
+      data: data,
+      queryParameters: queryParameters,
+      options: options,
+      cancelToken: cancelToken,
+    );
   }
 
   Future<Response> put(

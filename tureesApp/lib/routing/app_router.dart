@@ -16,6 +16,7 @@ import '../presentation/screens/payment/qpay_screen.dart';
 import '../presentation/screens/settings/mashin_screen.dart';
 import '../presentation/screens/settings/change_password_screen.dart';
 import '../presentation/screens/chat/chat_detail_screen.dart';
+import '../presentation/screens/ai_tuslakh/ai_tuslakh_screen.dart';
 
 /// Root navigator of the app. Warnings that must survive a route change —
 /// e.g. the "эрх устгагдсан" dialog, which is followed by a redirect to
@@ -62,6 +63,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/mashin', builder: (_, __) => const MashinScreen()),
       GoRoute(path: '/change-password', builder: (_, __) => const ChangePasswordScreen()),
       GoRoute(path: '/invoices', builder: (_, __) => const AllInvoicesScreen()),
+      // Нэгдсэн чат: AI туслах + захиргаа. `?tab=zakhirgaa` бол захиргааны таб дээр.
+      GoRoute(
+        path: '/ai-tuslakh',
+        builder: (_, state) => AiTuslakhScreen(
+          zakhirgaaTabaar: state.uri.queryParameters['tab'] == 'zakhirgaa',
+        ),
+      ),
       GoRoute(
         path: '/agreements/:id',
         builder: (context, state) {
@@ -90,7 +98,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/chat/:id',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
-          if (id == 'loading') return const _ChatLoadingScreen();
           final conversation = state.extra as ConversationModel?;
           return ChatDetailScreen(conversationId: id, conversation: conversation);
         },
@@ -115,14 +122,3 @@ final routerProvider = Provider<GoRouter>((ref) {
     ),
   );
 });
-
-class _ChatLoadingScreen extends StatelessWidget {
-  const _ChatLoadingScreen();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
-    );
-  }
-}

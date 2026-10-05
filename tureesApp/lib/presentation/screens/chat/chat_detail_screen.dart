@@ -19,10 +19,15 @@ class ChatDetailScreen extends ConsumerStatefulWidget {
   final String conversationId;
   final ConversationModel? conversation;
 
+  /// `true` бол өөрийн Scaffold/AppBar-гүйгээр зөвхөн мессежүүд болон оруулах
+  /// мөрийг зурна — «AI туслах»-ын дэлгэцийн «Захиргаа» таб дотор ашиглана.
+  final bool embedded;
+
   const ChatDetailScreen({
     super.key,
     required this.conversationId,
     this.conversation,
+    this.embedded = false,
   });
 
   @override
@@ -242,6 +247,58 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       }
     });
 
+    final body = Column(
+      children: [
+        Expanded(
+          child: Builder(builder: (context) {
+            if (state.isLoading && state.messages.isEmpty) return const AppLoading();
+            if (state.messages.isEmpty) {
+              return const AppEmpty(
+                icon: Icons.chat_bubble_outline_rounded,
+                message: 'Мессеж байхгүй байна',
+                subMessage: 'Эхний мессежийг илгээнэ үү',
+              );
+            }
+            return ListView.builder(
+              controller: _scrollController,
+              padding: EdgeInsets.symmetric(horizontal: context.tovZai(min: 16), vertical: 12),
+              itemCount: state.messages.length,
+              itemBuilder: (context, index) {
+                final message = state.messages[index];
+                final isMine = message.isFromUser;
+                final showDate = index == 0 ||
+                    _isDifferentDay(state.messages[index - 1].createdAt, message.createdAt);
+                return Column(
+                  children: [
+                    if (showDate) _DateDivider(date: message.createdAt),
+                    _MessageBubble(message: message, isMine: isMine),
+                  ],
+                );
+              },
+            );
+          }),
+        ),
+        if (state.error != null)
+          Container(
+            color: context.appErrorLight,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline, size: 14, color: AppColors.error),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(state.error!,
+                      style: const TextStyle(fontSize: 12, color: AppColors.error)),
+                ),
+              ],
+            ),
+          ),
+        _buildInputBar(state),
+      ],
+    );
+
+    if (widget.embedded) return body;
+
     return Scaffold(
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
@@ -275,55 +332,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           ],
         ),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: Builder(builder: (context) {
-              if (state.isLoading && state.messages.isEmpty) return const AppLoading();
-              if (state.messages.isEmpty) {
-                return const AppEmpty(
-                  icon: Icons.chat_bubble_outline_rounded,
-                  message: 'Мессеж байхгүй байна',
-                  subMessage: 'Эхний мессежийг илгээнэ үү',
-                );
-              }
-              return ListView.builder(
-                controller: _scrollController,
-                padding: EdgeInsets.symmetric(horizontal: context.tovZai(min: 16), vertical: 12),
-                itemCount: state.messages.length,
-                itemBuilder: (context, index) {
-                  final message = state.messages[index];
-                  final isMine = message.isFromUser;
-                  final showDate = index == 0 ||
-                      _isDifferentDay(state.messages[index - 1].createdAt, message.createdAt);
-                  return Column(
-                    children: [
-                      if (showDate) _DateDivider(date: message.createdAt),
-                      _MessageBubble(message: message, isMine: isMine),
-                    ],
-                  );
-                },
-              );
-            }),
-          ),
-          if (state.error != null)
-            Container(
-              color: context.appErrorLight,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  const Icon(Icons.error_outline, size: 14, color: AppColors.error),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(state.error!,
-                        style: const TextStyle(fontSize: 12, color: AppColors.error)),
-                  ),
-                ],
-              ),
-            ),
-          _buildInputBar(state),
-        ],
-      ),
+      body: body,
     );
   }
 
