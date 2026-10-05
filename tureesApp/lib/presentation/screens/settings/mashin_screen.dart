@@ -25,12 +25,28 @@ class _MashinScreenState extends ConsumerState<MashinScreen> {
   final _controller = TextEditingController();
   bool _saving = false;
 
+  /// The plate is 4 digits then 3 Cyrillic letters, so the keyboard starts
+  /// numeric and switches to the phone's text keyboard once the digits are in.
+  bool _usegOruulakh = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_keyboardSolikh);
+  }
+
+  void _keyboardSolikh() {
+    final useg = _controller.text.length >= 4;
+    if (useg != _usegOruulakh) setState(() => _usegOruulakh = useg);
+  }
+
   /// Contract the plate is registered against. The parking module lists a
   /// Түрээслэгч car by its талбай and гэрээ, so the record needs one.
   AgreementModel? _geree;
 
   @override
   void dispose() {
+    _controller.removeListener(_keyboardSolikh);
     _controller.dispose();
     super.dispose();
   }
@@ -250,6 +266,9 @@ class _MashinScreenState extends ConsumerState<MashinScreen> {
                       hint: '1234АБВ',
                       controller: _controller,
                       maxLength: 7,
+                      keyboardType: _usegOruulakh
+                          ? TextInputType.text
+                          : TextInputType.number,
                       textCapitalization: TextCapitalization.characters,
                       inputFormatters: [_UlsiinDugaarFormatter()],
                       onSubmitted: (_) => _add(),
@@ -331,10 +350,7 @@ class _MashinScreenState extends ConsumerState<MashinScreen> {
                                     Text(
                                       [
                                         if (mashin.turul.isNotEmpty) mashin.turul,
-                                        if (mashin.tuluv.isNotEmpty)
-                                          mashin.tuluv
-                                        else
-                                          'Хүлээгдэж буй',
+                                        if (mashin.tuluv.isNotEmpty) mashin.tuluv,
                                         if (mashin.talbainDugaar.isNotEmpty)
                                           mashin.talbainDugaar,
                                       ].join(' · '),

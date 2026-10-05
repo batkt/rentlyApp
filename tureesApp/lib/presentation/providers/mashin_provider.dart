@@ -23,8 +23,11 @@ final mashinuudProvider = FutureProvider<List<MashinModel>>((ref) async {
   if (user == null) return [];
   final register = user.register ?? '';
   if (register.isEmpty) return [];
+  // Сонгосон барилгын машинуудыг л харуулна — гэрээний жагсаалттай адил.
+  final barilgiinId = ref.watch(selectedBarilgiinIdProvider);
   return ref.read(mashinRepositoryProvider).getMashinuud(
         baiguullagiinId: user.baiguullagiinId,
         register: register,
+        barilgiinId: barilgiinId.isNotEmpty ? barilgiinId : null,
       );
 });

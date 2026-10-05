@@ -13,16 +13,18 @@ class MashinRepository {
 
   MashinRepository(this._client);
 
-  /// The tenant's own vehicles. Scoped by register the same way the web app
-  /// does — a plate belongs to whoever registered it, not to a building.
+  /// The tenant's own vehicles, scoped by register and — when a building is
+  /// selected — to that building's parking lot.
   Future<List<MashinModel>> getMashinuud({
     required String baiguullagiinId,
     required String register,
+    String? barilgiinId,
   }) async {
     final res = await _client.get(ApiConstants.mashin, queryParameters: {
       'query': jsonEncode({
         'baiguullagiinId': baiguullagiinId,
         'ezemshigchiinRegister': register,
+        if (barilgiinId != null) 'barilgiinId': barilgiinId,
       }),
       'khuudasniiKhemjee': 999999,
     });
