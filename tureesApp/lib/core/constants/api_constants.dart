@@ -26,6 +26,8 @@ class ApiConstants {
 
   // AI туслах — хариу нь text/plain-ээр stream ирнэ.
   static const String aiTuslakh = '/aiTuslakh';
+  // AI туслахын хариултын 👍/👎 үнэлгээ — { logId, unelgee: 1|-1|0, tailbar? }.
+  static const String aiTuslakhUnelgee = '/aiTuslakhUnelgee';
 
   // Organization
   static const String organization = '/baiguullaga';

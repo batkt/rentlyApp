@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_snackbar.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chat_provider.dart';
 import '../../widgets/common/app_loading.dart';
@@ -240,6 +241,15 @@ class _Messej {
   final String role; // user | assistant
   String content;
   bool aldaa = false;
+
+  /// Хэрэглэгч зогсоосон (дутуу) хариу — үнэлгээ авахгүй.
+  bool tasalsan = false;
+
+  /// Сервер `X-Ai-Log-Id` толгойгоор өгсөн log-ийн id (үнэлгээнд хэрэглэнэ).
+  String? logId;
+
+  /// 1 = 👍, -1 = 👎, null = үнэлээгүй.
+  int? unelgee;
   _Messej(this.role, this.content);
 }
 
@@ -350,6 +360,7 @@ class _AiTuslakhChatState extends ConsumerState<_AiTuslakhChat> {
             cancelToken: cancelToken,
           );
 
+      khariu.logId = res.headers.value('x-ai-log-id');
       final body = res.data as ResponseBody;
       if (cancelToken.isCancelled) return;
       _duussan = duussan;
@@ -373,8 +384,12 @@ class _AiTuslakhChatState extends ConsumerState<_AiTuslakhChat> {
         throw Exception('AI туслах хариу өгсөнгүй. Дахин оролдоно уу.');
       }
     } catch (e) {
+      if (e is DioException) {
+        khariu.logId ??= e.response?.headers.value('x-ai-log-id');
+      }
       if (!mounted || _zogsooson || (e is DioException && CancelToken.isCancel(e))) {
         // Хэрэглэгч өөрөө зогсоосон — алдаа харуулахгүй.
+        khariu.tasalsan = true;
       } else {
         final msg = await _aldaaniiMessej(e);
         if (mounted) {
@@ -458,6 +473,31 @@ class _AiTuslakhChatState extends ConsumerState<_AiTuslakhChat> {
     }
   }
 
+  /// 👍/👎 — UI-д шууд тусгаж, амжилтгүй бол буцаана. 0 = үнэлгээг цуцлах.
+  Future<bool> _unelgeeIlgeekh(_Messej m, int unelgee, [String? tailbar]) async {
+    final logId = m.logId;
+    if (logId == null) return false;
+    final umnukh = m.unelgee;
+    setState(() => m.unelgee = unelgee == 0 ? null : unelgee);
+    try {
+      await ref.read(dioClientProvider).post(
+        ApiConstants.aiTuslakhUnelgee,
+        data: {
+          'logId': logId,
+          'unelgee': unelgee,
+          if (tailbar != null && tailbar.isNotEmpty) 'tailbar': tailbar,
+        },
+      );
+      return true;
+    } catch (_) {
+      if (mounted) {
+        setState(() => m.unelgee = umnukh);
+        showAppSnackBar(context, 'Үнэлгээ хадгалж чадсангүй', turul: SnackTurul.aldaa);
+      }
+      return false;
+    }
+  }
+
   void _zogsookh() {
     _zogsooson = true;
     _cancelToken?.cancel();
@@ -488,7 +528,10 @@ class _AiTuslakhChatState extends ConsumerState<_AiTuslakhChat> {
                       controller: _scroll,
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                       itemCount: _tuukh.length,
-                      itemBuilder: (context, i) => _buildMessej(_tuukh[i]),
+                      itemBuilder: (context, i) => _buildMessej(
+                        _tuukh[i],
+                        suuliin: i == _tuukh.length - 1,
+                      ),
                     ),
             ),
             _buildOruulga(),
@@ -572,14 +615,46 @@ class _AiTuslakhChatState extends ConsumerState<_AiTuslakhChat> {
     );
   }
 
-  Widget _buildMessej(_Messej m) {
+  Widget _buildMessej(_Messej m, {bool suuliin = false}) {
     final user = m.role == 'user';
     final khoosonKhariu = !user && m.content.isEmpty && _khuleej;
+    final unelgeeKharuulakh = !user &&
+        m.logId != null &&
+        !m.aldaa &&
+        !m.tasalsan &&
+        m.content.trim().isNotEmpty &&
+        !(_khuleej && suuliin);
+    final bubble = _buildBubble(
+      m,
+      user: user,
+      khoosonKhariu: khoosonKhariu,
+      dooshZai: unelgeeKharuulakh ? 0 : 10,
+    );
+    if (!unelgeeKharuulakh) return bubble;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        bubble,
+        _UnelgeeMur(
+          key: ValueKey('unelgee_${m.logId}'),
+          unelgee: m.unelgee,
+          onUnelgee: (utga, [tailbar]) => _unelgeeIlgeekh(m, utga, tailbar),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBubble(
+    _Messej m, {
+    required bool user,
+    required bool khoosonKhariu,
+    double dooshZai = 10,
+  }) {
     return Align(
       alignment: user ? Alignment.centerRight : Alignment.centerLeft,
       child: LayoutBuilder(
         builder: (context, constraints) => Container(
-          margin: const EdgeInsets.only(bottom: 10),
+          margin: EdgeInsets.only(bottom: dooshZai),
           constraints: BoxConstraints(maxWidth: constraints.maxWidth * 0.82),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
@@ -687,6 +762,181 @@ class _AiTuslakhChatState extends ConsumerState<_AiTuslakhChat> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Хариултын доорх жижиг 👍/👎 товч. Сонгосныг дахин дарвал цуцална (0).
+/// 👎 дээр «Юу буруу байсан бэ?» нэг мөр тайлбар (заавал биш) асууна.
+class _UnelgeeMur extends StatefulWidget {
+  final int? unelgee;
+  final Future<bool> Function(int unelgee, [String? tailbar]) onUnelgee;
+
+  const _UnelgeeMur({super.key, required this.unelgee, required this.onUnelgee});
+
+  @override
+  State<_UnelgeeMur> createState() => _UnelgeeMurState();
+}
+
+class _UnelgeeMurState extends State<_UnelgeeMur> {
+  final _tailbar = TextEditingController();
+  bool _tailbarNeelttei = false;
+  bool _ilgeej = false;
+
+  @override
+  void dispose() {
+    _tailbar.dispose();
+    super.dispose();
+  }
+
+  Future<bool> _dar(int utga, [String? tailbar]) async {
+    if (_ilgeej) return false;
+    setState(() => _ilgeej = true);
+    final ok = await widget.onUnelgee(utga, tailbar);
+    if (mounted) setState(() => _ilgeej = false);
+    return ok;
+  }
+
+  Future<void> _sain() async {
+    HapticFeedback.selectionClick();
+    setState(() => _tailbarNeelttei = false);
+    await _dar(widget.unelgee == 1 ? 0 : 1);
+  }
+
+  Future<void> _muu() async {
+    HapticFeedback.selectionClick();
+    if (widget.unelgee == -1) {
+      setState(() => _tailbarNeelttei = false);
+      await _dar(0);
+      return;
+    }
+    final ok = await _dar(-1);
+    if (ok && mounted) {
+      _tailbar.clear();
+      setState(() => _tailbarNeelttei = true);
+    }
+  }
+
+  Future<void> _tailbarIlgeekh() async {
+    final tekst = _tailbar.text.trim();
+    if (tekst.isEmpty) {
+      setState(() => _tailbarNeelttei = false);
+      return;
+    }
+    final ok = await _dar(-1, tekst);
+    if (ok && mounted) {
+      setState(() => _tailbarNeelttei = false);
+      showAppSnackBar(context, 'Санал хүсэлтэд баярлалаа', turul: SnackTurul.amjilt);
+    }
+  }
+
+  Widget _tovch({
+    required IconData icon,
+    required bool songogdson,
+    required String tailbar,
+    required VoidCallback onTap,
+  }) {
+    return IconButton(
+      onPressed: _ilgeej ? null : onTap,
+      tooltip: tailbar,
+      icon: Icon(icon, size: 16),
+      color: songogdson ? AppColors.primary : context.appTextTertiary,
+      disabledColor: songogdson ? AppColors.primary : context.appTextTertiary,
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+      isSelected: songogdson,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sain = widget.unelgee == 1;
+    final muu = widget.unelgee == -1;
+    return Padding(
+      padding: const EdgeInsets.only(left: 2, bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _tovch(
+                icon: sain ? Icons.thumb_up_alt_rounded : Icons.thumb_up_alt_outlined,
+                songogdson: sain,
+                tailbar: 'Сайн хариулт',
+                onTap: _sain,
+              ),
+              _tovch(
+                icon: muu ? Icons.thumb_down_alt_rounded : Icons.thumb_down_alt_outlined,
+                songogdson: muu,
+                tailbar: 'Муу хариулт',
+                onTap: _muu,
+              ),
+            ],
+          ),
+          if (_tailbarNeelttei && muu)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 36,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: context.appCardBg,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: context.appDivider),
+                      ),
+                      alignment: Alignment.centerLeft,
+                      child: TextField(
+                        controller: _tailbar,
+                        autofocus: true,
+                        maxLength: 500,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => _tailbarIlgeekh(),
+                        style: TextStyle(fontSize: 13, color: context.appTextPrimary),
+                        decoration: InputDecoration(
+                          hintText: 'Юу буруу байсан бэ?',
+                          counterText: '',
+                          filled: false,
+                          isDense: true,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          disabledBorder: InputBorder.none,
+                          errorBorder: InputBorder.none,
+                          focusedErrorBorder: InputBorder.none,
+                          hintStyle: TextStyle(color: context.appTextTertiary, fontSize: 13),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: _ilgeej ? null : _tailbarIlgeekh,
+                    tooltip: 'Илгээх',
+                    icon: const Icon(Icons.send_rounded, size: 18),
+                    color: AppColors.primary,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  TextButton(
+                    onPressed: () => setState(() => _tailbarNeelttei = false),
+                    style: TextButton.styleFrom(
+                      foregroundColor: context.appTextSecondary,
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: const Size(0, 32),
+                    ),
+                    child: const Text('Алгасах', style: TextStyle(fontSize: 12.5)),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
