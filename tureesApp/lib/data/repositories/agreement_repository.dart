@@ -199,6 +199,25 @@ class AgreementRepository {
     }
   }
 
+  Future<({double uldegdel, double aldangi, double niitUldegdel})> getUldegdelInfo(
+    String gereeniiDugaar,
+    String barilgiinId, {
+    bool tsutsalsan = false,
+  }) async {
+    final res = await getUldegdel(
+      gereeniiDugaar,
+      barilgiinId,
+      tsutsalsan: tsutsalsan,
+    );
+    final uldegdel = double.tryParse(res['uldegdel']?.toString() ?? '0') ?? 0.0;
+    final aldangi = double.tryParse(res['aldangiinUldegdel']?.toString() ?? '0') ?? 0.0;
+    return (
+      uldegdel: uldegdel,
+      aldangi: aldangi,
+      niitUldegdel: uldegdel + aldangi,
+    );
+  }
+
   Future<double> getNiitUldegdel(
     String gereeniiDugaar,
     String barilgiinId, {

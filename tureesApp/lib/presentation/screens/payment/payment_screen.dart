@@ -30,6 +30,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   final _amountController = TextEditingController();
   AgreementModel? _selectedAgreement;
   double? _realUldegdel;
+  double? _pureUldegdel;
+  double? _aldangi;
   /// Хамгийн сүүлд автоматаар бөглөсөн дүн. Хэрэглэгч дүнгээ өөрчлөөгүй л бол
   /// шинэ үлдэгдлээр дарж бичнэ — өмнө нь зөвхөн хоосон талбарыг бөглөдөг
   /// байсан тул менежер төлбөр бүртгэсэн ч "төлөх дүн" хуучнаараа үлддэг байв.
@@ -64,32 +66,35 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     setState(() {
       _loadingUldegdel = true;
       _realUldegdel = null;
+      _pureUldegdel = null;
+      _aldangi = null;
     });
     try {
       final repo = ref.read(agreementRepositoryProvider);
-      // Дүнг ШУУД тооцуулна (uldegdelBodyo). Сүүлийн нэхэмжлэхийн хөлдөөсөн
-      // `niitUldegdel`-ийг уншвал turees дээр хийсэн өөрчлөлт болон QPay
-      // төлөлт энд тусахгүй, түрээслэгч хуучин дүнгээ дахин төлөх эрсдэлтэй.
-      // Дансны дугаарыг л нэхэмжлэхээс авна.
       final info = await repo.getLatestInvoiceInfo(agreement.id);
       if (!mounted) return;
-      double? uldegdel;
+      double? pure;
+      double? aldangi;
+      double? total;
       try {
-        uldegdel = await repo.getNiitUldegdel(
+        final uldInfo = await repo.getUldegdelInfo(
           agreement.gereeniiDugaar,
           agreement.barilgiinId,
           tsutsalsan: agreement.tuluv == -1,
         );
+        pure = uldInfo.uldegdel;
+        aldangi = uldInfo.aldangi;
+        total = uldInfo.niitUldegdel;
       } catch (_) {
-        uldegdel = info.niitUldegdel;
+        pure = info.niitUldegdel;
+        aldangi = 0;
+        total = info.niitUldegdel;
       }
       if (!mounted) return;
       setState(() {
-        _realUldegdel = uldegdel;
-        // Fall back to the contract's own account when the latest invoice
-        // carries none — the web app does the same. Without an account number
-        // the backend cannot link the QPay callback back to this contract, so
-        // the payment never reaches the manager's гүйлгээний түүх.
+        _pureUldegdel = pure;
+        _aldangi = aldangi;
+        _realUldegdel = total;
         final invoiceDans = info.dansniiDugaar;
         _dansniiDugaar = (invoiceDans != null && invoiceDans.isNotEmpty)
             ? invoiceDans
@@ -99,15 +104,17 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       final odooginKhemjee = _amountController.text;
       final khereglegchZasaagui =
           odooginKhemjee.isEmpty || odooginKhemjee == _avtomatDun;
-      if ((uldegdel ?? 0) > 0 && khereglegchZasaagui && !_baritsaaTulukh) {
-        final shineDun = _numFmt.format(uldegdel!);
+      if ((total ?? 0) > 0 && khereglegchZasaagui && !_baritsaaTulukh) {
+        final shineDun = _numFmt.format(total!);
         _amountController.text = shineDun;
         _avtomatDun = shineDun;
       }
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _realUldegdel = _selectedAgreement?.uldegdel;
+        _pureUldegdel = _selectedAgreement?.uldegdel;
+        _aldangi = _selectedAgreement?.aldangiinUldegdel ?? 0;
+        _realUldegdel = (_pureUldegdel ?? 0) + (_aldangi ?? 0);
         _loadingUldegdel = false;
       });
     }
@@ -204,6 +211,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         setState(() {
           _selectedAgreement = null;
           _realUldegdel = null;
+          _pureUldegdel = null;
+          _aldangi = null;
           _dansniiDugaar = null;
           _autoSelectDone = false;
           _baritsaaTulukh = false;
@@ -220,6 +229,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         _amountController.clear();
         _avtomatDun = null;
         _realUldegdel = null;
+        _pureUldegdel = null;
+        _aldangi = null;
         _baritsaaTulukh = false;
       });
       final agreement = _selectedAgreement;
@@ -258,6 +269,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             if (_selectedAgreement != null && _baritsaaUldegdel > 0) ...[
               _buildTulburiinTurul(),
               const SizedBox(height: 16),
+            ],
+            if (!_baritsaaTulukh && (_aldangi ?? 0) > 0) ...[
+              _buildAldangiWarning(),
+              const SizedBox(height: 12),
             ],
             _buildAmountInput(),
             const SizedBox(height: 8),
@@ -397,6 +412,53 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     );
   }
 
+  Widget _buildAldangiWarning() {
+    final aldangi = _aldangi ?? 0;
+    final pure = _pureUldegdel ?? 0;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7ED),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFFDBA74), width: 1.2),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 2),
+            child: Icon(Icons.info_outline_rounded, color: Color(0xFFEA580C), size: 20),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Нийт дуудаж байгаа төлбөрт алданги нэмэгдсэн дүн болно",
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: Color(0xFF9A3412),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "Үндсэн үлдэгдэл: ${AppFormatters.currency(pure)} | Алданги: ${AppFormatters.currency(aldangi)}",
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFFC2410C),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAmountInput() {
     // The field is normally pre-filled with the whole balance, so changing the
     // amount meant deleting a dozen digits one at a time — clear it in one tap.
@@ -491,7 +553,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                       const Icon(Icons.receipt_long_rounded, size: 16, color: AppColors.error),
                       const SizedBox(width: 8),
                       Text(
-                        baritsaa ? 'Барьцааны үлдэгдэл' : 'Нэхэмжлэлийн нийт дүн',
+                        baritsaa ? 'Барьцааны үлдэгдэл' : ((_aldangi ?? 0) > 0 ? 'Нийт төлөх дүн (алданги орсон)' : 'Нэхэмжлэлийн нийт дүн'),
                         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.error),
                       ),
                     ],

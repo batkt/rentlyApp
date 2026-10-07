@@ -63,7 +63,28 @@ class SecureStorageService {
     };
   }
 
+  Future<void> saveRememberedPhone(String phone) async {
+    try {
+      await _storage.write(key: 'remembered_phone', value: phone);
+    } catch (_) {}
+  }
+
+  Future<String?> getRememberedPhone() async {
+    try {
+      return await _storage.read(key: 'remembered_phone');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> clearRememberedPhone() async {
+    try {
+      await _storage.delete(key: 'remembered_phone');
+    } catch (_) {}
+  }
+
   Future<void> clearAll() async {
+    final rememberedPhone = await getRememberedPhone();
     final biometricEnabled = await isBiometricEnabled();
     if (biometricEnabled) {
       // Keep token, phone, and biometric_enabled so the user can re-authenticate
@@ -80,6 +101,9 @@ class SecureStorageService {
       ]);
     } else {
       await _storage.deleteAll();
+      if (rememberedPhone != null && rememberedPhone.isNotEmpty) {
+        await saveRememberedPhone(rememberedPhone);
+      }
     }
   }
 

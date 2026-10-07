@@ -40,6 +40,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   bool _biometricEnabled = false;
   bool _hasSavedToken = false;
   bool _showBiometricLoginButton = false;
+  bool _rememberUsername = false;
 
   late AnimationController _fadeController;
   late Animation<double> _fadeAnim;
@@ -65,6 +66,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       final hasToken = await storage.isLoggedIn();
       final savedPhone = await storage.read('utas');
       final faceAuth = available ? await bio.isFaceAuth : false;
+      final remembered = await storage.getRememberedPhone();
       if (!mounted) return;
       setState(() {
         _savedPhone = savedPhone ?? '';
@@ -72,7 +74,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         _hasSavedToken = hasToken;
         _canUseBiometric = available && hasToken;
         _isFaceAuth = faceAuth;
+        if (remembered != null && remembered.isNotEmpty) {
+          _phoneController.text = remembered;
+          _rememberUsername = true;
+        }
       });
+      if (remembered != null && remembered.isNotEmpty) {
+        _checkPhone(remembered);
+      }
     } catch (_) {
       // A Keystore/secure-storage read can throw (e.g. invalidated key after
       // an OS update or reinstall). This runs unawaited from initState, so an
@@ -157,6 +166,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     if (!mounted) return;
 
     if (result == LoginResult.success) {
+      if (_rememberUsername) {
+        await ref.read(secureStorageProvider).saveRememberedPhone(_phoneController.text.trim());
+      } else {
+        await ref.read(secureStorageProvider).clearRememberedPhone();
+      }
       // Save the selected org's buildings so the dashboard can show a selector
       final org = _orgs.isEmpty
           ? null
@@ -171,6 +185,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       await _offerBiometricSetup();
       if (mounted) context.go('/home');
     } else if (result == LoginResult.needsOrgSelection) {
+      if (_rememberUsername) {
+        await ref.read(secureStorageProvider).saveRememberedPhone(_phoneController.text.trim());
+      } else {
+        await ref.read(secureStorageProvider).clearRememberedPhone();
+      }
       context.push('/org-select');
     }
   }
@@ -397,6 +416,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           ),
           const SizedBox(height: 28),
           _buildPhoneField(isDark),
+          _buildRememberUsername(isDark),
           if (showOrgSelector) ...[
             const SizedBox(height: 16),
             _buildOrgSelector(isDark),
@@ -433,6 +453,43 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           const SizedBox(height: 16),
           _buildResetButton(isDark),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRememberUsername(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 4),
+      child: GestureDetector(
+        onTap: () => setState(() => _rememberUsername = !_rememberUsername),
+        behavior: HitTestBehavior.opaque,
+        child: Row(
+          children: [
+            SizedBox(
+              height: 20,
+              width: 20,
+              child: Checkbox(
+                value: _rememberUsername,
+                activeColor: AppColors.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                side: BorderSide(
+                  color: isDark ? const Color(0xFF64748B) : const Color(0xFFCBD5E1),
+                  width: 1.5,
+                ),
+                onChanged: (val) => setState(() => _rememberUsername = val ?? false),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Нэвтрэх нэр санах',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

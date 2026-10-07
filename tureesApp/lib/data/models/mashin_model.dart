@@ -17,6 +17,8 @@ class MashinModel {
   final String tuluv;
   final String gereeniiDugaar;
   final String talbainDugaar;
+  final String barilgiinId;
+  final String baiguullagiinId;
 
   const MashinModel({
     required this.id,
@@ -28,6 +30,8 @@ class MashinModel {
     this.tuluv = '',
     this.gereeniiDugaar = '',
     this.talbainDugaar = '',
+    this.barilgiinId = '',
+    this.baiguullagiinId = '',
   });
 
   factory MashinModel.fromJson(Map<String, dynamic> json) {
@@ -41,6 +45,8 @@ class MashinModel {
       tuluv: json['tuluv']?.toString() ?? '',
       gereeniiDugaar: json['gereeniiDugaar']?.toString() ?? '',
       talbainDugaar: json['ezemshigchiinTalbainDugaar']?.toString() ?? '',
+      barilgiinId: json['barilgiinId']?.toString() ?? '',
+      baiguullagiinId: json['baiguullagiinId']?.toString() ?? '',
     );
   }
 }

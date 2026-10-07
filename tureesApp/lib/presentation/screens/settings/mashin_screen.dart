@@ -149,7 +149,15 @@ class _MashinScreenState extends ConsumerState<MashinScreen> {
     if (confirmed != true) return;
 
     try {
-      await ref.read(mashinRepositoryProvider).deleteMashin(mashin.id);
+      final user = ref.read(currentUserProvider);
+      final bId = mashin.barilgiinId.isNotEmpty
+          ? mashin.barilgiinId
+          : (_geree?.barilgiinId.isNotEmpty == true ? _geree!.barilgiinId : user?.barilgiinId);
+      await ref.read(mashinRepositoryProvider).deleteMashin(
+            mashin.id,
+            barilgiinId: bId,
+            shaltgaan: 'Түрээслэгч апп-аас устгасан',
+          );
       ref.invalidate(mashinuudProvider);
       _toast('Амжилттай устгагдлаа!');
     } catch (_) {

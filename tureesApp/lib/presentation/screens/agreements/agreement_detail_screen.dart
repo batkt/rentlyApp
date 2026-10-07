@@ -452,21 +452,66 @@ class _TransactionsTab extends ConsumerWidget {
         }
         final keys = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
 
+        // Өмнөх сарын эцсийн үлдэгдлийг дараагийн сарын «Эхний үлдэгдэл» болгон
+        // гинжлэн тооцож оруулна (тэгэхгүй бол сар бүр 0-ээс эхэлж, нийт дүнтэй
+        // зөрүүтэй харагддаг).
+        final keysChronological = keys.reversed.toList();
+        final enrichedByMonth = <String, List<Map<String, dynamic>>>{};
+        double runningBalance = 0.0;
+
+        for (final key in keysChronological) {
+          final monthTxsNewestFirst = grouped[key]!;
+          final monthTxsChronological = monthTxsNewestFirst.reversed.toList();
+          final openingBalance = runningBalance;
+          final enrichedChronological = <Map<String, dynamic>>[];
+
+          // Сар бүрийн эхэнд «Эхний үлдэгдэл» мөр оруулна
+          enrichedChronological.add({
+            'ekhniiUldegdelEsekh': true,
+            'turul': 'ekhniiUldegdel',
+            'tailbar': 'Эхний үлдэгдэл',
+            'ognoo': '${key}-01 00:00:00',
+            'tulukhDun': openingBalance,
+            'tulsunDun': 0.0,
+            'khyamdral': 0.0,
+            'uldegdel': openingBalance,
+            '_perMonthUldegdel': openingBalance,
+          });
+
+          for (final tx in monthTxsChronological) {
+            if (tx['ekhniiUldegdelEsekh'] == true) {
+              runningBalance = (tx['uldegdel'] as num?)?.toDouble() ?? runningBalance;
+            } else {
+              final tulukhDun = (tx['tulukhDun'] as num?)?.toDouble() ?? 0.0;
+              final tulsunDun = (tx['tulsunDun'] as num?)?.toDouble() ?? 0.0;
+              final khyamdral = (tx['khyamdral'] as num?)?.toDouble() ?? 0.0;
+              runningBalance = runningBalance + tulukhDun - tulsunDun - khyamdral;
+            }
+            enrichedChronological.add({
+              ...tx,
+              '_perMonthUldegdel': runningBalance,
+              'uldegdel': runningBalance,
+            });
+          }
+
+          // Дэлгэрэнгүй цонхонд шинэ гүйлгээ нь дээрээ харагдахаар урвуулна
+          enrichedByMonth[key] = enrichedChronological.reversed.toList();
+        }
+
         return ListView.builder(
           padding: EdgeInsets.symmetric(horizontal: context.tovZai(), vertical: 12),
           itemCount: keys.length,
           itemBuilder: (context, index) {
             final key = keys[index];
-            final monthTxs = grouped[key]!;
-            final firstDateStr = monthTxs.first['ognoo']?.toString()
-                ?? monthTxs.first['guilgeeKhiisenOgnoo']?.toString();
+            final enrichedMonthTxs = enrichedByMonth[key] ?? [];
+            final originalMonthTxs = grouped[key] ?? [];
+            final firstDateStr = originalMonthTxs.firstOrNull?['ognoo']?.toString()
+                ?? originalMonthTxs.firstOrNull?['guilgeeKhiisenOgnoo']?.toString()
+                ?? key;
             final label = _monthLabel(firstDateStr);
 
-            // Net balance for the month (charges minus discounts/payments) —
-            // same figure as the detail sheet's final Үлд, so the summary card
-            // and the drill-down agree.
-            final enrichedMonthTxs = _perMonthUldegdel(monthTxs);
-            final monthNetTotal = (enrichedMonthTxs.first['_perMonthUldegdel'] as num?)?.toDouble() ?? 0.0;
+            final monthNetTotal = (enrichedMonthTxs.firstOrNull?['_perMonthUldegdel'] as num?)?.toDouble() ?? 0.0;
+            final actualTxCount = enrichedMonthTxs.where((t) => t['ekhniiUldegdelEsekh'] != true).length;
 
             return GestureDetector(
               onTap: () => showModalBottomSheet(
@@ -502,7 +547,7 @@ class _TransactionsTab extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(label, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-                          Text('${monthTxs.length} гүйлгээ',
+                          Text('${actualTxCount} гүйлгээ',
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.appTextTertiary)),
                         ],
                       ),
@@ -566,7 +611,7 @@ class _MonthTransactionsSheet extends StatelessWidget {
                 Text(monthLabel,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                 const Spacer(),
-                Text('${txs.length} гүйлгээ',
+                Text('${txs.where((t) => t['ekhniiUldegdelEsekh'] != true).length} гүйлгээ',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(color: context.appTextTertiary)),
               ],
             ),
@@ -632,7 +677,9 @@ class _MonthTransactionsSheet extends StatelessWidget {
                     : helberTuukhii;
 
                 double displayAmount;
-                if (isPayment) {
+                if (isEkhniiUldegdel) {
+                  displayAmount = (tx['uldegdel'] as num?)?.toDouble() ?? (tx['tulukhDun'] as num?)?.toDouble() ?? 0.0;
+                } else if (isPayment) {
                   displayAmount = tulsunAldangi > 0 ? tulsunAldangi : (tulsunDun > 0 ? tulsunDun : tulukhDun);
                 } else if (isKhyamdral) {
                   // Discounts reduce the month's balance — show as a negative amount.

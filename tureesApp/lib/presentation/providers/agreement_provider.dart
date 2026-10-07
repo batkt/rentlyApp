@@ -40,12 +40,15 @@ final agreementsProvider = FutureProvider<List<AgreementModel>>((ref) async {
   // balanceColor ногооноор зөв үзүүлдэг.
   final results = await Future.wait(agreements.map((a) async {
     try {
-      final niitUldegdel = await repo.getNiitUldegdel(
+      final info = await repo.getUldegdelInfo(
         a.gereeniiDugaar,
         a.barilgiinId,
         tsutsalsan: a.tuluv == -1,
       );
-      return a.copyWith(uldegdel: niitUldegdel);
+      return a.copyWith(
+        uldegdel: info.uldegdel,
+        aldangiinUldegdel: info.aldangi,
+      );
     } catch (_) {
       return a;
     }
@@ -57,7 +60,21 @@ final selectedAgreementProvider = StateProvider<AgreementModel?>((ref) => null);
 
 final agreementDetailProvider = FutureProvider.autoDispose.family<AgreementModel?, String>((ref, id) async {
   final repo = ref.read(agreementRepositoryProvider);
-  return repo.getAgreementById(id);
+  final a = await repo.getAgreementById(id);
+  if (a == null) return null;
+  try {
+    final info = await repo.getUldegdelInfo(
+      a.gereeniiDugaar,
+      a.barilgiinId,
+      tsutsalsan: a.tuluv == -1,
+    );
+    return a.copyWith(
+      uldegdel: info.uldegdel,
+      aldangiinUldegdel: info.aldangi,
+    );
+  } catch (_) {
+    return a;
+  }
 });
 
 /// Гэрээг загвартай нь нийлүүлсэн HTML — turees вэбийн "Гэрээ харах" товч юу

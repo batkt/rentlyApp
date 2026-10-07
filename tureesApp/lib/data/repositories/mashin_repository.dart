@@ -90,7 +90,18 @@ class MashinRepository {
     });
   }
 
-  Future<void> deleteMashin(String id) async {
-    await _client.delete(ApiConstants.mashinById(id));
+  Future<void> deleteMashin(
+    String id, {
+    String? barilgiinId,
+    String? shaltgaan,
+  }) async {
+    await _client.delete(
+      ApiConstants.mashinById(id),
+      data: {
+        if (barilgiinId != null && barilgiinId.isNotEmpty)
+          'baiguullagiinId': barilgiinId,
+        'shaltgaan': shaltgaan ?? 'Түрээслэгч апп-аас устгасан',
+      },
+    );
   }
 }
