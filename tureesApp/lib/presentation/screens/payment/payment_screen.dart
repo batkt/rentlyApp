@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -412,6 +413,22 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     );
   }
 
+  Widget _buildBalanceShimmer() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Shimmer.fromColors(
+      baseColor: isDark ? const Color(0xFF1E2A28) : const Color(0xFFE2E8F0),
+      highlightColor: isDark ? const Color(0xFF2D3B39) : const Color(0xFFF8FAFC),
+      child: Container(
+        width: double.infinity,
+        height: 48,
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E2A28) : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+        ),
+      ),
+    );
+  }
+
   Widget _buildAldangiWarning() {
     final aldangi = _aldangi ?? 0;
     final pure = _pureUldegdel ?? 0;
@@ -466,12 +483,21 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       valueListenable: _amountController,
       builder: (context, value, __) => AppTextField(
         label: 'Төлөх дүн (₮)',
-        hint: '0',
+        hint: _loadingUldegdel && _selectedAgreement != null ? 'Ачааллаж байна...': '0',
         controller: _amountController,
         keyboardType: const TextInputType.numberWithOptions(decimal: false),
         inputFormatters: [_ThousandsSeparatorFormatter()],
         prefixIcon: Icon(Icons.monetization_on_rounded, size: 18, color: context.appTextTertiary),
-        suffixIcon: value.text.isEmpty
+        suffixIcon: _loadingUldegdel && _selectedAgreement != null
+            ? const Padding(
+                padding: EdgeInsets.all(12),
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                ),
+              )
+            : value.text.isEmpty
             ? null
             : IconButton(
                 icon: Icon(Icons.cancel_rounded, size: 18, color: context.appTextTertiary),
@@ -533,6 +559,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Loading skeleton while fetching real balance
+        if (_loadingUldegdel && _selectedAgreement != null) ...[
+          _buildBalanceShimmer(),
+          const SizedBox(height: 10),
+        ],
         // Нийт үлдэгдэл button — shown prominently when there's a balance
         if (uldegdel > 0 && !_loadingUldegdel) ...[
           GestureDetector(
