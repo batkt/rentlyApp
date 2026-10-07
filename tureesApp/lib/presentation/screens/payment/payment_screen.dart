@@ -430,45 +430,25 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   }
 
   Widget _buildAldangiWarning() {
-    final aldangi = _aldangi ?? 0;
-    final pure = _pureUldegdel ?? 0;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: const Color(0xFFFFF7ED),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFFDBA74), width: 1.2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFDBA74), width: 1),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 2),
-            child: Icon(Icons.info_outline_rounded, color: Color(0xFFEA580C), size: 20),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "Нийт дуудаж байгаа төлбөрт алданги нэмэгдсэн дүн болно",
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    color: Color(0xFF9A3412),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  "Үндсэн үлдэгдэл: ${AppFormatters.currency(pure)} | Алданги: ${AppFormatters.currency(aldangi)}",
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFFC2410C),
-                  ),
-                ),
-              ],
+          const Icon(Icons.info_outline_rounded, color: Color(0xFFEA580C), size: 16),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              "Нийт дуудаж байгаа төлбөрт алданги нэмэгдсэн дүн болно",
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                color: Color(0xFF9A3412),
+              ),
             ),
           ),
         ],
@@ -584,7 +564,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                       const Icon(Icons.receipt_long_rounded, size: 16, color: AppColors.error),
                       const SizedBox(width: 8),
                       Text(
-                        baritsaa ? 'Барьцааны үлдэгдэл' : ((_aldangi ?? 0) > 0 ? 'Нийт төлөх дүн (алданги орсон)' : 'Нэхэмжлэлийн нийт дүн'),
+                        baritsaa ? 'Барьцааны үлдэгдэл' : 'Нэхэмжлэлийн нийт дүн',
                         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.error),
                       ),
                     ],
