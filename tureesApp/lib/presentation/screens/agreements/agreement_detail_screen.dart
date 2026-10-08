@@ -662,10 +662,14 @@ class _MonthTransactionsSheet extends StatelessWidget {
                         ? 'Алданги төлөлт'
                         : (tailbar.isNotEmpty ? tailbar : turulNer);
                 // Хэлбэр: matches web Khuulga — bank uses tulsunDans or aldangi label
+                // Вэбийн адил: дансны дугаар → төлсөн данс → «Банк». Өмнө нь
+                // алданги орсон бол «Төлсөн алданги» гэж бичээд түрээсийн
+                // төлөлт харагдахгүй болдог байсан.
+                final dansniiDugaar = tx['dansniiDugaar']?.toString().trim() ?? '';
                 final helberTuukhii = turul == 'bank'
-                    ? (tulsunAldangi > 0
-                        ? 'Төлсөн алданги'
-                        : (tulsunDans.isNotEmpty && tulsunDans.trim() != '' ? tulsunDans : 'Банк'))
+                    ? (dansniiDugaar.isNotEmpty
+                        ? dansniiDugaar
+                        : (tulsunDans.trim().isNotEmpty ? tulsunDans : 'Банк'))
                     : (isPayment && turul != 'bank' ? turulNer : '');
                 // Тайлбар нь хэлбэрээ аль хэдийн агуулж байвал доор нь дахин
                 // бичихгүй (ж: «QPay төлөлт — …» дээр «QPay» гэж давхарлах).
@@ -680,7 +684,12 @@ class _MonthTransactionsSheet extends StatelessWidget {
                 if (isEkhniiUldegdel) {
                   displayAmount = (tx['uldegdel'] as num?)?.toDouble() ?? (tx['tulukhDun'] as num?)?.toDouble() ?? 0.0;
                 } else if (isPayment) {
-                  displayAmount = tulsunAldangi > 0 ? tulsunAldangi : (tulsunDun > 0 ? tulsunDun : tulukhDun);
+                  // Нэг гүйлгээгээр түрээс + алданги хамт төлөгдсөн бол
+                  // (дансаар холбосон) нийт дүнг харуулна — вэбийн «Төлсөн дүн»-тэй
+                  // ижил. Задаргааг доор тусад нь харуулна.
+                  displayAmount = isTulsunAldangi
+                      ? tulsunAldangi
+                      : (tulsunDun + tulsunAldangi > 0 ? tulsunDun + tulsunAldangi : tulukhDun);
                 } else if (isKhyamdral) {
                   // Discounts reduce the month's balance — show as a negative amount.
                   displayAmount = -(khyamdral > 0 ? khyamdral : tulukhDun);
@@ -751,6 +760,15 @@ class _MonthTransactionsSheet extends StatelessWidget {
                             if (undsenDun > 0 && !isPayment && !isKhyamdral)
                               Text(
                                 'Түрээс: ${AppFormatters.currency(undsenDun)}',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: context.appTextTertiary, fontSize: 11,
+                                ),
+                              ),
+                            if (isPayment && !isTulsunAldangi && tulsunAldangi > 0)
+                              Text(
+                                tulsunDun > 0
+                                    ? 'Түрээс: ${AppFormatters.currency(tulsunDun)} · Алданги: ${AppFormatters.currency(tulsunAldangi)}'
+                                    : 'Алданги төлөлт: ${AppFormatters.currency(tulsunAldangi)}',
                                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                   color: context.appTextTertiary, fontSize: 11,
                                 ),
