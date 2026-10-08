@@ -45,6 +45,12 @@ class DuudlagaNotifier extends StateNotifier<DuudlagaState> {
 
   DuudlagaNotifier(this._repo, this._ref) : super(const DuudlagaState());
 
+  /// Нэвтэрсэн бус, одоо СОНГОСОН барилга (олон барилгатай түрээслэгч).
+  String _barilga(String nevtersenBarilga) {
+    final songoson = _ref.read(selectedBarilgiinIdProvider);
+    return songoson.isNotEmpty ? songoson : nevtersenBarilga;
+  }
+
   Future<void> load({bool refresh = false}) async {
     final user = _ref.read(currentUserProvider);
     if (user == null) return;
@@ -57,7 +63,7 @@ class DuudlagaNotifier extends StateNotifier<DuudlagaState> {
       final items = await _repo.getDuudlagaList(
         baiguullagiinId: user.baiguullagiinId,
         khariltsagchiinId: user.id,
-        barilgiinId: user.barilgiinId,
+        barilgiinId: _barilga(user.barilgiinId),
         page: page,
       );
       state = state.copyWith(
@@ -85,7 +91,7 @@ class DuudlagaNotifier extends StateNotifier<DuudlagaState> {
       final duudlaga = await _repo.createDuudlaga(
         baiguullagiinId: user.baiguullagiinId,
         khariltsagchiinId: user.id,
-        barilgiinId: user.barilgiinId,
+        barilgiinId: _barilga(user.barilgiinId),
         khariltsagchiinNer: user.fullName,
         khariltsagchiinUtas: user.utas.isNotEmpty ? user.utas.first : '',
         title: title,

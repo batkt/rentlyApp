@@ -169,8 +169,10 @@ class _NotificationsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(notificationsProvider);
+    final barilga = ref.watch(selectedBarilgiinIdProvider);
     final items = state.notifications
-        .where((n) => n.category == NotifCategory.medegdel)
+        .where((n) =>
+            n.category == NotifCategory.medegdel && n.barilgiinKhuu(barilga))
         .toList();
 
     if (state.isLoading && state.notifications.isEmpty) {
@@ -294,8 +296,10 @@ class _RequestsTabState extends ConsumerState<_RequestsTab> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(notificationsProvider);
+    final barilga = ref.watch(selectedBarilgiinIdProvider);
     final allItems = state.notifications
-        .where((n) => n.category == NotifCategory.request)
+        .where((n) =>
+            n.category == NotifCategory.request && n.barilgiinKhuu(barilga))
         .toList();
     final items = _turulFilter == null
         ? allItems
@@ -881,17 +885,24 @@ class _DuudlagaTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(duudlagaProvider);
+    // Олон барилгатай түрээслэгчид зөвхөн сонгосон барилгын дуудлагууд.
+    final barilga = ref.watch(selectedBarilgiinIdProvider);
+    final jagsaalt = state.duudlagaList.where((d) {
+      final b = d['barilgiinId'];
+      final bId = b is Map ? b['_id']?.toString() : b?.toString();
+      return barilga.isEmpty || bId == null || bId.isEmpty || bId == barilga;
+    }).toList();
 
-    if (state.isLoading && state.duudlagaList.isEmpty) {
+    if (state.isLoading && jagsaalt.isEmpty) {
       return const ShimmerList(itemCount: 4, itemHeight: 80);
     }
-    if (state.error != null && state.duudlagaList.isEmpty) {
+    if (state.error != null && jagsaalt.isEmpty) {
       return AppErrorWidget(
         message: 'Дуудлагууд ачаалахад алдаа гарлаа',
         onRetry: () => ref.read(duudlagaProvider.notifier).load(),
       );
     }
-    if (state.duudlagaList.isEmpty) {
+    if (jagsaalt.isEmpty) {
       return AppEmpty(
         icon: Icons.phone_outlined,
         message: 'Дуудлага байхгүй байна',
@@ -906,8 +917,8 @@ class _DuudlagaTab extends ConsumerWidget {
       onRefresh: () async => ref.read(duudlagaProvider.notifier).load(),
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: state.duudlagaList.length,
-        itemBuilder: (context, index) => _DuudlagaCard(data: state.duudlagaList[index]),
+        itemCount: jagsaalt.length,
+        itemBuilder: (context, index) => _DuudlagaCard(data: jagsaalt[index]),
       ),
     );
   }

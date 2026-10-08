@@ -89,8 +89,12 @@ final notificationsProvider = StateNotifierProvider<NotificationsNotifier, Notif
 final unreadCountProvider = Provider<int>((ref) {
   // Only count medegdel category — pending requests have tuluv==0 as their approval
   // status (not a "read" state), so including them inflates the badge incorrectly.
+  final barilga = ref.watch(selectedBarilgiinIdProvider);
   return ref.watch(notificationsProvider).notifications
-      .where((n) => n.isUnread && n.category == NotifCategory.medegdel)
+      .where((n) =>
+          n.isUnread &&
+          n.category == NotifCategory.medegdel &&
+          n.barilgiinKhuu(barilga))
       .length;
 });
 
@@ -141,7 +145,9 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
       final alreadyExists = state.notifications.any((n) => n.id == notif.id);
       if (!alreadyExists) {
         state = state.copyWith(notifications: [notif, ...state.notifications]);
-        _ref.read(incomingNotificationProvider.notifier).state = notif;
+        if (notif.barilgiinKhuu(_ref.read(selectedBarilgiinIdProvider))) {
+          _ref.read(incomingNotificationProvider.notifier).state = notif;
+        }
       }
     } catch (_) {}
   }
@@ -174,22 +180,17 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
           msg = msg.replaceAll('<ovog>', ovog).replaceAll('<ner>', ner);
         }
         if (msg == n.message) return n;
-        return NotificationModel(
-          id: n.id, title: n.title, message: msg,
-          khariltsagchiinId: n.khariltsagchiinId,
-          baiguullagiinId: n.baiguullagiinId,
-          tuluv: n.tuluv, turul: n.turul,
-          duudlagiinTurul: n.duudlagiinTurul,
-          createdAt: n.createdAt,
-          gereeniiId: n.gereeniiId,
-        );
+        return n.copyWith(message: msg);
       }).toList();
       state = state.copyWith(isLoading: false, notifications: processed);
       // Сокетын эвент алдагдсан ч (апп арын дэвсгэрт байсан, холболт
       // тасарсан) дахин ачаалахад шинээр ирсэн мэдэгдлийг баннераар харуулна.
       if (!_ekhniiAchaalal) {
         final shine = processed
-            .where((n) => n.isUnread && !umnukhIdnuud.contains(n.id))
+            .where((n) =>
+                n.isUnread &&
+                !umnukhIdnuud.contains(n.id) &&
+                n.barilgiinKhuu(_ref.read(selectedBarilgiinIdProvider)))
             .firstOrNull;
         if (shine != null) {
           _ref.read(incomingNotificationProvider.notifier).state = shine;
@@ -232,36 +233,26 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
     await _repo.markNotificationRead(id);
     state = state.copyWith(
       notifications: state.notifications.map((n) {
-        if (n.id == id) {
-          return NotificationModel(
-            id: n.id, title: n.title, message: n.message,
-            khariltsagchiinId: n.khariltsagchiinId, baiguullagiinId: n.baiguullagiinId,
-            tuluv: 1, turul: n.turul, duudlagiinTurul: n.duudlagiinTurul,
-            createdAt: n.createdAt,
-            gereeniiId: n.gereeniiId,
-          );
-        }
+        if (n.id == id) return n.copyWith(tuluv: 1);
         return n;
       }).toList(),
     );
   }
 
+  /// Зөвхөн сонгосон барилгад харагдаж буй мэдэгдлүүдийг уншсан болгоно.
   Future<void> markAllRead() async {
-    final unreadMedegdel = state.notifications
-        .where((n) => n.isUnread && n.category == NotifCategory.medegdel)
-        .toList();
+    final barilga = _ref.read(selectedBarilgiinIdProvider);
+    bool unshikh(NotificationModel n) =>
+        n.isUnread &&
+        n.category == NotifCategory.medegdel &&
+        n.barilgiinKhuu(barilga);
+    final unreadMedegdel = state.notifications.where(unshikh).toList();
     if (unreadMedegdel.isEmpty) return;
     await Future.wait(unreadMedegdel.map((n) => _repo.markNotificationRead(n.id)));
     state = state.copyWith(
-      notifications: state.notifications.map((n) => (n.isUnread && n.category == NotifCategory.medegdel)
-          ? NotificationModel(
-              id: n.id, title: n.title, message: n.message,
-              khariltsagchiinId: n.khariltsagchiinId, baiguullagiinId: n.baiguullagiinId,
-              tuluv: 1, turul: n.turul, duudlagiinTurul: n.duudlagiinTurul,
-              createdAt: n.createdAt,
-              gereeniiId: n.gereeniiId,
-            )
-          : n).toList(),
+      notifications: state.notifications
+          .map((n) => unshikh(n) ? n.copyWith(tuluv: 1) : n)
+          .toList(),
     );
   }
 }

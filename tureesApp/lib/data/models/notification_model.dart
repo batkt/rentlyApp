@@ -18,6 +18,9 @@ class NotificationModel {
   /// хүсэлт/дуудлагад байхгүй — [uuriinIlgeesenKhuselt] үүгээр ялгана.
   final String? ajiltniiId;
 
+  /// Түрээслэгч олон барилгад гэрээтэй үед жагсаалтыг сонгосон барилгаар шүүнэ.
+  final String? barilgiinId;
+
   const NotificationModel({
     required this.id,
     required this.title,
@@ -30,7 +33,30 @@ class NotificationModel {
     this.createdAt,
     this.gereeniiId,
     this.ajiltniiId,
+    this.barilgiinId,
   });
+
+  NotificationModel copyWith({String? message, int? tuluv}) => NotificationModel(
+        id: id,
+        title: title,
+        message: message ?? this.message,
+        khariltsagchiinId: khariltsagchiinId,
+        baiguullagiinId: baiguullagiinId,
+        tuluv: tuluv ?? this.tuluv,
+        turul: turul,
+        duudlagiinTurul: duudlagiinTurul,
+        createdAt: createdAt,
+        gereeniiId: gereeniiId,
+        ajiltniiId: ajiltniiId,
+        barilgiinId: barilgiinId,
+      );
+
+  /// Сонгосон барилгынх уу? Барилгагүй (хуучин) бичлэг бүх барилгад харагдана.
+  bool barilgiinKhuu(String songosonBarilgiinId) =>
+      songosonBarilgiinId.isEmpty ||
+      barilgiinId == null ||
+      barilgiinId!.isEmpty ||
+      barilgiinId == songosonBarilgiinId;
 
   /// Түрээслэгч өөрөө илгээсэн бичлэг үү? Эдгээр нь менежерт (turees) очих
   /// зорилготой ба ижил `khariltsagchiinId`-тайгаа буцаж ирдэг тул
@@ -92,6 +118,9 @@ class NotificationModel {
       createdAt: (json['createdAt'] ?? json['ognoo'])?.toString(),
       gereeniiId: json['gereeniiId']?.toString(),
       ajiltniiId: json['ajiltniiId']?.toString(),
+      barilgiinId: json['barilgiinId'] is Map
+          ? (json['barilgiinId']['_id']?.toString())
+          : json['barilgiinId']?.toString(),
     );
   }
 }
