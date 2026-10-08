@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -23,6 +25,7 @@ class PushNotificationService {
 
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
   bool _initialized = false;
+  StreamSubscription<String>? _tokenSolilt;
 
   /// Mirrors the "Мэдэгдэл харах" switch in Settings. Only governs what this
   /// app raises for a foreground message — a backgrounded/terminated app's
@@ -144,19 +147,40 @@ class PushNotificationService {
       debugPrint('[FCM] init амжилтгүй — токен бүртгэгдэхгүй');
       return;
     }
-    try {
-      final token = await FirebaseMessaging.instance.getToken();
-      if (token == null) {
-        // Google Play Services байхгүй/хуучирсан төхөөрөмж дээр (жишээ нь
-        // Huawei) getToken үргэлж null буцаана — FCM тэнд ажиллахгүй.
-        debugPrint('[FCM] getToken null буцаалаа — push ажиллахгүй');
+    // Токен дараа нь ирэх/солигдох үед ч хадгалагдана. Өмнө нь зөвхөн
+    // эхний оролдлого амжилттай үед л сонсдог байсан тул iOS дээр эхний
+    // getToken унавал тэр төхөөрөмжийн токен серверт ХЭЗЭЭ Ч очдоггүй байв.
+    await _tokenSolilt?.cancel();
+    _tokenSolilt = FirebaseMessaging.instance.onTokenRefresh.listen((t) {
+      onToken(t).catchError((e) => debugPrint('[FCM] токен хадгалж чадсангүй: $e'));
+    });
+
+    for (var oroldlogo = 1; oroldlogo <= 3; oroldlogo++) {
+      try {
+        // iOS: APNs токен ирээгүй байхад getToken `apns-token-not-set`
+        // алдаа шиддэг (ихэвчлэн нээх/нэвтрэх даруйд).
+        if (defaultTargetPlatform == TargetPlatform.iOS) {
+          String? apns;
+          for (var i = 0; i < 10 && apns == null; i++) {
+            apns = await FirebaseMessaging.instance.getAPNSToken();
+            if (apns == null) await Future.delayed(const Duration(seconds: 1));
+          }
+          if (apns == null) debugPrint('[FCM] APNs токен ирсэнгүй');
+        }
+        final token = await FirebaseMessaging.instance.getToken();
+        if (token == null) {
+          // Google Play Services байхгүй/хуучирсан төхөөрөмж дээр (жишээ нь
+          // Huawei) getToken үргэлж null буцаана — FCM тэнд ажиллахгүй.
+          debugPrint('[FCM] getToken null буцаалаа — push ажиллахгүй');
+          return;
+        }
+        debugPrint('[FCM] токен авлаа: ${token.substring(0, 12)}…');
+        await onToken(token);
         return;
+      } catch (e) {
+        debugPrint('[FCM] registerToken амжилтгүй ($oroldlogo/3): $e');
+        if (oroldlogo < 3) await Future.delayed(const Duration(seconds: 3));
       }
-      debugPrint('[FCM] токен авлаа: ${token.substring(0, 12)}…');
-      await onToken(token);
-      FirebaseMessaging.instance.onTokenRefresh.listen(onToken);
-    } catch (e) {
-      debugPrint('[FCM] registerToken амжилтгүй: $e');
     }
   }
 }
