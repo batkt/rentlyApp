@@ -39,6 +39,35 @@ class PaymentRepository {
     );
   }
 
+  /// Олон гэрээг НЭГ QPay нэхэмжлэхээр төлнө. Бүх гэрээ нэг барилга, нэг
+  /// дансных байх ёстой — backend шалгаж, задаргааг хадгалаад callback
+  /// дээр гэрээ тус бүрд бүртгэнэ.
+  Future<QpayInvoiceModel> generateOlonQpay({
+    required String barilgiinId,
+    required String register,
+    required String dansniiDugaar,
+    required List<({String gereeniiId, double dun})> gereenuud,
+  }) async {
+    final niit = gereenuud.fold<double>(0, (a, g) => a + g.dun);
+    final res = await _client.post(ApiConstants.qpayGenerate, data: {
+      'barilgiinId': barilgiinId,
+      'burtgeliinDugaar': register,
+      'dun': niit,
+      'dansniiDugaar': dansniiDugaar,
+      'gereenuud': [
+        for (final g in gereenuud) {'gereeniiId': g.gereeniiId, 'dun': g.dun},
+      ],
+    });
+
+    final data = res.data as Map<String, dynamic>;
+    return QpayInvoiceModel.fromQpayGargaya(
+      data,
+      oruulsanDun: niit,
+      gereeniiId: '',
+      barilgiinId: barilgiinId,
+    );
+  }
+
   /// Нэхэмжлэл төлөгдсөн эсэхийг шалгана.
   ///
   /// Өмнө нь `/qpayShalgay` руу хандаад хариунаас `tuluv == 1` эсвэл

@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/payment_model.dart';
 import '../../data/repositories/payment_repository.dart';
@@ -47,6 +48,48 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
     } catch (e) {
       state = state.copyWith(isLoading: false, error: 'Qpay нэхэмжлэх үүсгэхэд алдаа гарлаа');
     }
+  }
+
+  /// Нэг барилга, нэг дансны олон гэрээг нэг нэхэмжлэхээр төлнө.
+  Future<void> generateOlonQpay({
+    required String barilgiinId,
+    required String register,
+    required String dansniiDugaar,
+    required List<({String gereeniiId, double dun})> gereenuud,
+  }) async {
+    final user = _ref.read(currentUserProvider);
+    if (user == null) return;
+
+    state = state.copyWith(isLoading: true, error: null, invoice: null);
+    try {
+      final invoice = await _repo.generateOlonQpay(
+        barilgiinId: barilgiinId.isNotEmpty ? barilgiinId : user.barilgiinId,
+        register: register.isNotEmpty ? register : (user.register ?? ''),
+        dansniiDugaar: dansniiDugaar,
+        gereenuud: gereenuud,
+      );
+      state = state.copyWith(isLoading: false, invoice: invoice);
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: _aldaaniiMedegdel(e) ?? 'Qpay нэхэмжлэх үүсгэхэд алдаа гарлаа',
+      );
+    }
+  }
+
+  /// Backend-ийн `aldaa`/`message`-г (жишээ нь "Өөр барилгын гэрээнүүд...")
+  /// хэрэглэгчид шууд харуулна.
+  String? _aldaaniiMedegdel(Object e) {
+    if (e is DioException) {
+      final data = e.response?.data;
+      if (data is Map) {
+        final msg = data['aldaa'] ?? data['message'];
+        if (msg is String && msg.isNotEmpty) return msg;
+      } else if (data is String && data.isNotEmpty && data.length < 200) {
+        return data;
+      }
+    }
+    return null;
   }
 
   /// Шалгалт нь `zakhialgiinDugaar`-аар явна — QPay-н callback болон

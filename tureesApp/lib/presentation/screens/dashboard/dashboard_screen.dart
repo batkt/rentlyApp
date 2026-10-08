@@ -7,6 +7,7 @@ import '../../../data/models/agreement_model.dart';
 import '../../../data/models/user_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/agreement_provider.dart';
+import '../../providers/payment_provider.dart';
 import '../../widgets/cards/agreement_card.dart';
 import '../../widgets/common/app_loading.dart';
 import '../../widgets/common/app_text_field.dart';
@@ -23,6 +24,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
 
+  /// Олон гэрээ нэг дор төлөхөд сонгосон гэрээний id-ууд.
+  final Set<String> _songogdson = {};
+
+  /// Идэвхтэй, төлөх үлдэгдэлтэй гэрээг л сонгоно.
+  static bool _songokhBoloh(AgreementModel a) => a.isActive && a.uldegdel > 0;
+
+  void _songokh(AgreementModel a) => setState(() {
+        if (!_songogdson.remove(a.id)) _songogdson.add(a.id);
+      });
+
+  void _olonTulukh(List<AgreementModel> songogdson) {
+    if (songogdson.length == 1) {
+      context.push('/payment', extra: songogdson.first);
+    } else {
+      context.push('/olon-tulbur', extra: songogdson);
+    }
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -37,8 +56,31 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     // Өмнө нь 48-аар таглагдсан тул ~816-аас өргөн дэлгэц дээр голлохгүй сунадаг байв.
     final hPad = context.tovZai(min: 16);
 
+    // Барилга солиход эсвэл төлбөр амжилттай болоход сонголтыг цэвэрлэнэ.
+    ref.listen<String>(selectedBarilgiinIdProvider, (previous, next) {
+      if (previous != next && _songogdson.isNotEmpty) {
+        setState(_songogdson.clear);
+      }
+    });
+    ref.listen<int>(paymentClearSignalProvider, (previous, next) {
+      if (previous != next && _songogdson.isNotEmpty) {
+        setState(_songogdson.clear);
+      }
+    });
+    // Жагсаалтад байхгүй болсон (төлөгдсөн, цуцлагдсан) гэрээг тооцохгүй.
+    final songogdsonGereenuud = (agreementsAsync.valueOrNull ?? const [])
+        .where((a) => _songogdson.contains(a.id) && _songokhBoloh(a))
+        .toList();
+
     return Scaffold(
       backgroundColor: context.appBackground,
+      bottomNavigationBar: songogdsonGereenuud.isEmpty
+          ? null
+          : _OlonTulburBar(
+              gereenuud: songogdsonGereenuud,
+              onBolikh: () => setState(_songogdson.clear),
+              onTulukh: () => _olonTulukh(songogdsonGereenuud),
+            ),
       body: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: () async => ref.refresh(agreementsProvider),
@@ -492,6 +534,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           );
         }
 
+        // Сонгох нь 2+ төлөх гэрээтэй үед л утгатай.
+        final songokhIdevkhtei =
+            agreements.where(_songokhBoloh).length >= 2;
+
         return SliverPadding(
           padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 32),
           sliver: SliverList.separated(
@@ -505,11 +551,82 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 onPay: agreement.isActive
                     ? () => context.push('/payment', extra: agreement)
                     : null,
+                onSongokh: songokhIdevkhtei && _songokhBoloh(agreement)
+                    ? () => _songokh(agreement)
+                    : null,
+                songogdson: _songogdson.contains(agreement.id),
               );
             },
           ),
         );
       },
+    );
+  }
+}
+
+/// Сонгосон гэрээнүүдийн тоо, нийт үлдэгдэл ба "Төлөх" товч.
+class _OlonTulburBar extends StatelessWidget {
+  final List<AgreementModel> gereenuud;
+  final VoidCallback onBolikh;
+  final VoidCallback onTulukh;
+
+  const _OlonTulburBar({
+    required this.gereenuud,
+    required this.onBolikh,
+    required this.onTulukh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final niit = gereenuud.fold<double>(0, (a, g) => a + g.uldegdel);
+    return Material(
+      color: context.appCardBg,
+      elevation: 8,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${gereenuud.length} гэрээ сонгосон',
+                        style: theme.textTheme.labelSmall),
+                    const SizedBox(height: 2),
+                    Text(
+                      AppFormatters.currency(niit),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.error,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton(onPressed: onBolikh, child: const Text('Болих')),
+              const SizedBox(width: 4),
+              FilledButton.icon(
+                onPressed: onTulukh,
+                icon: const Icon(Icons.payment_rounded, size: 18),
+                label: const Text('Төлөх',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

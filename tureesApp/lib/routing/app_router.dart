@@ -13,6 +13,7 @@ import '../presentation/screens/agreements/agreement_detail_screen.dart';
 import '../presentation/screens/agreements/all_invoices_screen.dart';
 import '../presentation/screens/payment/payment_screen.dart';
 import '../presentation/screens/payment/qpay_screen.dart';
+import '../presentation/screens/payment/olon_geree_tulbur_screen.dart';
 import '../presentation/screens/settings/mashin_screen.dart';
 import '../presentation/screens/settings/change_password_screen.dart';
 import '../presentation/screens/chat/chat_detail_screen.dart';
@@ -86,6 +87,12 @@ final routerProvider = Provider<GoRouter>((ref) {
           final agreement = state.extra as AgreementModel?;
           return PaymentScreen(selectedAgreement: agreement);
         },
+      ),
+      GoRoute(
+        path: '/olon-tulbur',
+        builder: (context, state) => OlonGereeTulburScreen(
+          gereenuud: (state.extra as List?)?.cast<AgreementModel>() ?? const [],
+        ),
       ),
       GoRoute(
         path: '/qpay',

@@ -9,11 +9,18 @@ class AgreementCard extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onPay;
 
+  /// Олон гэрээ нэг дор төлөхөд сонгох. null бол сонгох боломжгүй (аватар
+  /// хэвээр харагдана).
+  final VoidCallback? onSongokh;
+  final bool songogdson;
+
   const AgreementCard({
     super.key,
     required this.agreement,
     this.onTap,
     this.onPay,
+    this.onSongokh,
+    this.songogdson = false,
   });
 
   @override
@@ -36,12 +43,14 @@ class AgreementCard extends StatelessWidget {
           // A cancelled contract is called out first — it outranks the debt
           // highlight, since paying into it is not what the tenant wants.
           border: Border.all(
-            color: !isActive
-                ? AppColors.error
-                : hasDebt
-                    ? AppColors.overdueChipBg
-                    : context.appDivider,
-            width: !isActive || hasDebt ? 1.5 : 1,
+            color: songogdson
+                ? AppColors.primary
+                : !isActive
+                    ? AppColors.error
+                    : hasDebt
+                        ? AppColors.overdueChipBg
+                        : context.appDivider,
+            width: songogdson ? 2 : (!isActive || hasDebt ? 1.5 : 1),
           ),
           boxShadow: [
             BoxShadow(
@@ -58,7 +67,13 @@ class AgreementCard extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _AgreementAvatar(name: agreement.shortName),
+                  onSongokh != null
+                      ? _SongokhAvatar(
+                          name: agreement.shortName,
+                          songogdson: songogdson,
+                          onTap: onSongokh!,
+                        )
+                      : _AgreementAvatar(name: agreement.shortName),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -263,6 +278,67 @@ class _AgreementAvatar extends StatelessWidget {
             fontWeight: FontWeight.w700,
             fontSize: 18,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Аватар дээр дарж гэрээг олноор төлөхөд сонгоно.
+class _SongokhAvatar extends StatelessWidget {
+  final String name;
+  final bool songogdson;
+  final VoidCallback onTap;
+
+  const _SongokhAvatar({
+    required this.name,
+    required this.songogdson,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      checked: songogdson,
+      label: 'Олноор төлөхөд сонгох',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 150),
+          child: songogdson
+              ? Container(
+                  key: const ValueKey('songogdson'),
+                  width: 46,
+                  height: 46,
+                  decoration: const BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.check_rounded,
+                      color: Colors.white, size: 26),
+                )
+              : Stack(
+                  key: const ValueKey('avatar'),
+                  clipBehavior: Clip.none,
+                  children: [
+                    _AgreementAvatar(name: name),
+                    Positioned(
+                      right: -2,
+                      bottom: -2,
+                      child: Container(
+                        width: 20,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          color: context.appCardBg,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                              color: context.appTextTertiary, width: 1.5),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
         ),
       ),
     );
