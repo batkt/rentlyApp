@@ -209,7 +209,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           ),
           backgroundColor: AppColors.primary,
           behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 5),
+          duration: const Duration(seconds: 2),
+          // Action-тай SnackBar нь Flutter 3.35+ дээр анхдагчаар үлддэг.
+          persist: false,
           action: SnackBarAction(
             label: 'Харах',
             textColor: Colors.white,
@@ -243,7 +245,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
           backgroundColor: AppColors.primary,
           behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 5),
+          duration: const Duration(seconds: 2),
+          // Action-тай SnackBar нь Flutter 3.35+ дээр анхдагчаар үлддэг.
+          persist: false,
           action: SnackBarAction(
             label: 'Нээх',
             textColor: Colors.white,
