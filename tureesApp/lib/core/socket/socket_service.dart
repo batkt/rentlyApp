@@ -27,10 +27,16 @@ class SocketService {
     if (isConnected) return;
 
     final token = await _storage.getToken();
+    // io.io() нь URL-аар кэшилдэг: forceNew-гүй бол гарсны дараа дахин
+    // нэвтрэхэд өмнө нь disconnect хийсэн ХААЛТТАЙ socket буцаж ирээд
+    // хэзээ ч холбогддоггүй (хуучин токентойгоо) — бодит цагийн мэдэгдэл
+    // апп бүрэн хаагдтал ирэхгүй байв.
+    _socket?.dispose();
     _socket = io.io(
       ApiConstants.serverKhayag,
       io.OptionBuilder()
           .setTransports(['websocket'])
+          .enableForceNew()
           .enableAutoConnect()
           .enableReconnection()
           .setReconnectionAttempts(5)
@@ -100,7 +106,7 @@ class SocketService {
   }
 
   void disconnect() {
-    _socket?.disconnect();
+    _socket?.dispose();
     _socket = null;
     _sonsogchid.clear();
   }
