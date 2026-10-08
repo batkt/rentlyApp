@@ -256,6 +256,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
+    // Токен устахаас өмнө утсыг салгана (сүлжээгүй бол менежер салгана).
+    if (state.isAuthenticated) await _repo.tukhuurumjSalgakh();
     _socket.disconnect();
     await _storage.clearAll();
     state = const AuthState();

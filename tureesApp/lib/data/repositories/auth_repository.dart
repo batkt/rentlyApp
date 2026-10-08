@@ -1,13 +1,18 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/network/dio_client.dart';
+import '../../core/storage/secure_storage.dart';
 import '../../core/constants/api_constants.dart';
 import '../models/user_model.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  return AuthRepository(ref.read(dioClientProvider));
+  return AuthRepository(
+    ref.read(dioClientProvider),
+    ref.read(secureStorageProvider),
+  );
 });
 
 /// Account state as the server sees it.
@@ -15,8 +20,9 @@ enum KhereglegchiinTuluv { baina, ustsan, khugatsaaDuussan, todorkhoigui }
 
 class AuthRepository {
   final DioClient _client;
+  final SecureStorageService _storage;
 
-  AuthRepository(this._client);
+  AuthRepository(this._client, this._storage);
 
   Future<List<({String id, String ner})>> getBarilguud(String orgId) async {
     try {
@@ -58,12 +64,24 @@ class AuthRepository {
       'utas': phone,
       'nuutsUg': password,
       'userAgent': 'TureesApp/1.0 (Mobile)',
+      // Нэг бүртгэл нэг утсан дээр л нэвтэрнэ — сервер шалгана.
+      'tukhuurumjiinId': await _storage.tukhuurumjiinIdAvya(),
+      'tukhuurumjiinNer': Platform.isIOS ? 'iPhone' : Platform.isAndroid ? 'Android' : Platform.operatingSystem,
       if (hasOrg) 'baiguullagiinId': baiguullagiinId,
       if (barilgiinId != null && barilgiinId.isNotEmpty) 'barilgiinId': barilgiinId,
     };
 
     final res = await _client.post(endpoint, data: data);
     return res.data as Map<String, dynamic>;
+  }
+
+  /// Гарахад энэ утсыг бүртгэлээс салгана (дараа нь өөр утсаар нэвтэрч болно).
+  Future<void> tukhuurumjSalgakh() async {
+    try {
+      await _client.post(ApiConstants.tukhuurumjSalgakh, data: {
+        'tukhuurumjiinId': await _storage.tukhuurumjiinIdAvya(),
+      });
+    } catch (_) {}
   }
 
   Future<UserModel?> getUserByToken() async {

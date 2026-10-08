@@ -189,6 +189,7 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
         final shine = processed
             .where((n) =>
                 n.isUnread &&
+                !n.uuriinIlgeesenKhuselt &&
                 !umnukhIdnuud.contains(n.id) &&
                 n.barilgiinKhuu(_ref.read(selectedBarilgiinIdProvider)))
             .firstOrNull;
@@ -202,7 +203,11 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
     }
   }
 
-  Future<void> submitRequest({required String message, String turul = 'sanal'}) async {
+  Future<void> submitRequest({
+    required String message,
+    String turul = 'sanal',
+    List<String> zurguud = const [],
+  }) async {
     final user = _ref.read(currentUserProvider);
     if (user == null) return;
     await _repo.submitSanal(
@@ -212,6 +217,7 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
       khariltsagchiinNer: user.fullName,
       message: message,
       turul: turul,
+      zurguud: zurguud,
     );
     await load();
   }
@@ -358,10 +364,12 @@ class DuudlagaNotifier extends StateNotifier<DuudlagaState> {
     String duudlagiinTurul = '',
     String khariltsagchiinUtas = '',
     String khariltsagchiinRegister = '',
+    List<String> zurguud = const [],
   }) async {
     final user = _ref.read(currentUserProvider);
     if (user == null) return;
     await _repo.submitDuudlaga(
+      zurguud: zurguud,
       baiguullagiinId: user.baiguullagiinId,
       barilgiinId: _ref.read(selectedBarilgiinIdProvider),
       khariltsagchiinId: user.id,

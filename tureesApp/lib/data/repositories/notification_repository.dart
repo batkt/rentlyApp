@@ -45,13 +45,11 @@ class NotificationRepository {
       'khuudasniiKhemjee': pageSize,
     });
     final list = (res.data['jagsaalt'] as List?) ?? [];
-    // Түрээслэгчийн өөрийнх нь илгээсэн дуудлага/хүсэлт нь менежерт (turees)
-    // зориулагдсан ба ижил `khariltsagchiinId`-тайгаа буцаж ирдэг тул энд
-    // хасна — эс тэгвээс өөрийн илгээсэн зүйл өөрт нь мэдэгдэл болж харагдана.
-    return list
-        .map((e) => NotificationModel.fromJson(e))
-        .where((n) => !n.uuriinIlgeesenKhuselt)
-        .toList();
+    // Түрээслэгчийн өөрийн илгээсэн санал/гомдол энд үлдэнэ: «Хүсэлт» таб
+    // тэднийг төлөвтэй нь харуулна. Мэдэгдэл таб, тоолуур, баннер нь зөвхөн
+    // `medegdel` ангиллыг авдаг тул тэнд холилдохгүй. Өмнө нь энд бүрмөсөн
+    // хасдаг байсан тул «Санал хүсэлт»/«Гомдол» шүүлтүүр үргэлж хоосон байв.
+    return list.map((e) => NotificationModel.fromJson(e)).toList();
   }
 
   /// Submit a tenant request/complaint (Санал хүсэлт / Гомдол) via /sanalKhadgalya,
@@ -63,12 +61,13 @@ class NotificationRepository {
     required String khariltsagchiinNer,
     required String message,
     String turul = 'sanal',
+    List<String> zurguud = const [],
   }) async {
     await _client.post(ApiConstants.feedback, data: {
       'baiguullagiinId': baiguullagiinId,
       'barilgiinId': barilgiinId,
       'turul': turul,
-      'zurguud': [],
+      'zurguud': zurguud,
       'message': message,
       'khariltsagchiinId': khariltsagchiinId,
       'khariltsagchiinNer': khariltsagchiinNer,
@@ -161,8 +160,10 @@ class NotificationRepository {
     String duudlagiinTurul = '',
     String khariltsagchiinUtas = '',
     String khariltsagchiinRegister = '',
+    List<String> zurguud = const [],
   }) async {
     await _client.post(ApiConstants.duudlagaKhadgalya, data: {
+      'zurguud': zurguud,
       'baiguullagiinId': baiguullagiinId,
       'barilgiinId': barilgiinId,
       'khariltsagchiinId': khariltsagchiinId,

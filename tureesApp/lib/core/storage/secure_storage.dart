@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../constants/api_constants.dart';
@@ -100,11 +101,31 @@ class SecureStorageService {
         _storage.delete(key: 'selected_barilgiinId'),
       ]);
     } else {
+      final tukhuurumjiinId = await _storage.read(key: _tukhuurumjiinKey);
       await _storage.deleteAll();
       if (rememberedPhone != null && rememberedPhone.isNotEmpty) {
         await saveRememberedPhone(rememberedPhone);
       }
+      // Төхөөрөмжийн id гарсны дараа ч хэвээр — эс тэгвээс сервер дээр
+      // салгалт амжилтгүй болсон үед өөрийн утсаараа нэвтэрч чадахгүй болно.
+      if (tukhuurumjiinId != null) {
+        await _storage.write(key: _tukhuurumjiinKey, value: tukhuurumjiinId);
+      }
     }
+  }
+
+  static const _tukhuurumjiinKey = 'tukhuurumjiin_id';
+
+  /// Энэ суулгалтын байнгын id («нэг бүртгэл = нэг утас»). Анх дуудахад үүснэ.
+  Future<String> tukhuurumjiinIdAvya() async {
+    final baigaa = await _storage.read(key: _tukhuurumjiinKey);
+    if (baigaa != null && baigaa.isNotEmpty) return baigaa;
+    final r = Random.secure();
+    final shine = List.generate(16, (_) => r.nextInt(256))
+        .map((b) => b.toRadixString(16).padLeft(2, '0'))
+        .join();
+    await _storage.write(key: _tukhuurumjiinKey, value: shine);
+    return shine;
   }
 
   Future<bool> isLoggedIn() async {

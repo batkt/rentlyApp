@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +12,8 @@ import '../agreements/agreement_detail_screen.dart' show kAgreementInvoiceTab;
 import '../../widgets/cards/notification_card.dart';
 import '../../widgets/common/app_loading.dart';
 import '../../../core/utils/app_snackbar.dart';
+import '../../../data/repositories/agreement_repository.dart';
+import '../../widgets/common/zurgiin_jagsaalt.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
@@ -247,6 +251,14 @@ void _medegdelKharuulya(BuildContext context, NotificationModel medegdel) {
                   medegdel.message,
                   style: theme.textTheme.bodyLarge?.copyWith(fontSize: 17, height: 1.45),
                 ),
+                if (medegdel.zurguud.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  ZurgiinJagsaalt(
+                    zurguud: medegdel.zurguud,
+                    baiguullagiinId: medegdel.baiguullagiinId ?? '',
+                    khemjee: 80,
+                  ),
+                ],
                 if (medegdel.createdAt != null) ...[
                   const SizedBox(height: 14),
                   Text(
@@ -504,6 +516,17 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
             const SizedBox(height: 8),
             Text(notification.message, style: Theme.of(context).textTheme.bodyMedium),
           ],
+          if (notification.zurguud.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ZurgiinJagsaalt(
+              zurguud: notification.zurguud,
+              baiguullagiinId: notification.baiguullagiinId ?? '',
+            ),
+          ],
+          KhariultuudKharuulakh(
+            khariultuud: notification.khariultuud,
+            baiguullagiinId: notification.baiguullagiinId ?? '',
+          ),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -593,6 +616,20 @@ class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
   String _duudlagaSubTurul = '';
   bool _isDropdownOpen = false;
   bool _loading = false;
+  List<File> _zurguud = [];
+
+  /// Сонгосон зургуудыг /zuragKhadgalya руу хуулж id-уудыг буцаана.
+  Future<List<String>> _zurguudKhuulakh() async {
+    final user = ref.read(currentUserProvider);
+    if (user == null || _zurguud.isEmpty) return const [];
+    final repo = ref.read(agreementRepositoryProvider);
+    final idnuud = <String>[];
+    for (final f in _zurguud) {
+      final id = await repo.uploadImage(f, user.baiguullagiinId);
+      if (id.isNotEmpty) idnuud.add(id);
+    }
+    return idnuud;
+  }
 
   static const _duudlagaTurulOptions = [
     'Сантехник', 'Цахилгаан', 'Халаалтын систем', 'Агааржуулалт', 'Лифт засвар',
@@ -624,9 +661,11 @@ class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
     }
     setState(() => _loading = true);
     try {
+      final zurguud = await _zurguudKhuulakh();
       if (_isDuudlaga) {
         final user = ref.read(currentUserProvider);
         await ref.read(duudlagaProvider.notifier).submit(
+              zurguud: zurguud,
               title: _duudlagaTitleCtrl.text.trim(),
               message: _msgCtrl.text.trim(),
               duudlagiinTurul: _duudlagaSubTurul,
@@ -637,6 +676,7 @@ class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
         await ref.read(notificationsProvider.notifier).submitRequest(
               message: _msgCtrl.text.trim(),
               turul: _turul,
+              zurguud: zurguud,
             );
       }
       if (!mounted) return;
@@ -740,6 +780,12 @@ class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
                       )
                     : null,
               ),
+            ),
+            const SizedBox(height: 12),
+            ZuragSongogch(
+              zurguud: _zurguud,
+              idevkhgui: _loading,
+              onChanged: (v) => setState(() => _zurguud = v),
             ),
             if (_isDuudlaga) ...[
               const SizedBox(height: 12),
@@ -1006,6 +1052,18 @@ class _DuudlagaCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(message, style: Theme.of(context).textTheme.bodySmall, maxLines: 2, overflow: TextOverflow.ellipsis),
                 ],
+                if (zurguudUnshikh(data['zurguud']).isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  ZurgiinJagsaalt(
+                    zurguud: zurguudUnshikh(data['zurguud']),
+                    baiguullagiinId: data['baiguullagiinId']?.toString() ?? '',
+                    khemjee: 52,
+                  ),
+                ],
+                KhariultuudKharuulakh(
+                  khariultuud: khariultuudUnshikh(data['khariultuud']),
+                  baiguullagiinId: data['baiguullagiinId']?.toString() ?? '',
+                ),
                 if (createdAt != null) ...[
                   const SizedBox(height: 6),
                   Text(AppFormatters.dateTime(createdAt), style: Theme.of(context).textTheme.labelSmall),
