@@ -6,7 +6,6 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/utils/formatters.dart';
 
 /// Санал/гомдол/дуудлага, мэдэгдэлд хавсаргасан зургуудын жижиг зураг.
 /// Дарахад бүтэн дэлгэцээр (томруулж, гүйлгэж) харуулна.
@@ -91,87 +90,8 @@ class ZurgiinJagsaalt extends StatelessWidget {
   }
 }
 
-/// Менежерийн (turees вэб) хариунууд — текст ба зураг.
-class KhariultuudKharuulakh extends StatelessWidget {
-  final List<Map<String, dynamic>> khariultuud;
-  final String baiguullagiinId;
-
-  const KhariultuudKharuulakh({
-    super.key,
-    required this.khariultuud,
-    required this.baiguullagiinId,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (khariultuud.isEmpty) return const SizedBox.shrink();
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final kh in khariultuud)
-          Container(
-            margin: const EdgeInsets.only(top: 8),
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.support_agent_rounded,
-                        size: 14, color: AppColors.primary),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        (kh['ajiltniiNer']?.toString().isNotEmpty ?? false)
-                            ? 'Менежер · ${kh['ajiltniiNer']}'
-                            : 'Менежерийн хариу',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      AppFormatters.date(kh['ognoo']?.toString()),
-                      style: theme.textTheme.labelSmall,
-                    ),
-                  ],
-                ),
-                if ((kh['message']?.toString() ?? '').isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(kh['message'].toString(), style: theme.textTheme.bodySmall),
-                ],
-                if (zurguudUnshikh(kh['zurguud']).isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  ZurgiinJagsaalt(
-                    zurguud: zurguudUnshikh(kh['zurguud']),
-                    baiguullagiinId: baiguullagiinId,
-                    khemjee: 56,
-                  ),
-                ],
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-}
-
 List<String> zurguudUnshikh(dynamic utga) => (utga is List)
     ? utga.map((e) => e.toString()).where((e) => e.isNotEmpty).toList()
-    : const [];
-
-List<Map<String, dynamic>> khariultuudUnshikh(dynamic utga) => (utga is List)
-    ? utga
-        .whereType<Map>()
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList()
     : const [];
 
 /// Хүсэлтийн маягт дээрх зураг сонгогч (дээд тал нь [deedKhyazgaar]).

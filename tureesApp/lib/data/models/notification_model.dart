@@ -24,9 +24,6 @@ class NotificationModel {
   /// Хавсаргасан зургуудын id (`/zuragAvya`).
   final List<String> zurguud;
 
-  /// Менежерийн хариунууд: {message, zurguud, ajiltniiNer, ognoo}.
-  final List<Map<String, dynamic>> khariultuud;
-
   const NotificationModel({
     required this.id,
     required this.title,
@@ -41,7 +38,6 @@ class NotificationModel {
     this.ajiltniiId,
     this.barilgiinId,
     this.zurguud = const [],
-    this.khariultuud = const [],
   });
 
   NotificationModel copyWith({String? message, int? tuluv}) => NotificationModel(
@@ -58,7 +54,6 @@ class NotificationModel {
         ajiltniiId: ajiltniiId,
         barilgiinId: barilgiinId,
         zurguud: zurguud,
-        khariultuud: khariultuud,
       );
 
   /// Сонгосон барилгынх уу? Барилгагүй (хуучин) бичлэг бүх барилгад харагдана.
@@ -134,11 +129,6 @@ class NotificationModel {
       zurguud: (json['zurguud'] as List?)
               ?.map((e) => e.toString())
               .where((e) => e.isNotEmpty)
-              .toList() ??
-          const [],
-      khariultuud: (json['khariultuud'] as List?)
-              ?.whereType<Map>()
-              .map((e) => Map<String, dynamic>.from(e))
               .toList() ??
           const [],
     );

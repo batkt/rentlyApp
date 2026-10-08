@@ -523,10 +523,7 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
               baiguullagiinId: notification.baiguullagiinId ?? '',
             ),
           ],
-          KhariultuudKharuulakh(
-            khariultuud: notification.khariultuud,
-            baiguullagiinId: notification.baiguullagiinId ?? '',
-          ),
+
           const SizedBox(height: 8),
           Row(
             children: [
@@ -1060,10 +1057,7 @@ class _DuudlagaCard extends StatelessWidget {
                     khemjee: 52,
                   ),
                 ],
-                KhariultuudKharuulakh(
-                  khariultuud: khariultuudUnshikh(data['khariultuud']),
-                  baiguullagiinId: data['baiguullagiinId']?.toString() ?? '',
-                ),
+
                 if (createdAt != null) ...[
                   const SizedBox(height: 6),
                   Text(AppFormatters.dateTime(createdAt), style: Theme.of(context).textTheme.labelSmall),
