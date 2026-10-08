@@ -239,7 +239,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         .where((m) => !m.isFromUser && m.ajiltanNer != null && m.ajiltanNer!.isNotEmpty)
         .lastOrNull
         ?.ajiltanNer;
-    final name = agentName ?? 'Оператор';
+    final name = agentName ?? 'Менежер';
 
     ref.listen(messagesProvider(widget.conversationId), (prev, next) {
       if ((prev?.messages.length ?? 0) < next.messages.length) {

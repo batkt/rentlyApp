@@ -98,7 +98,7 @@ class _ConversationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasUnread = conversation.unreadCount > 0;
-    final name = conversation.khariltsagchiinNer.isNotEmpty ? conversation.khariltsagchiinNer : 'Оператор';
+    final name = conversation.khariltsagchiinNer.isNotEmpty ? conversation.khariltsagchiinNer : 'Менежер';
     final initials = name.isNotEmpty ? name[0].toUpperCase() : 'З';
 
     return ListTile(

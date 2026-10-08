@@ -15,14 +15,16 @@ class NotificationRepository {
   NotificationRepository(this._client);
 
   Future<List<NotificationModel>> getNotifications({
-    required String khariltsagchiinId,
+    required List<String> khariltsagchiinIdnuud,
     int page = 1,
     int pageSize = 200,
   }) async {
     // Mirror the web `useSonorduulga` query: pull every relevant turul so the
     // Мэдэгдэл / Хүсэлт tabs can categorise them client-side.
     final query = {
-      'khariltsagchiinId': khariltsagchiinId,
+      'khariltsagchiinId': khariltsagchiinIdnuud.length == 1
+          ? khariltsagchiinIdnuud.first
+          : {r'$in': khariltsagchiinIdnuud},
       'turul': {
         r'$in': [
           'medegdel',

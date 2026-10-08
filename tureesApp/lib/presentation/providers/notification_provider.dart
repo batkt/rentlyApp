@@ -82,7 +82,7 @@ final notificationsProvider = StateNotifierProvider<NotificationsNotifier, Notif
     ref.read(notificationRepositoryProvider),
     ref,
     ref.read(socketServiceProvider),
-    user?.id,
+    user?.medegdliinIdnuud ?? const [],
   );
 });
 
@@ -124,12 +124,12 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
   final NotificationRepository _repo;
   final Ref _ref;
   final SocketService _socket;
-  final String? _userId;
+  final List<String> _userIdnuud;
 
-  NotificationsNotifier(this._repo, this._ref, this._socket, this._userId)
+  NotificationsNotifier(this._repo, this._ref, this._socket, this._userIdnuud)
       : super(const NotificationsState()) {
-    if (_userId != null) {
-      _socket.on('khariltsagch$_userId', _onSocketNotification);
+    for (final id in _userIdnuud) {
+      _socket.on('khariltsagch$id', _onSocketNotification);
     }
   }
 
@@ -148,8 +148,8 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
 
   @override
   void dispose() {
-    if (_userId != null) {
-      _socket.off('khariltsagch$_userId', _onSocketNotification);
+    for (final id in _userIdnuud) {
+      _socket.off('khariltsagch$id', _onSocketNotification);
     }
     super.dispose();
   }
@@ -159,7 +159,9 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
     if (user == null) return;
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final list = await _repo.getNotifications(khariltsagchiinId: user.id);
+      final list = await _repo.getNotifications(
+        khariltsagchiinIdnuud: user.medegdliinIdnuud,
+      );
       final ovog = user.ovog;
       final ner = user.ner;
       final processed = list.map((n) {

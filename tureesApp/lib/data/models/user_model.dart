@@ -21,6 +21,14 @@ class UserModel {
   /// Тэдгээрийн гэрээ ч мөн [gereeniiIdnuud]-д нэгтгэгдсэн ирдэг тул сануулга харуулна.
   final bool medeelelZuruutei;
 
+  /// Түрээслэгч барилга бүрт тусдаа бичлэгтэй — менежер аль барилгынхаар
+  /// нь илгээсэн мэдэгдлийг ч харахын тулд бүх id (өөрийнхийг оролцуулан).
+  final List<String> khariltsagchiinIdnuud;
+
+  /// Мэдэгдэл татах/сонсох id-ууд. Хуучин backend буцаахгүй бол зөвхөн [id].
+  List<String> get medegdliinIdnuud =>
+      khariltsagchiinIdnuud.isNotEmpty ? khariltsagchiinIdnuud : [id];
+
   const UserModel({
     required this.id,
     required this.ner,
@@ -36,6 +44,7 @@ class UserModel {
     this.appErkhuud = const [],
     this.gereeniiIdnuud = const [],
     this.medeelelZuruutei = false,
+    this.khariltsagchiinIdnuud = const [],
   });
 
   String get fullName => '$ovog $ner'.trim();
@@ -59,6 +68,10 @@ class UserModel {
       gereeniiIdnuud:
           (json['gereeniiIdnuud'] as List?)?.map((e) => e.toString()).toList() ?? [],
       medeelelZuruutei: json['medeelelZuruutei'] == true,
+      khariltsagchiinIdnuud: (json['khariltsagchiinIdnuud'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
     );
   }
 
