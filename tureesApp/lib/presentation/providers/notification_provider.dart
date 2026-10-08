@@ -154,11 +154,15 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
     super.dispose();
   }
 
+  /// Эхний ачааллаар хуучин мэдэгдлүүдийг баннер болгохгүй.
+  bool _ekhniiAchaalal = true;
+
   Future<void> load() async {
     final user = _ref.read(currentUserProvider);
     if (user == null) return;
     state = state.copyWith(isLoading: true, error: null);
     try {
+      final umnukhIdnuud = state.notifications.map((n) => n.id).toSet();
       final list = await _repo.getNotifications(
         khariltsagchiinIdnuud: user.medegdliinIdnuud,
       );
@@ -181,6 +185,17 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
         );
       }).toList();
       state = state.copyWith(isLoading: false, notifications: processed);
+      // Сокетын эвент алдагдсан ч (апп арын дэвсгэрт байсан, холболт
+      // тасарсан) дахин ачаалахад шинээр ирсэн мэдэгдлийг баннераар харуулна.
+      if (!_ekhniiAchaalal) {
+        final shine = processed
+            .where((n) => n.isUnread && !umnukhIdnuud.contains(n.id))
+            .firstOrNull;
+        if (shine != null) {
+          _ref.read(incomingNotificationProvider.notifier).state = shine;
+        }
+      }
+      _ekhniiAchaalal = false;
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }
