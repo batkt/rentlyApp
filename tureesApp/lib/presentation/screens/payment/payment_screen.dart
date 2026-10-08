@@ -105,8 +105,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       final odooginKhemjee = _amountController.text;
       final khereglegchZasaagui =
           odooginKhemjee.isEmpty || odooginKhemjee == _avtomatDun;
-      if ((total ?? 0) > 0 && khereglegchZasaagui && !_baritsaaTulukh) {
-        final shineDun = _numFmt.format(total!);
+      final tulukh = _tulukhDunBodokh(pure, aldangi, total);
+      if (tulukh > 0 && khereglegchZasaagui && !_baritsaaTulukh) {
+        final shineDun = _numFmt.format(tulukh);
         _amountController.text = shineDun;
         _avtomatDun = shineDun;
       }
@@ -121,7 +122,23 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     }
   }
 
-  double get _displayUldegdel => _realUldegdel ?? _selectedAgreement?.uldegdel ?? 0;
+  double get _displayUldegdel =>
+      _tulukhDunBodokh(_pureUldegdel, _aldangi, _realUldegdel ?? _selectedAgreement?.uldegdel);
+
+  /// Төлөх дүн = түрээсийн үлдэгдэл (эерэг бол) + алдангийн үлдэгдэл.
+  /// Менежер «Төлөлт бүртгэх»-ээр гараар төлөлт оруулахад алданги
+  /// хасагддаггүй тул түрээс илүү төлөгдсөн (сөрөг) ч алданги үлддэг —
+  /// өмнө нь нийлбэр нь сөрөг гарч алдангийг төлөх боломжгүй байв.
+  /// QPay callback алдангийг эхэлж хаадаг (qpayTulultBurtgeye).
+  static double _tulukhDunBodokh(double? tsever, double? aldangi, double? niit) {
+    if (tsever == null && aldangi == null) return niit ?? 0;
+    final turees = (tsever ?? 0) > 0 ? tsever! : 0.0;
+    return turees + (aldangi ?? 0);
+  }
+
+  /// Түрээс төлөгдсөн (эсвэл илүү төлөгдсөн), зөвхөн алданги үлдсэн.
+  bool get _zuvkhunAldangi =>
+      (_aldangi ?? 0) > 0 && (_pureUldegdel ?? 0) <= 0;
 
   /// Барьцааны үлдэгдлийг жагсаалтын шинэ утгаас уншина — сонгосон гэрээний
   /// объект энэ State-д хадгалагддаг тул барьцаа төлсний дараа хуучирдаг.
@@ -441,10 +458,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         children: [
           const Icon(Icons.info_outline_rounded, color: Color(0xFFEA580C), size: 16),
           const SizedBox(width: 8),
-          const Expanded(
+          Expanded(
             child: Text(
-              "Нийт дуудаж байгаа төлбөрт алданги нэмэгдсэн дүн болно",
-              style: TextStyle(
+              _zuvkhunAldangi
+                  ? 'Түрээсийн төлбөр төлөгдсөн байна. Алдангийн үлдэгдэл '
+                      '${AppFormatters.currency(_aldangi)} төлөх боломжтой.'
+                  : 'Нийт дуудаж байгаа төлбөрт алданги '
+                      '${AppFormatters.currency(_aldangi)} нэмэгдсэн дүн болно',
+              style: const TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
                 color: Color(0xFF9A3412),
@@ -564,7 +585,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                       const Icon(Icons.receipt_long_rounded, size: 16, color: AppColors.error),
                       const SizedBox(width: 8),
                       Text(
-                        baritsaa ? 'Барьцааны үлдэгдэл' : 'Нэхэмжлэлийн нийт дүн',
+                        baritsaa
+                            ? 'Барьцааны үлдэгдэл'
+                            : _zuvkhunAldangi
+                                ? 'Алдангийн үлдэгдэл'
+                                : 'Нэхэмжлэлийн нийт дүн',
                         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.error),
                       ),
                     ],

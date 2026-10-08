@@ -93,7 +93,8 @@ class _OlonGereeTulburScreenState extends ConsumerState<OlonGereeTulburScreen> {
           a.barilgiinId,
           tsutsalsan: a.tuluv == -1,
         );
-        uldegdel = uld.niitUldegdel;
+        // Илүү төлөгдсөн түрээс алдангийг нөхөхгүй (payment_screen-тэй ижил).
+        uldegdel = (uld.uldegdel > 0 ? uld.uldegdel : 0) + uld.aldangi;
       } catch (_) {
         uldegdel = info.niitUldegdel ?? a.uldegdel;
       }
