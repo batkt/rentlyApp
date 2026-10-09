@@ -79,7 +79,11 @@ class NotificationModel {
 
   /// Which tab this record belongs to.
   NotifCategory get category {
-    if (turul == 'medegdel' || turul == 'sonorduulga') {
+    // Шаардлага менежерээс ирдэг мэдэгдэл тул Мэдэгдэл таб дээр харагдана.
+    if (turul == 'medegdel' ||
+        turul == 'sonorduulga' ||
+        turul == 'shaardlaga' ||
+        duudlagiinTurul == 'shaardlaga') {
       return NotifCategory.medegdel;
     }
     if (_requestTypes.contains(turul)) return NotifCategory.request;

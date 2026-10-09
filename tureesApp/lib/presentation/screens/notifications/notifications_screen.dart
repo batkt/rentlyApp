@@ -213,7 +213,7 @@ class _NotificationsTab extends ConsumerWidget {
             if (items[index].isUnread) {
               ref.read(notificationsProvider.notifier).markRead(items[index].id);
             }
-            _medegdelKharuulya(context, items[index]);
+            _medegdelKharuulya(context, ref, items[index]);
           },
         ),
       ),
@@ -223,8 +223,15 @@ class _NotificationsTab extends ConsumerWidget {
 
 /// Жагсаалтад мэдэгдэл 2 мөрөөр тасардаг тул дарахад бүтэн бичвэрийг
 /// томоор нь жижиг цонхонд харуулна.
-void _medegdelKharuulya(BuildContext context, NotificationModel medegdel) {
+void _medegdelKharuulya(
+  BuildContext context,
+  WidgetRef ref,
+  NotificationModel medegdel,
+) {
   final gereeniiId = medegdel.gereeniiId;
+  // Шаардлагыг түрээслэгч хүлээн авна (Санал хүсэлт таб дээрхтэй ижил).
+  final khuleenAvakh =
+      medegdel.requestTypeLabel == 'Шаардлага' && medegdel.tuluv != 1;
   final nekhemjlekhtei = medegdel.turul == 'nekhemjlekh' &&
       gereeniiId != null &&
       gereeniiId.isNotEmpty;
@@ -284,6 +291,25 @@ void _medegdelKharuulya(BuildContext context, NotificationModel medegdel) {
             onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Хаах'),
           ),
+          if (khuleenAvakh)
+            FilledButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                try {
+                  await ref
+                      .read(notificationsProvider.notifier)
+                      .khuleenAvya(medegdel.id);
+                  if (!context.mounted) return;
+                  showAppSnackBar(context, 'Шаардлагыг хүлээн авлаа',
+                      turul: SnackTurul.amjilt);
+                } catch (_) {
+                  if (!context.mounted) return;
+                  showAppSnackBar(context, 'Хүлээн авахад алдаа гарлаа',
+                      turul: SnackTurul.aldaa);
+                }
+              },
+              child: const Text('Хүлээн авах'),
+            ),
         ],
       );
     },
@@ -303,7 +329,7 @@ class _RequestsTabState extends ConsumerState<_RequestsTab> {
   // null = Бүгд (all)
   String? _turulFilter;
 
-  static const _turulOptions = ['Санал хүсэлт', 'Шаардлага', 'Гомдол'];
+  static const _turulOptions = ['Санал хүсэлт', 'Гомдол'];
 
   @override
   Widget build(BuildContext context) {
