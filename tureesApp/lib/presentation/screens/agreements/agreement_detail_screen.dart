@@ -557,17 +557,20 @@ class _TransactionsTab extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    if (monthNetTotal != 0) ...[
-                      Text(
-                        AppFormatters.currency(monthNetTotal),
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                          color: monthNetTotal < 0 ? AppColors.success : AppColors.error,
-                        ),
+                    // Тухайн сард үлдэгдэлгүй бол хоосон биш «0.00» гэж харуулна.
+                    Text(
+                      AppFormatters.currency(monthNetTotal),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: monthNetTotal < 0
+                            ? AppColors.success
+                            : monthNetTotal > 0
+                                ? AppColors.error
+                                : context.appTextTertiary,
                       ),
-                      const SizedBox(width: 4),
-                    ],
+                    ),
+                    const SizedBox(width: 4),
                     Icon(Icons.chevron_right_rounded, size: 20, color: context.appTextTertiary),
                   ],
                 ),
@@ -816,11 +819,15 @@ class _MonthTransactionsSheet extends StatelessWidget {
                                 fontSize: 11,
                               ),
                             ),
-                          if (uldegdel != 0)
-                            Text(
+                          // Үлдэгдэлгүй (0) үед ч «0.00» харагдана.
+                          Text(
                               'Үлд: ${AppFormatters.currency(uldegdel)}',
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: uldegdel < 0 ? AppColors.success : AppColors.error,
+                                color: uldegdel < 0
+                                    ? AppColors.success
+                                    : uldegdel > 0
+                                        ? AppColors.error
+                                        : context.appTextTertiary,
                                 fontSize: 11,
                               ),
                             ),
