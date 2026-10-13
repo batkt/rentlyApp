@@ -644,7 +644,6 @@ class _RequestFormSheet extends ConsumerStatefulWidget {
 
 class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
   final _msgCtrl = TextEditingController();
-  final _duudlagaTitleCtrl = TextEditingController();
   late String _turul = widget.initialTurul == 'shaardlaga' ? 'sanal' : widget.initialTurul;
   String _duudlagaSubTurul = '';
   bool _isDropdownOpen = false;
@@ -677,7 +676,6 @@ class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
   @override
   void dispose() {
     _msgCtrl.dispose();
-    _duudlagaTitleCtrl.dispose();
     super.dispose();
   }
 
@@ -688,8 +686,8 @@ class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
       showAppSnackBar(context, 'Тайлбар оруулна уу', turul: SnackTurul.sanuulga);
       return;
     }
-    if (_isDuudlaga && (_duudlagaSubTurul.isEmpty || _duudlagaTitleCtrl.text.trim().isEmpty)) {
-      showAppSnackBar(context, 'Бүх талбарыг бөглөнө үү', turul: SnackTurul.sanuulga);
+    if (_isDuudlaga && _duudlagaSubTurul.isEmpty) {
+      showAppSnackBar(context, 'Дуудлагын төрлөө сонгоно уу', turul: SnackTurul.sanuulga);
       return;
     }
     setState(() => _loading = true);
@@ -699,7 +697,9 @@ class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
         final user = ref.read(currentUserProvider);
         await ref.read(duudlagaProvider.notifier).submit(
               zurguud: zurguud,
-              title: _duudlagaTitleCtrl.text.trim(),
+              // Гарчиг асуухаа больсон — вэб дуудлагыг гарчгаар нь
+              // харуулдаг тул сонгосон төрлийг гарчиг болгоно.
+              title: _duudlagaSubTurul,
               message: _msgCtrl.text.trim(),
               duudlagiinTurul: _duudlagaSubTurul,
               khariltsagchiinUtas: user?.primaryPhone ?? '',
@@ -779,19 +779,6 @@ class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
             const SizedBox(height: 16),
             if (_isDuudlaga) ...[
               _buildDuudlagaTypeDropdown(context),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _duudlagaTitleCtrl,
-                maxLength: 40,
-                textCapitalization: TextCapitalization.sentences,
-                textInputAction: TextInputAction.next,
-                onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  labelText: 'Гарчиг',
-                  hintText: 'Дуудлагын гарчиг...',
-                  counterText: '${_duudlagaTitleCtrl.text.length}/40',
-                ),
-              ),
               const SizedBox(height: 12),
             ],
             TextField(
