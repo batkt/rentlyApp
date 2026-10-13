@@ -11,6 +11,7 @@ import '../../../data/models/notification_model.dart';
 import '../../providers/agreement_provider.dart';
 import '../../providers/ai_tuslakh_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/payment_provider.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../agreements/agreement_detail_screen.dart' show kAgreementInvoiceTab;
@@ -302,6 +303,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final navBarIndex = visibleTabs.indexOf(safeScreenIndex).clamp(0, destinations.length - 1);
 
     void onSongokh(int i) {
+      if (visibleTabs[i] != safeScreenIndex) {
+        ref.read(gereeSongoltTseverlekhProvider.notifier).state++;
+      }
       ref.read(_navIndexProvider.notifier).state = visibleTabs[i];
       _tabSolikhod();
     }

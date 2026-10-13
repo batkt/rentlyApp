@@ -20,10 +20,16 @@ class _GereeniiTulbur {
   final String? dans;
   final TextEditingController dunController;
 
+  /// Үлдэгдлийн задаргаа: түрээс (бусад авлагатай) ба алданги.
+  final double turees;
+  final double aldangi;
+
   _GereeniiTulbur({
     required this.geree,
     required this.uldegdel,
     required this.dans,
+    required this.turees,
+    required this.aldangi,
   }) : dunController = TextEditingController(
             text: uldegdel > 0 ? _numFmt.format(uldegdel) : '');
 
@@ -81,6 +87,7 @@ class _OlonGereeTulburScreenState extends ConsumerState<OlonGereeTulburScreen> {
     final repo = ref.read(agreementRepositoryProvider);
     String? dans;
     double uldegdel = a.uldegdel;
+    double aldangi = a.aldangiinUldegdel > 0 ? a.aldangiinUldegdel : 0;
     try {
       final info = await repo.getLatestInvoiceInfo(a.id);
       final invoiceDans = info.dansniiDugaar;
@@ -95,13 +102,21 @@ class _OlonGereeTulburScreenState extends ConsumerState<OlonGereeTulburScreen> {
         );
         // Илүү төлөгдсөн түрээс алдангийг нөхөхгүй (payment_screen-тэй ижил).
         uldegdel = (uld.uldegdel > 0 ? uld.uldegdel : 0) + uld.aldangi;
+        aldangi = uld.aldangi > 0 ? uld.aldangi : 0;
       } catch (_) {
         uldegdel = info.niitUldegdel ?? a.uldegdel;
       }
     } catch (_) {
       dans = a.dans;
     }
-    return _GereeniiTulbur(geree: a, uldegdel: uldegdel, dans: dans);
+    final turees = uldegdel - aldangi;
+    return _GereeniiTulbur(
+      geree: a,
+      uldegdel: uldegdel,
+      dans: dans,
+      turees: turees > 0 ? turees : 0,
+      aldangi: aldangi,
+    );
   }
 
   Future<void> _achaalya() async {
@@ -281,6 +296,52 @@ class _Sanuulga extends StatelessWidget {
   }
 }
 
+/// «Түрээс · Талбай 1006   450,000₮» мөр.
+class _ZadargaaniiMur extends StatelessWidget {
+  final String ner;
+  final String? talbai;
+  final double dun;
+  final Color color;
+
+  const _ZadargaaniiMur({
+    required this.ner,
+    required this.talbai,
+    required this.dun,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.labelSmall;
+    return Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(ner,
+                style: style?.copyWith(color: color, fontWeight: FontWeight.w700)),
+          ),
+          if (talbai != null && talbai!.isNotEmpty) ...[
+            const SizedBox(width: 6),
+            Text('Талбай $talbai', style: style),
+          ],
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(AppFormatters.currency(dun),
+                style: style?.copyWith(fontWeight: FontWeight.w600),
+                overflow: TextOverflow.ellipsis),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _BulegKart extends StatelessWidget {
   final _DansniiBuleg buleg;
   final String? garchig;
@@ -343,15 +404,31 @@ class _BulegKart extends StatelessWidget {
                         Text(m.geree.gereeniiDugaar,
                             style: theme.textTheme.bodyMedium
                                 ?.copyWith(fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 2),
-                        Text(
-                          [
-                            if (m.geree.talbainDugaar != null)
-                              'Талбай ${m.geree.talbainDugaar}',
-                            'Үлдэгдэл ${AppFormatters.currency(m.uldegdel)}',
-                          ].join(' · '),
-                          style: theme.textTheme.labelSmall,
-                        ),
+                        const SizedBox(height: 4),
+                        // Юуны төлбөр болохыг талбайгаар нь задалж харуулна.
+                        if (m.turees > 0)
+                          _ZadargaaniiMur(
+                            ner: 'Түрээс',
+                            talbai: m.geree.talbainDugaar,
+                            dun: m.turees,
+                            color: AppColors.primary,
+                          ),
+                        if (m.aldangi > 0)
+                          _ZadargaaniiMur(
+                            ner: 'Алданги',
+                            talbai: m.geree.talbainDugaar,
+                            dun: m.aldangi,
+                            color: AppColors.error,
+                          ),
+                        if (m.turees <= 0 && m.aldangi <= 0)
+                          Text(
+                            [
+                              if (m.geree.talbainDugaar != null)
+                                'Талбай ${m.geree.talbainDugaar}',
+                              'Үлдэгдэл ${AppFormatters.currency(m.uldegdel)}',
+                            ].join(' · '),
+                            style: theme.textTheme.labelSmall,
+                          ),
                       ],
                     ),
                   ),

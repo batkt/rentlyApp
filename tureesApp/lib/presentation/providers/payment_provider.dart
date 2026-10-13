@@ -10,6 +10,9 @@ final qpayInvoiceProvider = StateProvider<QpayInvoiceModel?>((ref) => null);
 /// the home IndexedStack and is never disposed — wipes the amount it was left
 /// holding and refetches the balance instead of showing the pre-payment one.
 final paymentClearSignalProvider = StateProvider<int>((ref) => 0);
+
+/// Таб солиход нүүр хуудасны олон гэрээний сонголтыг цэвэрлэх дохио.
+final gereeSongoltTseverlekhProvider = StateProvider<int>((ref) => 0);
 final paymentAmountProvider = StateProvider<double>((ref) => 0.0);
 final paymentLoadingProvider = StateProvider<bool>((ref) => false);
 final paymentSuccessProvider = StateProvider<bool>((ref) => false);
