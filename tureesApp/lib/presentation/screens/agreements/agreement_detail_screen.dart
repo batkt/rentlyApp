@@ -515,7 +515,10 @@ class _TransactionsTab extends ConsumerWidget {
                 ?? key;
             final label = _monthLabel(firstDateStr);
 
-            final monthNetTotal = (enrichedMonthTxs.firstOrNull?['_perMonthUldegdel'] as num?)?.toDouble() ?? 0.0;
+            // Бутархайн алдаанаас «-0.00» (ногоон) гарахгүйн тулд мөнгөн
+            // дүнг 2 орон хүртэл бөөрөнхийлнө — 0 бол үргэлж саарал «0.00₮».
+            final monthNetTotal = _bukhulukh(
+                (enrichedMonthTxs.firstOrNull?['_perMonthUldegdel'] as num?)?.toDouble() ?? 0.0);
             final actualTxCount = enrichedMonthTxs.where((t) => t['ekhniiUldegdelEsekh'] != true).length;
 
             return GestureDetector(
@@ -654,8 +657,8 @@ class _MonthTransactionsSheet extends StatelessWidget {
                 // Per-month balance (resets to 0 each month — see _perMonthUldegdel).
                 // Can go negative (e.g. a discount before any charge offsets it) —
                 // that's shown as-is, not floored to 0.
-                final uldegdel = (tx['_perMonthUldegdel'] as num?)?.toDouble()
-                    ?? (tx['uldegdel'] as num?)?.toDouble() ?? 0.0;
+                final uldegdel = _bukhulukh((tx['_perMonthUldegdel'] as num?)?.toDouble()
+                    ?? (tx['uldegdel'] as num?)?.toDouble() ?? 0.0);
                 final ekhniiUldegdel = (tx['ekhniiUldegdel'] as num?)?.toDouble() ?? 0.0;
                 final tailbar = tx['tailbar']?.toString() ?? '';
                 final dateStr = tx['ognoo']?.toString() ?? tx['guilgeeKhiisenOgnoo']?.toString();
@@ -2132,3 +2135,6 @@ class _Row extends StatelessWidget {
     );
   }
 }
+
+/// Мөнгөн дүнг 2 орон хүртэл бөөрөнхийлнө; −0.004 г.м. нь 0.0 (сөрөг тэмдэггүй).
+double _bukhulukh(double v) => (v * 100).round() / 100;
