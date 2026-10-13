@@ -250,6 +250,7 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
     final barilga = _ref.read(selectedBarilgiinIdProvider);
     bool unshikh(NotificationModel n) =>
         n.isUnread &&
+        !n.shaardlagaEsekh &&
         n.category == NotifCategory.medegdel &&
         n.barilgiinKhuu(barilga);
     final unreadMedegdel = state.notifications.where(unshikh).toList();

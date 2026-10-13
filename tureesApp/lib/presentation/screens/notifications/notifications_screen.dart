@@ -210,7 +210,8 @@ class _NotificationsTab extends ConsumerWidget {
         itemBuilder: (context, index) => NotificationCard(
           notification: items[index],
           onTap: () {
-            if (items[index].isUnread) {
+            // Шаардлагыг «Хүлээн авах» дарахад л уншсан болгоно.
+            if (items[index].isUnread && !items[index].shaardlagaEsekh) {
               ref.read(notificationsProvider.notifier).markRead(items[index].id);
             }
             _medegdelKharuulya(context, ref, items[index]);
@@ -230,8 +231,7 @@ void _medegdelKharuulya(
 ) {
   final gereeniiId = medegdel.gereeniiId;
   // Шаардлагыг түрээслэгч хүлээн авна (Санал хүсэлт таб дээрхтэй ижил).
-  final khuleenAvakh =
-      medegdel.requestTypeLabel == 'Шаардлага' && medegdel.tuluv != 1;
+  final khuleenAvakh = medegdel.shaardlagaEsekh && medegdel.tuluv != 1;
   final nekhemjlekhtei = medegdel.turul == 'nekhemjlekh' &&
       gereeniiId != null &&
       gereeniiId.isNotEmpty;
@@ -241,9 +241,19 @@ void _medegdelKharuulya(
       final theme = Theme.of(dialogContext);
       return AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          medegdel.title,
-          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (medegdel.shaardlagaEsekh) ...[
+              ShaardlagiinShoshgo(khuleenAvsan: medegdel.tuluv == 1),
+              const SizedBox(height: 8),
+            ],
+            Text(
+              medegdel.title,
+              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ],
         ),
         content: ConstrainedBox(
           constraints: BoxConstraints(

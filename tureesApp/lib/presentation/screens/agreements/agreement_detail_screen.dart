@@ -237,6 +237,11 @@ class _InfoTab extends StatelessWidget {
           title: 'Гэрээний мэдээлэл',
           icon: Icons.assignment_rounded,
           children: [
+            _Row(
+              icon: agreement.turGereeEsekh ? Icons.schedule_rounded : Icons.verified_rounded,
+              label: 'Гэрээний төрөл',
+              value: agreement.turulNer,
+            ),
             if (agreement.register != null && agreement.register!.isNotEmpty)
               _Row(icon: Icons.badge_rounded, label: 'Регистр', value: agreement.register!),
             _Row(
@@ -257,7 +262,7 @@ class _InfoTab extends StatelessWidget {
             if (agreement.duusakhOgnoo != null)
               _Row(icon: Icons.event_busy_rounded, label: 'Дуусах огноо', value: AppFormatters.date(agreement.duusakhOgnoo)),
             if (agreement.khugatsaa != null)
-              _Row(icon: Icons.timer_rounded, label: 'Хугацаа', value: '${agreement.khugatsaa} сар'),
+              _Row(icon: Icons.timer_rounded, label: 'Хугацаа', value: agreement.khugatsaaText!),
           ],
         ),
         if (agreement.zardluud.isNotEmpty) ...[

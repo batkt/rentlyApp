@@ -14,6 +14,9 @@ class NotificationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isUnread = notification.isUnread;
+    final shaardlaga = notification.shaardlagaEsekh;
+    // Хүлээн аваагүй шаардлага улаанаар ялгарна.
+    final accent = shaardlaga ? AppColors.error : AppColors.primary;
 
     return GestureDetector(
       onTap: onTap,
@@ -21,10 +24,14 @@ class NotificationCard extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: isUnread ? context.appPrimaryContainer : context.appCardBg,
+          color: isUnread
+              ? (shaardlaga ? AppColors.error.withOpacity(0.06) : context.appPrimaryContainer)
+              : context.appCardBg,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isUnread ? AppColors.primaryLight.withOpacity(0.4) : context.appDivider,
+            color: isUnread
+                ? (shaardlaga ? AppColors.error.withOpacity(0.4) : AppColors.primaryLight.withOpacity(0.4))
+                : context.appDivider,
           ),
         ),
         child: Row(
@@ -34,11 +41,11 @@ class NotificationCard extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: isUnread ? AppColors.primary : context.appInputFill,
+                color: isUnread ? accent : context.appInputFill,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
-                Icons.notifications_rounded,
+                shaardlaga ? Icons.assignment_late_rounded : Icons.notifications_rounded,
                 size: 20,
                 color: isUnread ? Colors.white : context.appTextTertiary,
               ),
@@ -48,6 +55,10 @@ class NotificationCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (shaardlaga) ...[
+                    ShaardlagiinShoshgo(khuleenAvsan: !isUnread),
+                    const SizedBox(height: 6),
+                  ],
                   Row(
                     children: [
                       Expanded(
@@ -62,7 +73,7 @@ class NotificationCard extends StatelessWidget {
                         Container(
                           width: 8,
                           height: 8,
-                          decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                          decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
                         ),
                     ],
                   ),
@@ -85,6 +96,51 @@ class NotificationCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// «Шаардлага» шошго + төлөв (хүлээн авах / хүлээн авсан).
+class ShaardlagiinShoshgo extends StatelessWidget {
+  final bool khuleenAvsan;
+
+  const ShaardlagiinShoshgo({super.key, required this.khuleenAvsan});
+
+  @override
+  Widget build(BuildContext context) {
+    final tuluvColor = khuleenAvsan ? AppColors.success : AppColors.warning;
+    return Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      children: [
+        _Shoshgo(text: 'Шаардлага', color: AppColors.error),
+        _Shoshgo(
+          text: khuleenAvsan ? 'Хүлээн авсан' : 'Хүлээн авах',
+          color: tuluvColor,
+        ),
+      ],
+    );
+  }
+}
+
+class _Shoshgo extends StatelessWidget {
+  final String text;
+  final Color color;
+
+  const _Shoshgo({required this.text, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color),
       ),
     );
   }

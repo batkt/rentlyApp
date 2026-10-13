@@ -93,6 +93,8 @@ class AgreementCard extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 4),
+                        _GereeniiTurulChip(tur: agreement.turGereeEsekh),
+                        const SizedBox(height: 4),
                         Row(
                           children: [
                             Icon(Icons.receipt_long_rounded, size: 13, color: context.appTextTertiary),
@@ -246,6 +248,40 @@ class AgreementCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Үндсэн / түр гэрээг ялгах шошго. Өнгө нь вэбийн гэрээний жагсаалттай
+/// ижил: түр — purple-600, үндсэн — blue-500.
+class _GereeniiTurulChip extends StatelessWidget {
+  final bool tur;
+
+  const _GereeniiTurulChip({required this.tur});
+
+  static const _turColor = Color(0xFF9333EA);
+  static const _undsenColor = Color(0xFF3B82F6);
+
+  @override
+  Widget build(BuildContext context) {
+    final color = tur ? _turColor : _undsenColor;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(tur ? Icons.schedule_rounded : Icons.verified_rounded, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            tur ? 'Түр гэрээ' : 'Үндсэн гэрээ',
+            style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
+          ),
+        ],
       ),
     );
   }
