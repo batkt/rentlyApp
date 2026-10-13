@@ -306,6 +306,33 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     );
   }
 
+  void _negGereeSongokh(AgreementModel v) {
+    setState(() {
+      _selectedAgreement = v;
+      _baritsaaTulukh = false;
+      _realUldegdel = null;
+      _dansniiDugaar = null;
+      _amountController.clear();
+    });
+    _fetchRealUldegdel(v);
+  }
+
+  Future<void> _gereeSongokh(List<AgreementModel> active) async {
+    final songoson = await showModalBottomSheet<List<AgreementModel>>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _GereeSongokhSheet(gereenuud: active),
+    );
+    if (!mounted || songoson == null || songoson.isEmpty) return;
+    if (songoson.length == 1) {
+      _negGereeSongokh(songoson.first);
+    } else {
+      context.push('/olon-tulbur', extra: songoson);
+    }
+  }
+
   Widget _buildAgreementSelector(AsyncValue<List<AgreementModel>> agreementsAsync) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -354,73 +381,26 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               );
             }
 
-            return Container(
-              decoration: BoxDecoration(
-                color: context.appCardBg,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: context.appDivider),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<AgreementModel>(
-                  value: _selectedAgreement,
-                  isExpanded: true,
-                  dropdownColor: context.appCardBg,
-                  hint: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text('Гэрээ сонгох...', style: TextStyle(color: context.appTextTertiary)),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  itemHeight: 60,
-                  // Бүх гэрээ ихэвчлэн нэг түрээслэгчийнх байдаг тул нэрний
-                  // оронд гэрээ/талбайн дугаар, үлдэгдлийг харуулна.
-                  items: active.map((a) => DropdownMenuItem(
-                    value: a,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                a.gereeniiDugaar,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: context.appTextPrimary,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              if ((a.talbainDugaar ?? '').isNotEmpty)
-                                Text(
-                                  'Талбай: ${a.talbainDugaar}',
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(fontSize: 12, color: context.appTextTertiary),
-                                ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          AppFormatters.balance(a.uldegdel),
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: a.uldegdel.balanceColor,
-                          ),
-                        ),
-                      ],
+            // Нэг эсвэл олон гэрээ сонгоно. Олон бол нүүр дэлгэцийнх шиг
+            // «Олон гэрээ төлөх» рүү шилжинэ.
+            return InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: () => _gereeSongokh(active),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                decoration: BoxDecoration(
+                  color: context.appCardBg,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: context.appDivider),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text('Гэрээ сонгох...',
+                          style: TextStyle(color: context.appTextTertiary)),
                     ),
-                  )).toList(),
-                  onChanged: (v) {
-                    setState(() {
-                      _selectedAgreement = v;
-                      _baritsaaTulukh = false;
-                      _realUldegdel = null;
-                      _dansniiDugaar = null;
-                      _amountController.clear();
-                    });
-                    if (v != null) _fetchRealUldegdel(v);
-                  },
+                    Icon(Icons.arrow_drop_down_rounded, color: context.appTextTertiary),
+                  ],
                 ),
               ),
             );
@@ -853,6 +833,147 @@ class _PaymentMethodCard extends StatelessWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// «Гэрээ сонгох» — нэг эсвэл олон гэрээ (чагтлах, «Бүгдийг сонгох»).
+class _GereeSongokhSheet extends StatefulWidget {
+  final List<AgreementModel> gereenuud;
+
+  const _GereeSongokhSheet({required this.gereenuud});
+
+  @override
+  State<_GereeSongokhSheet> createState() => _GereeSongokhSheetState();
+}
+
+class _GereeSongokhSheetState extends State<_GereeSongokhSheet> {
+  final Set<String> _songogdson = {};
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final gereenuud = widget.gereenuud;
+    final bugd = _songogdson.length == gereenuud.length;
+    final songoson =
+        gereenuud.where((a) => _songogdson.contains(a.id)).toList();
+    final niit = songoson.fold<double>(
+        0, (s, a) => s + (a.uldegdel > 0 ? a.uldegdel : 0));
+
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.8,
+      ),
+      decoration: BoxDecoration(
+        color: context.appCardBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 36,
+            height: 4,
+            margin: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+                color: context.appDivider, borderRadius: BorderRadius.circular(2)),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 8, 4),
+            child: Row(
+              children: [
+                Text('Гэрээ сонгох',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w700)),
+                const Spacer(),
+                if (gereenuud.length > 1)
+                  TextButton.icon(
+                    onPressed: () => setState(() {
+                      if (bugd) {
+                        _songogdson.clear();
+                      } else {
+                        _songogdson.addAll(gereenuud.map((a) => a.id));
+                      }
+                    }),
+                    icon: Icon(bugd
+                        ? Icons.check_box_rounded
+                        : Icons.check_box_outline_blank_rounded),
+                    label: const Text('Бүгдийг сонгох'),
+                  ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Flexible(
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: gereenuud.length,
+              itemBuilder: (_, i) {
+                final a = gereenuud[i];
+                final sonogdsonEsekh = _songogdson.contains(a.id);
+                return CheckboxListTile(
+                  value: sonogdsonEsekh,
+                  activeColor: AppColors.primary,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  onChanged: (_) => setState(() {
+                    if (!_songogdson.remove(a.id)) _songogdson.add(a.id);
+                  }),
+                  title: Text(a.gereeniiDugaar,
+                      style: const TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: (a.talbainDugaar ?? '').isNotEmpty
+                      ? Text('Талбай: ${a.talbainDugaar}')
+                      : null,
+                  secondary: Text(
+                    AppFormatters.balance(a.uldegdel),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: a.uldegdel.balanceColor,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const Divider(height: 1),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('${songoson.length} гэрээ сонгосон',
+                            style: theme.textTheme.labelSmall),
+                        Text(AppFormatters.currency(niit),
+                            style: theme.textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700)),
+                      ],
+                    ),
+                  ),
+                  FilledButton(
+                    onPressed: songoson.isEmpty
+                        ? null
+                        : () => Navigator.pop(context, songoson),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 22, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: Text(songoson.length > 1 ? 'Олноор төлөх' : 'Сонгох'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
