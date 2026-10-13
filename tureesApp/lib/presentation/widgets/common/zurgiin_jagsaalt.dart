@@ -14,16 +14,54 @@ class ZurgiinJagsaalt extends StatelessWidget {
   final String baiguullagiinId;
   final double khemjee;
 
+  /// Зургийг бүтэн өргөнөөр нь томоор (дараалуулан) харуулна — мэдэгдлийн
+  /// дэлгэрэнгүй цонхонд. Үгүй бол жижиг дөрвөлжин зургууд.
+  final bool butenUrgun;
+
   const ZurgiinJagsaalt({
     super.key,
     required this.zurguud,
     required this.baiguullagiinId,
     this.khemjee = 64,
+    this.butenUrgun = false,
   });
 
   @override
   Widget build(BuildContext context) {
     if (zurguud.isEmpty) return const SizedBox.shrink();
+    if (butenUrgun) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < zurguud.length; i++)
+            Padding(
+              padding: EdgeInsets.only(bottom: i == zurguud.length - 1 ? 0 : 10),
+              child: GestureDetector(
+                onTap: () => _butenKharakh(context, i),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: CachedNetworkImage(
+                    imageUrl: ApiConstants.zuragAvya(baiguullagiinId, zurguud[i]),
+                    fit: BoxFit.fitWidth,
+                    placeholder: (_, __) => AspectRatio(
+                      aspectRatio: 4 / 3,
+                      child: Container(color: context.appInputFill),
+                    ),
+                    errorWidget: (_, __, ___) => AspectRatio(
+                      aspectRatio: 4 / 3,
+                      child: Container(
+                        color: context.appInputFill,
+                        child: Icon(Icons.broken_image_outlined,
+                            color: context.appTextTertiary),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
+    }
     return Wrap(
       spacing: 6,
       runSpacing: 6,

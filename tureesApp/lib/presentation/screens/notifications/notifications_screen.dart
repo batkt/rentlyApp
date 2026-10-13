@@ -239,8 +239,14 @@ void _medegdelKharuulya(
     context: context,
     builder: (dialogContext) {
       final theme = Theme.of(dialogContext);
+      final zuragtai = medegdel.zurguud.isNotEmpty;
       return AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        // Зурагтай мэдэгдэл жижиг цонхонд багтахгүй байсан тул дэлгэцийн
+        // бараг бүх өргөн, өндрийг ашиглана.
+        insetPadding: zuragtai
+            ? const EdgeInsets.symmetric(horizontal: 12, vertical: 24)
+            : const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -257,7 +263,9 @@ void _medegdelKharuulya(
         ),
         content: ConstrainedBox(
           constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(dialogContext).size.height * 0.5,
+            maxHeight: MediaQuery.of(dialogContext).size.height *
+                (zuragtai ? 0.75 : 0.5),
+            minWidth: zuragtai ? MediaQuery.of(dialogContext).size.width : 0,
           ),
           child: SingleChildScrollView(
             child: Column(
@@ -273,7 +281,7 @@ void _medegdelKharuulya(
                   ZurgiinJagsaalt(
                     zurguud: medegdel.zurguud,
                     baiguullagiinId: medegdel.baiguullagiinId ?? '',
-                    khemjee: 80,
+                    butenUrgun: true,
                   ),
                 ],
                 if (medegdel.createdAt != null) ...[
