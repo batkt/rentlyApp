@@ -24,6 +24,25 @@ import '../presentation/screens/ai_tuslakh/ai_tuslakh_screen.dart';
 /// /login — are shown against this key rather than a screen's own context.
 final tureesNavKey = GlobalKey<NavigatorState>();
 
+/// Дэлгэцээс гарах (буцах товч, swipe) эсвэл шинэ дэлгэц нээгдэхэд гарыг
+/// хаана. Үгүй бол AI чат г.м. бичих талбартай дэлгэцээс буцахад гар
+/// нүүр дэлгэц дээр нээлттэй үлддэг байв.
+class _GarKhaagch extends NavigatorObserver {
+  void _khaakh() => FocusManager.instance.primaryFocus?.unfocus();
+
+  @override
+  void didPop(Route route, Route? previousRoute) => _khaakh();
+
+  @override
+  void didPush(Route route, Route? previousRoute) => _khaakh();
+
+  @override
+  void didRemove(Route route, Route? previousRoute) => _khaakh();
+
+  @override
+  void didStartUserGesture(Route route, Route? previousRoute) => _khaakh();
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
   // Build the router ONCE. Recreating GoRouter on every auth change spawns a
   // fresh Navigator GlobalKey and triggers "GlobalKey used multiple times"
@@ -35,6 +54,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     navigatorKey: tureesNavKey,
+    observers: [_GarKhaagch()],
     initialLocation: '/login',
     refreshListenable: refresh,
     redirect: (context, state) {
