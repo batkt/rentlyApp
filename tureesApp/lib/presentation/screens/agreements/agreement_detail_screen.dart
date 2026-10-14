@@ -237,6 +237,11 @@ class _InfoTab extends StatelessWidget {
           title: 'Гэрээний мэдээлэл',
           icon: Icons.assignment_rounded,
           children: [
+            _Row(
+              icon: agreement.turGereeEsekh ? Icons.schedule_rounded : Icons.verified_rounded,
+              label: 'Гэрээний төрөл',
+              value: agreement.turulNer,
+            ),
             if (agreement.register != null && agreement.register!.isNotEmpty)
               _Row(icon: Icons.badge_rounded, label: 'Регистр', value: agreement.register!),
             _Row(
@@ -257,7 +262,7 @@ class _InfoTab extends StatelessWidget {
             if (agreement.duusakhOgnoo != null)
               _Row(icon: Icons.event_busy_rounded, label: 'Дуусах огноо', value: AppFormatters.date(agreement.duusakhOgnoo)),
             if (agreement.khugatsaa != null)
-              _Row(icon: Icons.timer_rounded, label: 'Хугацаа', value: '${agreement.khugatsaa} сар'),
+              _Row(icon: Icons.timer_rounded, label: 'Хугацаа', value: agreement.khugatsaaText!),
           ],
         ),
         if (agreement.zardluud.isNotEmpty) ...[
@@ -510,7 +515,10 @@ class _TransactionsTab extends ConsumerWidget {
                 ?? key;
             final label = _monthLabel(firstDateStr);
 
-            final monthNetTotal = (enrichedMonthTxs.firstOrNull?['_perMonthUldegdel'] as num?)?.toDouble() ?? 0.0;
+            // Бутархайн алдаанаас «-0.00» (ногоон) гарахгүйн тулд мөнгөн
+            // дүнг 2 орон хүртэл бөөрөнхийлнө — 0 бол үргэлж саарал «0.00₮».
+            final monthNetTotal = _bukhulukh(
+                (enrichedMonthTxs.firstOrNull?['_perMonthUldegdel'] as num?)?.toDouble() ?? 0.0);
             final actualTxCount = enrichedMonthTxs.where((t) => t['ekhniiUldegdelEsekh'] != true).length;
 
             return GestureDetector(
@@ -552,17 +560,20 @@ class _TransactionsTab extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    if (monthNetTotal != 0) ...[
-                      Text(
-                        AppFormatters.currency(monthNetTotal),
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                          color: monthNetTotal < 0 ? AppColors.success : AppColors.error,
-                        ),
+                    // Тухайн сард үлдэгдэлгүй бол хоосон биш «0.00» гэж харуулна.
+                    Text(
+                      AppFormatters.currency(monthNetTotal),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: monthNetTotal < 0
+                            ? AppColors.success
+                            : monthNetTotal > 0
+                                ? AppColors.error
+                                : context.appTextTertiary,
                       ),
-                      const SizedBox(width: 4),
-                    ],
+                    ),
+                    const SizedBox(width: 4),
                     Icon(Icons.chevron_right_rounded, size: 20, color: context.appTextTertiary),
                   ],
                 ),
@@ -646,8 +657,8 @@ class _MonthTransactionsSheet extends StatelessWidget {
                 // Per-month balance (resets to 0 each month — see _perMonthUldegdel).
                 // Can go negative (e.g. a discount before any charge offsets it) —
                 // that's shown as-is, not floored to 0.
-                final uldegdel = (tx['_perMonthUldegdel'] as num?)?.toDouble()
-                    ?? (tx['uldegdel'] as num?)?.toDouble() ?? 0.0;
+                final uldegdel = _bukhulukh((tx['_perMonthUldegdel'] as num?)?.toDouble()
+                    ?? (tx['uldegdel'] as num?)?.toDouble() ?? 0.0);
                 final ekhniiUldegdel = (tx['ekhniiUldegdel'] as num?)?.toDouble() ?? 0.0;
                 final tailbar = tx['tailbar']?.toString() ?? '';
                 final dateStr = tx['ognoo']?.toString() ?? tx['guilgeeKhiisenOgnoo']?.toString();
@@ -811,11 +822,15 @@ class _MonthTransactionsSheet extends StatelessWidget {
                                 fontSize: 11,
                               ),
                             ),
-                          if (uldegdel != 0)
-                            Text(
+                          // Үлдэгдэлгүй (0) үед ч «0.00» харагдана.
+                          Text(
                               'Үлд: ${AppFormatters.currency(uldegdel)}',
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: uldegdel < 0 ? AppColors.success : AppColors.error,
+                                color: uldegdel < 0
+                                    ? AppColors.success
+                                    : uldegdel > 0
+                                        ? AppColors.error
+                                        : context.appTextTertiary,
                                 fontSize: 11,
                               ),
                             ),
@@ -2120,3 +2135,6 @@ class _Row extends StatelessWidget {
     );
   }
 }
+
+/// Мөнгөн дүнг 2 орон хүртэл бөөрөнхийлнө; −0.004 г.м. нь 0.0 (сөрөг тэмдэггүй).
+double _bukhulukh(double v) => (v * 100).round() / 100;

@@ -4,6 +4,7 @@ import 'core/theme/app_theme.dart';
 import 'presentation/providers/theme_provider.dart';
 import 'presentation/widgets/common/erkh_khamgaalagch.dart';
 import 'presentation/widgets/common/inactivity_detector.dart';
+import 'presentation/widgets/common/khuvilbar_shalgagch.dart';
 import 'routing/app_router.dart';
 import 'core/utils/responsive.dart';
 
@@ -26,8 +27,10 @@ class TureesApp extends ConsumerWidget {
         return MediaQuery(
           data: MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
           child: ChiglelKhyanagch(
-            child: ErkhKhamgaalagch(
-              child: InactivityDetector(child: child!),
+            child: KhuvilbarShalgagch(
+              child: ErkhKhamgaalagch(
+                child: InactivityDetector(child: child!),
+              ),
             ),
           ),
         );

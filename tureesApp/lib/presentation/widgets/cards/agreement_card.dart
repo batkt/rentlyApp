@@ -97,9 +97,9 @@ class AgreementCard extends StatelessWidget {
                           children: [
                             Icon(Icons.receipt_long_rounded, size: 13, color: context.appTextTertiary),
                             const SizedBox(width: 4),
-                            Text(
-                              agreement.gereeniiDugaar,
-                              style: theme.textTheme.bodySmall,
+                            _GereeniiDugaar(
+                              dugaar: agreement.gereeniiDugaar,
+                              tur: agreement.turGereeEsekh,
                             ),
                             if (agreement.talbainDugaar != null) ...[
                               const SizedBox(width: 8),
@@ -246,6 +246,38 @@ class AgreementCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Гэрээний дугаар — арын өнгөөр нь үндсэн (цэнхэр) / түр (нил ягаан)
+/// гэрээг ялгана. Вэбийн гэрээний жагсаалттай ижил өнгө: blue-500, purple-600.
+class _GereeniiDugaar extends StatelessWidget {
+  final String dugaar;
+  final bool tur;
+
+  const _GereeniiDugaar({required this.dugaar, required this.tur});
+
+  static const _turColor = Color(0xFF9333EA);
+  static const _undsenColor = Color(0xFF3B82F6);
+
+  @override
+  Widget build(BuildContext context) {
+    final color = tur ? _turColor : _undsenColor;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(4),
+        border: Border(left: BorderSide(color: color, width: 2)),
+      ),
+      child: Text(
+        dugaar,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
       ),
     );
   }

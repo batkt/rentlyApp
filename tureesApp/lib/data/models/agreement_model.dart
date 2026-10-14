@@ -26,6 +26,10 @@ class AgreementModel {
   /// callback back to this contract.
   final String? dans;
 
+  /// Түр гэрээ эсэх (гэрээний загварын `turGereeEsekh`). Түр гэрээний
+  /// [khugatsaa] нь сараар биш хоногоор хадгалагддаг.
+  final bool turGereeEsekh;
+
   /// Алданги. [uldegdel] дотор аль хэдийн нэмэгдсэн байдаг
   /// (getNiitUldegdel) тул зөвхөн задаргаа харуулахад ашиглана — нийт дүн
   /// дээр дахин нэмж БОЛОХГҮЙ.
@@ -65,6 +69,7 @@ class AgreementModel {
     this.baritsaaniiUldegdel = 0,
     this.zurguud = const [],
     this.dans,
+    this.turGereeEsekh = false,
   });
 
   /// End of the rental period. Contracts that only carry a duration (сар) get
@@ -75,8 +80,16 @@ class AgreementModel {
     if (explicit != null) return explicit;
     final start = DateTime.tryParse(gereeniiOgnoo ?? '');
     if (start == null || khugatsaa == null) return null;
+    if (turGereeEsekh) return start.add(Duration(days: khugatsaa!));
     return DateTime(start.year, start.month + khugatsaa!, start.day);
   }
+
+  String get turulNer => turGereeEsekh ? 'Түр гэрээ' : 'Үндсэн гэрээ';
+
+  /// «12 сар» / «15 хоног».
+  String? get khugatsaaText => khugatsaa == null
+      ? null
+      : '$khugatsaa ${turGereeEsekh ? 'хоног' : 'сар'}';
 
   /// Барьцаанаас үлдэж төлөх дүн. Гэрээнд барьцаа тохироогүй эсвэл бүрэн
   /// төлөгдсөн бол 0.
@@ -126,6 +139,7 @@ class AgreementModel {
       duusakhOgnoo: duusakhOgnoo,
       zurguud: zurguud ?? this.zurguud,
       dans: dans,
+      turGereeEsekh: turGereeEsekh,
     );
   }
 
@@ -159,6 +173,7 @@ class AgreementModel {
       duusakhOgnoo: json['duusakhOgnoo']?.toString(),
       zurguud: (json['zurguud'] as List?) ?? [],
       dans: json['dans']?.toString(),
+      turGereeEsekh: json['turGereeEsekh'] == true,
     );
   }
 }

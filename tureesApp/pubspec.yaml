@@ -1,7 +1,11 @@
 name: Rently
 description: Turees - Property Rental Management App
 publish_to: "none"
+<<<<<<< HEAD
 version: 1.21.1+22
+=======
+version: 1.21.2+1
+>>>>>>> d7d4d1aefc4a8550328a8f468768cc1beaf41877
 
 environment:
   sdk: ^3.10.7

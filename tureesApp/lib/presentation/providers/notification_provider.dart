@@ -250,6 +250,7 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
     final barilga = _ref.read(selectedBarilgiinIdProvider);
     bool unshikh(NotificationModel n) =>
         n.isUnread &&
+        !n.shaardlagaEsekh &&
         n.category == NotifCategory.medegdel &&
         n.barilgiinKhuu(barilga);
     final unreadMedegdel = state.notifications.where(unshikh).toList();
@@ -343,8 +344,44 @@ class DuudlagaState {
 class DuudlagaNotifier extends StateNotifier<DuudlagaState> {
   final NotificationRepository _repo;
   final Ref _ref;
+  final SocketService _socket;
+  final List<String> _userIdnuud;
 
-  DuudlagaNotifier(this._repo, this._ref) : super(const DuudlagaState());
+  /// Менежер дуудлагын төлөв (дууссан/цуцалсан) солиход сервер
+  /// `duudlagaTuluv<khariltsagchiinId>` цацна — жагсаалтыг дахин
+  /// ачаалахгүйгээр шууд шинэчилнэ.
+  DuudlagaNotifier(this._repo, this._ref, this._socket, this._userIdnuud)
+      : super(const DuudlagaState()) {
+    for (final id in _userIdnuud) {
+      _socket.on('duudlagaTuluv$id', _onTuluvSoligdson);
+    }
+  }
+
+  void _onTuluvSoligdson(dynamic data) {
+    if (data is! Map || !mounted) return;
+    final id = data['_id']?.toString();
+    if (id == null || id.isEmpty) return;
+    final baigaa = state.duudlagaList.any((d) => d['_id']?.toString() == id);
+    if (!baigaa) {
+      load();
+      return;
+    }
+    state = state.copyWith(
+      duudlagaList: state.duudlagaList
+          .map((d) => d['_id']?.toString() == id
+              ? {...d, ...Map<String, dynamic>.from(data)}
+              : d)
+          .toList(),
+    );
+  }
+
+  @override
+  void dispose() {
+    for (final id in _userIdnuud) {
+      _socket.off('duudlagaTuluv$id', _onTuluvSoligdson);
+    }
+    super.dispose();
+  }
 
   Future<void> load() async {
     final user = _ref.read(currentUserProvider);
@@ -385,5 +422,11 @@ class DuudlagaNotifier extends StateNotifier<DuudlagaState> {
 }
 
 final duudlagaProvider = StateNotifierProvider<DuudlagaNotifier, DuudlagaState>((ref) {
-  return DuudlagaNotifier(ref.read(notificationRepositoryProvider), ref);
+  final user = ref.watch(currentUserProvider);
+  return DuudlagaNotifier(
+    ref.read(notificationRepositoryProvider),
+    ref,
+    ref.read(socketServiceProvider),
+    user?.medegdliinIdnuud ?? const [],
+  );
 });

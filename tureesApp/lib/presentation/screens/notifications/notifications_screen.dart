@@ -210,10 +210,11 @@ class _NotificationsTab extends ConsumerWidget {
         itemBuilder: (context, index) => NotificationCard(
           notification: items[index],
           onTap: () {
-            if (items[index].isUnread) {
+            // Шаардлагыг «Хүлээн авах» дарахад л уншсан болгоно.
+            if (items[index].isUnread && !items[index].shaardlagaEsekh) {
               ref.read(notificationsProvider.notifier).markRead(items[index].id);
             }
-            _medegdelKharuulya(context, items[index]);
+            _medegdelKharuulya(context, ref, items[index]);
           },
         ),
       ),
@@ -223,8 +224,14 @@ class _NotificationsTab extends ConsumerWidget {
 
 /// Жагсаалтад мэдэгдэл 2 мөрөөр тасардаг тул дарахад бүтэн бичвэрийг
 /// томоор нь жижиг цонхонд харуулна.
-void _medegdelKharuulya(BuildContext context, NotificationModel medegdel) {
+void _medegdelKharuulya(
+  BuildContext context,
+  WidgetRef ref,
+  NotificationModel medegdel,
+) {
   final gereeniiId = medegdel.gereeniiId;
+  // Шаардлагыг түрээслэгч хүлээн авна (Санал хүсэлт таб дээрхтэй ижил).
+  final khuleenAvakh = medegdel.shaardlagaEsekh && medegdel.tuluv != 1;
   final nekhemjlekhtei = medegdel.turul == 'nekhemjlekh' &&
       gereeniiId != null &&
       gereeniiId.isNotEmpty;
@@ -232,15 +239,33 @@ void _medegdelKharuulya(BuildContext context, NotificationModel medegdel) {
     context: context,
     builder: (dialogContext) {
       final theme = Theme.of(dialogContext);
+      final zuragtai = medegdel.zurguud.isNotEmpty;
       return AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          medegdel.title,
-          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+        // Зурагтай мэдэгдэл жижиг цонхонд багтахгүй байсан тул дэлгэцийн
+        // бараг бүх өргөн, өндрийг ашиглана.
+        insetPadding: zuragtai
+            ? const EdgeInsets.symmetric(horizontal: 12, vertical: 24)
+            : const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (medegdel.shaardlagaEsekh) ...[
+              ShaardlagiinShoshgo(khuleenAvsan: medegdel.tuluv == 1),
+              const SizedBox(height: 8),
+            ],
+            Text(
+              medegdel.title,
+              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ],
         ),
         content: ConstrainedBox(
           constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(dialogContext).size.height * 0.5,
+            maxHeight: MediaQuery.of(dialogContext).size.height *
+                (zuragtai ? 0.75 : 0.5),
+            minWidth: zuragtai ? MediaQuery.of(dialogContext).size.width : 0,
           ),
           child: SingleChildScrollView(
             child: Column(
@@ -256,7 +281,7 @@ void _medegdelKharuulya(BuildContext context, NotificationModel medegdel) {
                   ZurgiinJagsaalt(
                     zurguud: medegdel.zurguud,
                     baiguullagiinId: medegdel.baiguullagiinId ?? '',
-                    khemjee: 80,
+                    butenUrgun: true,
                   ),
                 ],
                 if (medegdel.createdAt != null) ...[
@@ -284,6 +309,25 @@ void _medegdelKharuulya(BuildContext context, NotificationModel medegdel) {
             onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Хаах'),
           ),
+          if (khuleenAvakh)
+            FilledButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                try {
+                  await ref
+                      .read(notificationsProvider.notifier)
+                      .khuleenAvya(medegdel.id);
+                  if (!context.mounted) return;
+                  showAppSnackBar(context, 'Шаардлагыг хүлээн авлаа',
+                      turul: SnackTurul.amjilt);
+                } catch (_) {
+                  if (!context.mounted) return;
+                  showAppSnackBar(context, 'Хүлээн авахад алдаа гарлаа',
+                      turul: SnackTurul.aldaa);
+                }
+              },
+              child: const Text('Хүлээн авах'),
+            ),
         ],
       );
     },
@@ -303,7 +347,7 @@ class _RequestsTabState extends ConsumerState<_RequestsTab> {
   // null = Бүгд (all)
   String? _turulFilter;
 
-  static const _turulOptions = ['Санал хүсэлт', 'Шаардлага', 'Гомдол'];
+  static const _turulOptions = ['Санал хүсэлт', 'Гомдол'];
 
   @override
   Widget build(BuildContext context) {
@@ -608,7 +652,6 @@ class _RequestFormSheet extends ConsumerStatefulWidget {
 
 class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
   final _msgCtrl = TextEditingController();
-  final _duudlagaTitleCtrl = TextEditingController();
   late String _turul = widget.initialTurul == 'shaardlaga' ? 'sanal' : widget.initialTurul;
   String _duudlagaSubTurul = '';
   bool _isDropdownOpen = false;
@@ -641,7 +684,6 @@ class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
   @override
   void dispose() {
     _msgCtrl.dispose();
-    _duudlagaTitleCtrl.dispose();
     super.dispose();
   }
 
@@ -652,8 +694,8 @@ class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
       showAppSnackBar(context, 'Тайлбар оруулна уу', turul: SnackTurul.sanuulga);
       return;
     }
-    if (_isDuudlaga && (_duudlagaSubTurul.isEmpty || _duudlagaTitleCtrl.text.trim().isEmpty)) {
-      showAppSnackBar(context, 'Бүх талбарыг бөглөнө үү', turul: SnackTurul.sanuulga);
+    if (_isDuudlaga && _duudlagaSubTurul.isEmpty) {
+      showAppSnackBar(context, 'Дуудлагын төрлөө сонгоно уу', turul: SnackTurul.sanuulga);
       return;
     }
     setState(() => _loading = true);
@@ -663,7 +705,9 @@ class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
         final user = ref.read(currentUserProvider);
         await ref.read(duudlagaProvider.notifier).submit(
               zurguud: zurguud,
-              title: _duudlagaTitleCtrl.text.trim(),
+              // Гарчиг асуухаа больсон — вэб дуудлагыг гарчгаар нь
+              // харуулдаг тул сонгосон төрлийг гарчиг болгоно.
+              title: _duudlagaSubTurul,
               message: _msgCtrl.text.trim(),
               duudlagiinTurul: _duudlagaSubTurul,
               khariltsagchiinUtas: user?.primaryPhone ?? '',
@@ -743,19 +787,6 @@ class _RequestFormSheetState extends ConsumerState<_RequestFormSheet> {
             const SizedBox(height: 16),
             if (_isDuudlaga) ...[
               _buildDuudlagaTypeDropdown(context),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _duudlagaTitleCtrl,
-                maxLength: 40,
-                textCapitalization: TextCapitalization.sentences,
-                textInputAction: TextInputAction.next,
-                onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  labelText: 'Гарчиг',
-                  hintText: 'Дуудлагын гарчиг...',
-                  counterText: '${_duudlagaTitleCtrl.text.length}/40',
-                ),
-              ),
               const SizedBox(height: 12),
             ],
             TextField(

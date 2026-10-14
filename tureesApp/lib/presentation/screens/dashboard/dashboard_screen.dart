@@ -34,6 +34,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         if (!_songogdson.remove(a.id)) _songogdson.add(a.id);
       });
 
+  /// Өөр хуудас руу шилжихэд олон гэрээний сонголтыг цэвэрлэнэ («Төлөх»
+  /// товчоор олноор төлөх үед л сонголт хадгалагдана).
+  void _ondooKhuudasRuu(String zam, {Object? extra}) {
+    if (_songogdson.isNotEmpty) setState(_songogdson.clear);
+    context.push(zam, extra: extra);
+  }
+
   void _olonTulukh(List<AgreementModel> songogdson) {
     if (songogdson.length == 1) {
       context.push('/payment', extra: songogdson.first);
@@ -63,6 +70,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       }
     });
     ref.listen<int>(paymentClearSignalProvider, (previous, next) {
+      if (previous != next && _songogdson.isNotEmpty) {
+        setState(_songogdson.clear);
+      }
+    });
+    // Өөр таб руу шилжихэд сонголт хадгалагдахгүй.
+    ref.listen<int>(gereeSongoltTseverlekhProvider, (previous, next) {
       if (previous != next && _songogdson.isNotEmpty) {
         setState(_songogdson.clear);
       }
@@ -492,7 +505,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             tooltip: 'Бүх нэхэмжлэх',
             icon: const Icon(Icons.receipt_long_rounded, size: 20, color: AppColors.primary),
             visualDensity: VisualDensity.compact,
-            onPressed: () => context.push('/invoices'),
+            onPressed: () => _ondooKhuudasRuu('/invoices'),
           ),
           const Spacer(),
           _FilterChip(label: 'Идэвхтэй', value: 1, current: currentFilter),
@@ -538,18 +551,36 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         final songokhIdevkhtei =
             agreements.where(_songokhBoloh).length >= 2;
 
+        final songokhBolokh = filtered.where(_songokhBoloh).toList();
+        final bugdSongogdson = songokhBolokh.isNotEmpty &&
+            songokhBolokh.every((a) => _songogdson.contains(a.id));
+        final tolgoitoi = songokhIdevkhtei && songokhBolokh.length >= 2;
+
         return SliverPadding(
           padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 32),
           sliver: SliverList.separated(
-            itemCount: filtered.length,
+            itemCount: filtered.length + (tolgoitoi ? 1 : 0),
             separatorBuilder: (_, __) => const SizedBox(height: 10),
             itemBuilder: (context, index) {
-              final agreement = filtered[index];
+              if (tolgoitoi && index == 0) {
+                return _BugdiigSongokh(
+                  songogdson: bugdSongogdson,
+                  too: songokhBolokh.length,
+                  onChanged: () => setState(() {
+                    if (bugdSongogdson) {
+                      _songogdson.removeAll(songokhBolokh.map((a) => a.id));
+                    } else {
+                      _songogdson.addAll(songokhBolokh.map((a) => a.id));
+                    }
+                  }),
+                );
+              }
+              final agreement = filtered[index - (tolgoitoi ? 1 : 0)];
               return AgreementCard(
                 agreement: agreement,
-                onTap: () => context.push('/agreements/${agreement.id}', extra: agreement),
+                onTap: () => _ondooKhuudasRuu('/agreements/${agreement.id}', extra: agreement),
                 onPay: agreement.isActive
-                    ? () => context.push('/payment', extra: agreement)
+                    ? () => _ondooKhuudasRuu('/payment', extra: agreement)
                     : null,
                 onSongokh: songokhIdevkhtei && _songokhBoloh(agreement)
                     ? () => _songokh(agreement)
@@ -560,6 +591,44 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Төлөх үлдэгдэлтэй бүх гэрээг нэг дор сонгох / болих.
+class _BugdiigSongokh extends StatelessWidget {
+  final bool songogdson;
+  final int too;
+  final VoidCallback onChanged;
+
+  const _BugdiigSongokh({
+    required this.songogdson,
+    required this.too,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onChanged,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          children: [
+            Checkbox(
+              value: songogdson,
+              onChanged: (_) => onChanged(),
+              activeColor: AppColors.primary,
+              visualDensity: VisualDensity.compact,
+            ),
+            Text(
+              'Бүгдийг сонгох ($too)',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

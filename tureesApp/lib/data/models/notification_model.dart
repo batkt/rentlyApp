@@ -75,11 +75,23 @@ class NotificationModel {
 
   bool get isUnread => tuluv == 0;
 
+  /// Менежерээс ирсэн шаардлага. Түрээслэгч «Хүлээн авах» дарж баталгаажуулна.
+  /// Уншсан болгох (`sonorduulgaKharlaa`) нь сервер дээр мөн `tuluv: 1`
+  /// болгодог тул шаардлагыг зөвхөн хүлээн авахад л уншсан болгоно —
+  /// эс бөгөөс нээж харсан шаардлага хүлээн авсан мэт харагдаж, менежерт
+  /// мэдэгдэл очихгүй.
+  bool get shaardlagaEsekh =>
+      turul == 'shaardlaga' || duudlagiinTurul == 'shaardlaga';
+
   static const _requestTypes = {'sanal', 'sanalKhuselt', 'shaardlaga', 'gomdol'};
 
   /// Which tab this record belongs to.
   NotifCategory get category {
-    if (turul == 'medegdel' || turul == 'sonorduulga') {
+    // Шаардлага менежерээс ирдэг мэдэгдэл тул Мэдэгдэл таб дээр харагдана.
+    if (turul == 'medegdel' ||
+        turul == 'sonorduulga' ||
+        turul == 'shaardlaga' ||
+        duudlagiinTurul == 'shaardlaga') {
       return NotifCategory.medegdel;
     }
     if (_requestTypes.contains(turul)) return NotifCategory.request;
