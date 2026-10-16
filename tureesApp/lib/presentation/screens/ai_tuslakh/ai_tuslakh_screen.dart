@@ -251,6 +251,25 @@ class _Messej {
   /// 1 = 👍, -1 = 👎, null = үнэлээгүй.
   int? unelgee;
   _Messej(this.role, this.content);
+
+  /// Аппаар хийх боломжгүй үйлдэлд AI хариултын төгсгөлд бичдэг тэмдэг
+  /// (tureesBack aiTuslakhRoute) — «Менежертэй чатлах» товч болгоно.
+  static const menejerTemdeg = '[[MENEJER]]';
+
+  bool get menejerTemdegtei => role == 'assistant' && content.contains(menejerTemdeg);
+
+  /// Тэмдэггүй харуулах текст. Stream-ээр ирж байхад төгсгөлд тасарсан
+  /// хэсэг («[[MEN») гарч ирэхгүйн тулд түүнийг ч хасна.
+  String get kharuulakhText {
+    var t = content.replaceAll(menejerTemdeg, '');
+    for (var i = menejerTemdeg.length - 1; i > 0; i--) {
+      if (t.endsWith(menejerTemdeg.substring(0, i))) {
+        t = t.substring(0, t.length - i);
+        break;
+      }
+    }
+    return t.trimRight();
+  }
 }
 
 /// AI туслахын яриа — Scaffold-гүй, нэгдсэн чатын дэлгэц дотор суулгана.
@@ -624,18 +643,39 @@ class _AiTuslakhChatState extends ConsumerState<_AiTuslakhChat> {
         !m.tasalsan &&
         m.content.trim().isNotEmpty &&
         !(_khuleej && suuliin);
+    // Аппаар хийх боломжгүй үйлдэл — «Менежер» таб руу шилжүүлэх товч.
+    final menejerTovch = widget.onOperator != null &&
+        m.menejerTemdegtei &&
+        !m.aldaa &&
+        !(_khuleej && suuliin);
     final bubble = _buildBubble(
       m,
       user: user,
       khoosonKhariu: khoosonKhariu,
-      dooshZai: unelgeeKharuulakh ? 0 : 10,
+      dooshZai: unelgeeKharuulakh || menejerTovch ? 0 : 10,
     );
-    if (!unelgeeKharuulakh) return bubble;
+    if (!unelgeeKharuulakh && !menejerTovch) return bubble;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         bubble,
-        _UnelgeeMur(
+        if (menejerTovch)
+          Padding(
+            padding: EdgeInsets.only(top: 6, bottom: unelgeeKharuulakh ? 0 : 10),
+            child: OutlinedButton.icon(
+              onPressed: widget.onOperator,
+              icon: const Icon(Icons.support_agent_rounded, size: 18),
+              label: const Text('Менежертэй чатлах'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ),
+        if (unelgeeKharuulakh)
+          _UnelgeeMur(
           key: ValueKey('unelgee_${m.logId}'),
           unelgee: m.unelgee,
           onUnelgee: (utga, [tailbar]) => _unelgeeIlgeekh(m, utga, tailbar),
@@ -679,7 +719,7 @@ class _AiTuslakhChatState extends ConsumerState<_AiTuslakhChat> {
                       style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4),
                     )
                   : _MarkdownLite(
-                      text: m.content,
+                      text: m.kharuulakhText,
                       color: m.aldaa ? AppColors.error : context.appTextPrimary,
                     ),
         ),
